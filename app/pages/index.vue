@@ -161,7 +161,7 @@ const { getCities, searchCities } = useCity()
 const { user } = useAuth()
 const { detectCity, detectedCity, detecting, gpsError } = useGPS()
 
-const { data: cities, pending, error } = await useAsyncData('cities', getCities)
+const { data: cities, pending, error } = await useAsyncData('cities', getCities, { lazy: true })
 
 const searchQuery = ref('')
 const searchResults = ref<any[]>([])

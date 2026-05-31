@@ -30,7 +30,7 @@
 
 <script setup lang="ts">
 const { getCities } = useCity()
-const { data: cities, pending, error } = await useAsyncData('all-cities', getCities)
+const { data: cities, pending, error } = await useAsyncData('all-cities', getCities, { lazy: true })
 
 onMounted(() => {
   const obs = new IntersectionObserver(

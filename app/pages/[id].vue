@@ -147,7 +147,8 @@ const { getCity } = useCity()
 
 const { data: city, pending, error } = await useAsyncData(
   `city-${route.params.id}`,
-  () => getCity(route.params.id as string)
+  () => getCity(route.params.id as string),
+  { lazy: true }
 )
 
 useSeoMeta({

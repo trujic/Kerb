@@ -47,6 +47,7 @@ export default defineNuxtConfig({
     preset: process.env.NITRO_PRESET || undefined,
     prerender: {
       routes: ['/', '/cities', '/contribute', '/roadmap'],
+      failOnError: false,
     },
   },
 })
