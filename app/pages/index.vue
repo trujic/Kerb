@@ -5,20 +5,20 @@
       <div class="container">
         <!-- Map -->
         <ClientOnly>
-          <LocationMap :lat="coords!.lat" :lng="coords!.lng" :accuracy="coords!.accuracy" :height="260" class="gps-hero-map" />
+          <LocationMap v-if="coords" :lat="coords.lat" :lng="coords.lng" :accuracy="coords.accuracy" :height="260" class="gps-hero-map" />
         </ClientOnly>
 
         <!-- City badge -->
         <div class="gps-city-bar">
           <div class="gps-city-info">
-            <span class="gps-city-flag">{{ detectedCity!.flag }}</span>
+            <span class="gps-city-flag">{{ detectedCity?.flag }}</span>
             <div>
-              <div class="gps-city-name">{{ detectedCity!.name }}</div>
-              <div class="gps-city-country">{{ detectedCity!.country }}</div>
+              <div class="gps-city-name">{{ detectedCity?.name }}</div>
+              <div class="gps-city-country">{{ detectedCity?.country }}</div>
             </div>
-            <span v-if="cityDetail.verified" class="gps-verified">✓ Verified</span>
+            <span v-if="cityDetail?.verified" class="gps-verified">✓ Verified</span>
           </div>
-          <NuxtLink :to="`/${detectedCity!.id}`" class="gps-full-link">Full guide →</NuxtLink>
+          <NuxtLink :to="`/${detectedCity?.id}`" class="gps-full-link">Full guide →</NuxtLink>
         </div>
 
         <!-- Zone cards -->
@@ -252,9 +252,10 @@ watch(gpsMode, async (active) => {
 
 const openZoneSMS = (zone: any) => {
   if (!zone.sms_number) {
-    navigateTo(`/${detectedCity.value!.id}`)
+    navigateTo(`/${detectedCity.value?.id}`)
     return
   }
+  if (!import.meta.client) return
   const body = encodeURIComponent(defaultPlate.value ?? '')
   window.location.href = `sms:${zone.sms_number}?body=${body}`
 }
@@ -319,7 +320,7 @@ const steps = [
 
 onMounted(() => {
   // user is set async by the Supabase plugin — watch so we catch both immediate and delayed init
-  const stopWatch = watch(user, (u) => { if (u) { detectCity(); stopWatch() } }, { immediate: true })
+  let stopWatch = watch(user, (u) => { if (u) { detectCity(); stopWatch() } }, { immediate: true })
 
   const obs = new IntersectionObserver(
     (entries) => {
