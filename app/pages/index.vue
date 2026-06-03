@@ -29,7 +29,7 @@
               v-for="zone in cityDetail.zones"
               :key="zone.id"
               class="zone-pay-card"
-              :class="{ 'zpc-sms': zone.sms_code && cityDetail.sms_number }"
+              :class="{ 'zpc-sms': zone.sms_number }"
               @click="openZoneSMS(zone)"
             >
               <div class="zpc-stripe" :style="{ background: zone.color }" />
@@ -43,8 +43,11 @@
                   <div class="zpc-methods">
                     <span v-for="pm in cityDetail.payment_methods" :key="pm.id" class="tag">{{ pm.label }}</span>
                   </div>
-                  <div v-if="zone.sms_code && cityDetail.sms_number" class="zpc-sms-action">
-                    <span class="zpc-plate">{{ defaultPlate ?? 'No plate saved' }}</span>
+                  <div v-if="zone.sms_number" class="zpc-sms-action">
+                    <div class="zpc-sms-left">
+                      <span class="zpc-to">To {{ zone.sms_number }}</span>
+                      <span class="zpc-plate">{{ defaultPlate ?? 'Add plate in profile' }}</span>
+                    </div>
                     <span class="zpc-sms-btn">Pay via SMS →</span>
                   </div>
                 </div>
@@ -237,14 +240,12 @@ watch(gpsMode, async (active) => {
 }, { immediate: true })
 
 const openZoneSMS = (zone: any) => {
-  const number = cityDetail.value?.sms_number
-  if (!number || !zone.sms_code) {
+  if (!zone.sms_number) {
     navigateTo(`/${detectedCity.value!.id}`)
     return
   }
-  const parts = [zone.sms_code, defaultPlate.value].filter(Boolean)
-  const body = encodeURIComponent(parts.join(' '))
-  window.location.href = `sms:${number}?body=${body}`
+  const body = encodeURIComponent(defaultPlate.value ?? '')
+  window.location.href = `sms:${zone.sms_number}?body=${body}`
 }
 
 const cityDetail = ref<any>(null)
@@ -747,14 +748,25 @@ h2 {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   padding-top: 8px;
   border-top: 1px solid var(--border);
 }
+.zpc-sms-left {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.zpc-to {
+  font-size: 11px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+}
 .zpc-plate {
   font-family: var(--font-mono);
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text2);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
   letter-spacing: 0.5px;
 }
 .zpc-sms-btn {
