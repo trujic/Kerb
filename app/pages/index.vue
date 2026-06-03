@@ -229,7 +229,18 @@ const { getCities, searchCities, getCity } = useCity()
 const { user, getProfile } = useAuth()
 const { detectCity, detectedCity, coords, detecting, gpsError } = useGPS()
 
+const cityDetail = ref<any>(null)
+const loadingCityDetail = ref(false)
+const gpsMode = computed(() => !!(user.value && detectedCity.value && cityDetail.value))
 const defaultPlate = ref<string | null>(null)
+
+watch(detectedCity, async (city) => {
+  if (!city) return
+  loadingCityDetail.value = true
+  try { cityDetail.value = await getCity(city.id) }
+  finally { loadingCityDetail.value = false }
+})
+
 watch(gpsMode, async (active) => {
   if (!active || defaultPlate.value) return
   try {
@@ -247,18 +258,6 @@ const openZoneSMS = (zone: any) => {
   const body = encodeURIComponent(defaultPlate.value ?? '')
   window.location.href = `sms:${zone.sms_number}?body=${body}`
 }
-
-const cityDetail = ref<any>(null)
-const loadingCityDetail = ref(false)
-
-watch(detectedCity, async (city) => {
-  if (!city) return
-  loadingCityDetail.value = true
-  try { cityDetail.value = await getCity(city.id) }
-  finally { loadingCityDetail.value = false }
-})
-
-const gpsMode = computed(() => !!(user.value && detectedCity.value && cityDetail.value))
 
 const { data: cities, pending, error } = await useAsyncData('cities', getCities, { lazy: true })
 
