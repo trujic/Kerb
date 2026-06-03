@@ -1,7 +1,56 @@
 <template>
   <div>
-    <!-- ── HERO ── -->
-    <section class="hero">
+    <!-- ── GPS DASHBOARD (logged-in + city detected) ── -->
+    <section v-if="gpsMode" class="hero-gps">
+      <div class="container">
+        <!-- Map -->
+        <ClientOnly>
+          <LocationMap :lat="coords!.lat" :lng="coords!.lng" :accuracy="coords!.accuracy" :height="260" class="gps-hero-map" />
+        </ClientOnly>
+
+        <!-- City badge -->
+        <div class="gps-city-bar">
+          <div class="gps-city-info">
+            <span class="gps-city-flag">{{ detectedCity!.flag }}</span>
+            <div>
+              <div class="gps-city-name">{{ detectedCity!.name }}</div>
+              <div class="gps-city-country">{{ detectedCity!.country }}</div>
+            </div>
+            <span v-if="cityDetail.verified" class="gps-verified">✓ Verified</span>
+          </div>
+          <NuxtLink :to="`/${detectedCity!.id}`" class="gps-full-link">Full guide →</NuxtLink>
+        </div>
+
+        <!-- Zone cards -->
+        <div class="gps-zones">
+          <p class="section-label">Parking zones</p>
+          <div class="zone-pay-list">
+            <div v-for="zone in cityDetail.zones" :key="zone.id" class="zone-pay-card">
+              <div class="zpc-stripe" :style="{ background: zone.color }" />
+              <div class="zpc-body">
+                <div class="zpc-top">
+                  <span class="zpc-name">{{ zone.name }}</span>
+                  <span class="zpc-price">{{ zone.price }}</span>
+                </div>
+                <p class="zpc-rules">{{ zone.rules }}</p>
+                <div class="zpc-methods">
+                  <span v-for="pm in cityDetail.payment_methods" :key="pm.id" class="tag">{{ pm.label }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Fine warning -->
+        <div v-if="cityDetail.fine" class="gps-fine">
+          <span class="gps-fine-label">Fine if unpaid</span>
+          <span class="gps-fine-amount">{{ cityDetail.fine }}</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── HERO (default, non-GPS) ── -->
+    <section v-else class="hero">
       <div class="container">
         <p class="section-label fade-up">Street parking · Europe</p>
         <h1 class="fade-up-2">
@@ -13,16 +62,10 @@
           Always confirm with local signage before you park.
         </p>
 
-        <!-- GPS detected city -->
-        <div v-if="detectedCity" class="gps-result fade-up-3">
-          <div class="gps-result-header">
-            <span class="gps-icon">📍</span>
-            <span>You appear to be in <strong>{{ detectedCity.flag }} {{ detectedCity.name }}</strong></span>
-            <NuxtLink :to="`/${detectedCity.id}`" class="gps-link">View parking rules →</NuxtLink>
-          </div>
-          <ClientOnly>
-            <LocationMap v-if="coords" :lat="coords.lat" :lng="coords.lng" :accuracy="coords.accuracy" />
-          </ClientOnly>
+        <!-- GPS detecting state -->
+        <div v-if="detecting" class="gps-detecting fade-up-3">
+          <span class="gps-icon">📍</span>
+          <span>Detecting your location…</span>
         </div>
         <div v-else-if="gpsError" class="gps-error fade-up-3">{{ gpsError }}</div>
 
@@ -120,6 +163,8 @@
       </div>
     </section>
 
+    <!-- ── HOW IT WORKS + CTA (hidden in GPS mode) ── -->
+    <template v-if="!gpsMode">
     <!-- ── HOW IT WORKS ── -->
     <section id="how" class="section-how">
       <div class="container">
@@ -160,13 +205,26 @@
         </div>
       </div>
     </section>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
-const { getCities, searchCities } = useCity()
+const { getCities, searchCities, getCity } = useCity()
 const { user } = useAuth()
 const { detectCity, detectedCity, coords, detecting, gpsError } = useGPS()
+
+const cityDetail = ref<any>(null)
+const loadingCityDetail = ref(false)
+
+watch(detectedCity, async (city) => {
+  if (!city) return
+  loadingCityDetail.value = true
+  try { cityDetail.value = await getCity(city.id) }
+  finally { loadingCityDetail.value = false }
+})
+
+const gpsMode = computed(() => !!(user.value && detectedCity.value && cityDetail.value))
 
 const { data: cities, pending, error } = await useAsyncData('cities', getCities, { lazy: true })
 
@@ -535,5 +593,150 @@ h2 {
 @media (max-width: 600px) {
   .cities-grid { grid-template-columns: 1fr; }
   .hero { padding: 100px 24px 48px; }
+}
+
+/* ── GPS DASHBOARD ── */
+.hero-gps {
+  padding: 80px 0 40px;
+  border-bottom: 1px solid var(--border);
+}
+.gps-hero-map {
+  width: 100%;
+  height: 260px;
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  margin-bottom: 0;
+}
+/* City bar below map */
+.gps-city-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 0 20px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 28px;
+}
+.gps-city-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.gps-city-flag { font-size: 28px; line-height: 1; }
+.gps-city-name {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  color: var(--text);
+}
+.gps-city-country {
+  font-size: 11px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.gps-verified {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  color: var(--green);
+  background: var(--green-bg);
+  border: 1px solid var(--green-border);
+  padding: 3px 8px;
+  border-radius: 20px;
+}
+.gps-full-link {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--blue);
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: color 150ms var(--ease-out);
+}
+.gps-full-link:hover { color: var(--blue-hover); }
+
+/* Zone pay cards */
+.gps-zones { margin-bottom: 20px; }
+.zone-pay-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+}
+.zone-pay-card {
+  display: flex;
+  align-items: stretch;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  transition: box-shadow 200ms var(--ease-out), border-color 200ms var(--ease-out);
+}
+.zone-pay-card:hover { box-shadow: var(--shadow-sm); border-color: var(--border2); }
+.zpc-stripe { width: 5px; flex-shrink: 0; }
+.zpc-body { flex: 1; padding: 14px 16px; }
+.zpc-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+.zpc-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.zpc-price {
+  font-size: 18px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  color: var(--blue);
+  letter-spacing: -0.5px;
+}
+.zpc-rules {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.5;
+  margin-bottom: 10px;
+}
+.zpc-methods {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+/* Fine warning */
+.gps-fine {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--red-bg);
+  border: 1px solid var(--red-border);
+  border-radius: var(--r-md);
+  padding: 10px 14px;
+}
+.gps-fine-label {
+  font-size: 12px;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.gps-fine-amount {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--red);
+  font-family: var(--font-mono);
+}
+
+/* Detecting state */
+.gps-detecting {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--muted);
+  margin-bottom: 14px;
 }
 </style>

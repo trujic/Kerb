@@ -3,7 +3,7 @@
 </template>
 
 <script setup lang="ts">
-const props = defineProps<{ lat: number; lng: number; accuracy?: number }>()
+const props = defineProps<{ lat: number; lng: number; accuracy?: number; height?: number }>()
 
 const mapEl = ref<HTMLElement | null>(null)
 
@@ -91,8 +91,7 @@ onMounted(async () => {
 <style scoped>
 .location-map {
   width: 100%;
-  height: 200px;
-  border-radius: 0 0 var(--r-md) var(--r-md);
+  height: v-bind('`${props.height ?? 200}px`');
   overflow: hidden;
 }
 </style>
