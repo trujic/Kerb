@@ -5,33 +5,27 @@
       <div class="container">
         <!-- Map -->
         <ClientOnly>
-          <LocationMap v-if="coords" :lat="coords.lat" :lng="coords.lng" :accuracy="coords.accuracy" :height="260" class="gps-hero-map" />
+          <LocationMap :lat="coords!.lat" :lng="coords!.lng" :accuracy="coords!.accuracy" :height="260" class="gps-hero-map" />
         </ClientOnly>
 
         <!-- City badge -->
         <div class="gps-city-bar">
           <div class="gps-city-info">
-            <span class="gps-city-flag">{{ detectedCity?.flag }}</span>
+            <span class="gps-city-flag">{{ detectedCity!.flag }}</span>
             <div>
-              <div class="gps-city-name">{{ detectedCity?.name }}</div>
-              <div class="gps-city-country">{{ detectedCity?.country }}</div>
+              <div class="gps-city-name">{{ detectedCity!.name }}</div>
+              <div class="gps-city-country">{{ detectedCity!.country }}</div>
             </div>
-            <span v-if="cityDetail?.verified" class="gps-verified">✓ Verified</span>
+            <span v-if="cityDetail.verified" class="gps-verified">✓ Verified</span>
           </div>
-          <NuxtLink :to="`/${detectedCity?.id}`" class="gps-full-link">Full guide →</NuxtLink>
+          <NuxtLink :to="`/${detectedCity!.id}`" class="gps-full-link">Full guide →</NuxtLink>
         </div>
 
         <!-- Zone cards -->
         <div class="gps-zones">
           <p class="section-label">Parking zones</p>
           <div class="zone-pay-list">
-            <button
-              v-for="zone in cityDetail.zones"
-              :key="zone.id"
-              class="zone-pay-card"
-              :class="{ 'zpc-sms': zone.sms_number }"
-              @click="openZoneSMS(zone)"
-            >
+            <div v-for="zone in cityDetail.zones" :key="zone.id" class="zone-pay-card">
               <div class="zpc-stripe" :style="{ background: zone.color }" />
               <div class="zpc-body">
                 <div class="zpc-top">
@@ -39,20 +33,11 @@
                   <span class="zpc-price">{{ zone.price }}</span>
                 </div>
                 <p class="zpc-rules">{{ zone.rules }}</p>
-                <div class="zpc-footer">
-                  <div class="zpc-methods">
-                    <span v-for="pm in cityDetail.payment_methods" :key="pm.id" class="tag">{{ pm.label }}</span>
-                  </div>
-                  <div v-if="zone.sms_number" class="zpc-sms-action">
-                    <div class="zpc-sms-left">
-                      <span class="zpc-to">To {{ zone.sms_number }}</span>
-                      <span class="zpc-plate">{{ defaultPlate ?? 'Add plate in profile' }}</span>
-                    </div>
-                    <span class="zpc-sms-btn">Pay via SMS →</span>
-                  </div>
+                <div class="zpc-methods">
+                  <span v-for="pm in cityDetail.payment_methods" :key="pm.id" class="tag">{{ pm.label }}</span>
                 </div>
               </div>
-            </button>
+            </div>
           </div>
         </div>
 
@@ -226,13 +211,11 @@
 
 <script setup lang="ts">
 const { getCities, searchCities, getCity } = useCity()
-const { user, getProfile } = useAuth()
+const { user } = useAuth()
 const { detectCity, detectedCity, coords, detecting, gpsError } = useGPS()
 
 const cityDetail = ref<any>(null)
 const loadingCityDetail = ref(false)
-const gpsMode = computed(() => !!(user.value && detectedCity.value && cityDetail.value))
-const defaultPlate = ref<string | null>(null)
 
 watch(detectedCity, async (city) => {
   if (!city) return
@@ -241,24 +224,9 @@ watch(detectedCity, async (city) => {
   finally { loadingCityDetail.value = false }
 })
 
-watch(gpsMode, async (active) => {
-  if (!active || defaultPlate.value) return
-  try {
-    const profile = await getProfile()
-    const plate = profile?.plates?.find((p: any) => p.is_default) ?? profile?.plates?.[0]
-    defaultPlate.value = plate?.plate ?? null
-  } catch {}
-}, { immediate: true })
+const gpsMode = computed(() => !!(user.value && detectedCity.value && cityDetail.value))
 
-const openZoneSMS = (zone: any) => {
-  if (!zone.sms_number) {
-    navigateTo(`/${detectedCity.value?.id}`)
-    return
-  }
-  if (!import.meta.client) return
-  const body = encodeURIComponent(defaultPlate.value ?? '')
-  window.location.href = `sms:${zone.sms_number}?body=${body}`
-}
+const { data: cities, pending, error } = await useAsyncData('cities', getCities, { lazy: true })
 
 const searchQuery = ref('')
 const searchResults = ref<any[]>([])
@@ -316,15 +284,9 @@ const steps = [
   },
 ]
 
-const { data: cities, pending, error } = useAsyncData('cities', getCities, { lazy: true })
-
 onMounted(() => {
-  // user is set async by the Supabase plugin — handle both already-set and delayed cases
-  if (user.value) {
-    detectCity()
-  } else {
-    const stopWatch = watch(user, (u) => { if (u) { detectCity(); stopWatch() } })
-  }
+  // user is set async by the Supabase plugin — watch so we catch both immediate and delayed init
+  const stopWatch = watch(user, (u) => { if (u) { detectCity(); stopWatch() } }, { immediate: true })
 
   const obs = new IntersectionObserver(
     (entries) => {
@@ -738,64 +700,10 @@ h2 {
   line-height: 1.5;
   margin-bottom: 10px;
 }
-.zpc-footer {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
 .zpc-methods {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
-}
-.zpc-sms-action {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  padding-top: 8px;
-  border-top: 1px solid var(--border);
-}
-.zpc-sms-left {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-.zpc-to {
-  font-size: 11px;
-  color: var(--muted);
-  font-family: var(--font-mono);
-}
-.zpc-plate {
-  font-family: var(--font-mono);
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text);
-  letter-spacing: 0.5px;
-}
-.zpc-sms-btn {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--blue);
-}
-.zone-pay-card {
-  width: 100%;
-  text-align: left;
-  cursor: pointer;
-  background: none;
-  font-family: var(--font-body);
-}
-.zone-pay-card.zpc-sms:active {
-  transform: scale(0.99);
-}
-@media (hover: hover) and (pointer: fine) {
-  .zone-pay-card.zpc-sms:hover {
-    border-color: var(--blue-border);
-    box-shadow: var(--shadow-md);
-  }
-  .zone-pay-card.zpc-sms:hover .zpc-sms-btn {
-    text-decoration: underline;
-  }
 }
 
 /* Fine warning */
