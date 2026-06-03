@@ -25,7 +25,13 @@
         <div class="gps-zones">
           <p class="section-label">Parking zones</p>
           <div class="zone-pay-list">
-            <div v-for="zone in cityDetail.zones" :key="zone.id" class="zone-pay-card">
+            <button
+              v-for="zone in cityDetail.zones"
+              :key="zone.id"
+              class="zone-pay-card"
+              :class="{ 'zpc-sms': zone.sms_code && cityDetail.sms_number }"
+              @click="openZoneSMS(zone)"
+            >
               <div class="zpc-stripe" :style="{ background: zone.color }" />
               <div class="zpc-body">
                 <div class="zpc-top">
@@ -33,11 +39,17 @@
                   <span class="zpc-price">{{ zone.price }}</span>
                 </div>
                 <p class="zpc-rules">{{ zone.rules }}</p>
-                <div class="zpc-methods">
-                  <span v-for="pm in cityDetail.payment_methods" :key="pm.id" class="tag">{{ pm.label }}</span>
+                <div class="zpc-footer">
+                  <div class="zpc-methods">
+                    <span v-for="pm in cityDetail.payment_methods" :key="pm.id" class="tag">{{ pm.label }}</span>
+                  </div>
+                  <div v-if="zone.sms_code && cityDetail.sms_number" class="zpc-sms-action">
+                    <span class="zpc-plate">{{ defaultPlate ?? 'No plate saved' }}</span>
+                    <span class="zpc-sms-btn">Pay via SMS →</span>
+                  </div>
                 </div>
               </div>
-            </div>
+            </button>
           </div>
         </div>
 
@@ -211,8 +223,29 @@
 
 <script setup lang="ts">
 const { getCities, searchCities, getCity } = useCity()
-const { user } = useAuth()
+const { user, getProfile } = useAuth()
 const { detectCity, detectedCity, coords, detecting, gpsError } = useGPS()
+
+const defaultPlate = ref<string | null>(null)
+watch(gpsMode, async (active) => {
+  if (!active || defaultPlate.value) return
+  try {
+    const profile = await getProfile()
+    const plate = profile?.plates?.find((p: any) => p.is_default) ?? profile?.plates?.[0]
+    defaultPlate.value = plate?.plate ?? null
+  } catch {}
+}, { immediate: true })
+
+const openZoneSMS = (zone: any) => {
+  const number = cityDetail.value?.sms_number
+  if (!number || !zone.sms_code) {
+    navigateTo(`/${detectedCity.value!.id}`)
+    return
+  }
+  const parts = [zone.sms_code, defaultPlate.value].filter(Boolean)
+  const body = encodeURIComponent(parts.join(' '))
+  window.location.href = `sms:${number}?body=${body}`
+}
 
 const cityDetail = ref<any>(null)
 const loadingCityDetail = ref(false)
@@ -700,10 +733,53 @@ h2 {
   line-height: 1.5;
   margin-bottom: 10px;
 }
+.zpc-footer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
 .zpc-methods {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
+}
+.zpc-sms-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+.zpc-plate {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text2);
+  letter-spacing: 0.5px;
+}
+.zpc-sms-btn {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--blue);
+}
+.zone-pay-card {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  background: none;
+  font-family: var(--font-body);
+}
+.zone-pay-card.zpc-sms:active {
+  transform: scale(0.99);
+}
+@media (hover: hover) and (pointer: fine) {
+  .zone-pay-card.zpc-sms:hover {
+    border-color: var(--blue-border);
+    box-shadow: var(--shadow-md);
+  }
+  .zone-pay-card.zpc-sms:hover .zpc-sms-btn {
+    text-decoration: underline;
+  }
 }
 
 /* Fine warning */
