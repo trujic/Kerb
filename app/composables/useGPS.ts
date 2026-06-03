@@ -2,6 +2,7 @@ export const useGPS = () => {
   const supabase = useSupabaseClient()
 
   const detectedCity = ref<{ id: string; name: string; country: string; flag: string } | null>(null)
+  const coords = ref<{ lat: number; lng: number; accuracy: number } | null>(null)
   const detecting = ref(false)
   const gpsError = ref<string | null>(null)
 
@@ -23,7 +24,8 @@ export const useGPS = () => {
         })
       })
 
-      const { latitude, longitude } = position.coords
+      const { latitude, longitude, accuracy } = position.coords
+      coords.value = { lat: latitude, lng: longitude, accuracy }
 
       // Reverse geocode with Nominatim (free, no API key)
       const res = await fetch(
@@ -62,5 +64,5 @@ export const useGPS = () => {
     }
   }
 
-  return { detectCity, detectedCity, detecting, gpsError }
+  return { detectCity, detectedCity, coords, detecting, gpsError }
 }

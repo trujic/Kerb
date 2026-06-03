@@ -15,9 +15,14 @@
 
         <!-- GPS detected city -->
         <div v-if="detectedCity" class="gps-result fade-up-3">
-          <span class="gps-icon">📍</span>
-          <span>You appear to be in <strong>{{ detectedCity.flag }} {{ detectedCity.name }}</strong></span>
-          <NuxtLink :to="`/${detectedCity.id}`" class="gps-link">View parking rules →</NuxtLink>
+          <div class="gps-result-header">
+            <span class="gps-icon">📍</span>
+            <span>You appear to be in <strong>{{ detectedCity.flag }} {{ detectedCity.name }}</strong></span>
+            <NuxtLink :to="`/${detectedCity.id}`" class="gps-link">View parking rules →</NuxtLink>
+          </div>
+          <ClientOnly>
+            <LocationMap v-if="coords" :lat="coords.lat" :lng="coords.lng" :accuracy="coords.accuracy" />
+          </ClientOnly>
         </div>
         <div v-else-if="gpsError" class="gps-error fade-up-3">{{ gpsError }}</div>
 
@@ -161,7 +166,7 @@
 <script setup lang="ts">
 const { getCities, searchCities } = useCity()
 const { user } = useAuth()
-const { detectCity, detectedCity, detecting, gpsError } = useGPS()
+const { detectCity, detectedCity, coords, detecting, gpsError } = useGPS()
 
 const { data: cities, pending, error } = await useAsyncData('cities', getCities, { lazy: true })
 
@@ -266,17 +271,20 @@ h1 {
 
 /* GPS */
 .gps-result {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   font-size: 14px;
   color: var(--text2);
   background: var(--green-bg);
   border: 1px solid var(--green-border);
   border-radius: var(--r-md);
-  padding: 10px 14px;
   max-width: 560px;
   margin-bottom: 14px;
+  overflow: hidden;
+}
+.gps-result-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
   flex-wrap: wrap;
 }
 .gps-icon { font-size: 16px; flex-shrink: 0; }
