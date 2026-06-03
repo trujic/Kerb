@@ -154,13 +154,16 @@ const { data: cities } = await useAsyncData('profile-cities', async () => {
 
 // Load profile
 onMounted(async () => {
-  const profile = await getProfile()
-  if (profile) {
-    profileForm.displayName = profile.display_name ?? ''
-    profileForm.defaultCityId = profile.default_city_id ?? ''
-    plates.value = profile.plates ?? []
+  try {
+    const profile = await getProfile()
+    if (profile) {
+      profileForm.displayName = profile.display_name ?? ''
+      profileForm.defaultCityId = profile.default_city_id ?? ''
+      plates.value = profile.plates ?? []
+    }
+  } finally {
+    loading.value = false
   }
-  loading.value = false
 })
 
 const saveProfile = async () => {

@@ -41,6 +41,7 @@
             />
             <button class="search-btn" @click="goToFirstResult">Find →</button>
           </div>
+          <Transition name="dropdown">
           <div v-if="searchResults.length" class="search-dropdown">
             <NuxtLink
               v-for="c in searchResults"
@@ -57,6 +58,7 @@
               <span class="sri-arrow">→</span>
             </NuxtLink>
           </div>
+          </Transition>
         </div>
 
         <!-- Meta stats -->
@@ -339,9 +341,10 @@ h1 {
   color: #fff;
   white-space: nowrap;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background 150ms var(--ease-out), transform 150ms var(--ease-out);
 }
 .search-btn:hover { background: var(--blue-hover); }
+.search-btn:active { transform: scale(0.97); }
 .search-dropdown {
   position: absolute;
   top: calc(100% + 6px);
@@ -352,6 +355,16 @@ h1 {
   overflow: hidden;
   z-index: 50;
   box-shadow: var(--shadow-lg);
+  transform-origin: top center;
+}
+.dropdown-enter-active,
+.dropdown-leave-active {
+  transition: opacity 150ms var(--ease-out), transform 150ms var(--ease-out);
+}
+.dropdown-enter-from,
+.dropdown-leave-to {
+  opacity: 0;
+  transform: scale(0.97) translateY(-4px);
 }
 .search-result {
   display: flex;
@@ -411,6 +424,11 @@ h2 {
   grid-template-columns: repeat(3, 1fr);
   gap: 16px;
 }
+.cities-grid .reveal:nth-child(2) { transition-delay: 50ms; }
+.cities-grid .reveal:nth-child(3) { transition-delay: 100ms; }
+.cities-grid .reveal:nth-child(4) { transition-delay: 150ms; }
+.cities-grid .reveal:nth-child(5) { transition-delay: 200ms; }
+.cities-grid .reveal:nth-child(6) { transition-delay: 250ms; }
 .skeleton {
   height: 200px;
   background: var(--bg2);

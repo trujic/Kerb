@@ -43,13 +43,18 @@ function tagClass(label: string) {
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   padding: 22px;
-  transition: box-shadow 0.2s, border-color 0.2s, transform 0.2s;
+  transition: box-shadow 200ms var(--ease-out), border-color 200ms var(--ease-out), transform 200ms var(--ease-out);
 }
 .city-card:hover {
   box-shadow: var(--shadow-md);
   border-color: var(--blue-border);
-  transform: translateY(-2px);
 }
+@media (hover: hover) and (pointer: fine) {
+  .city-card:hover {
+    transform: translateY(-2px);
+  }
+}
+.city-card:active { transform: scale(0.98); }
 .card-top {
   display: flex;
   align-items: center;

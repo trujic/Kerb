@@ -57,6 +57,10 @@
   --shadow-sm: 0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
   --shadow-md: 0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
   --shadow-lg: 0 12px 32px rgba(0,0,0,0.10), 0 4px 8px rgba(0,0,0,0.04);
+
+  /* Easing */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
 }
 
 /* ── RESET ──────────────────────────────────────────────────────────────────── */
@@ -99,7 +103,7 @@ img { display: block; max-width: 100%; }
 .reveal {
   opacity: 0;
   transform: translateY(14px);
-  transition: opacity 0.45s, transform 0.45s;
+  transition: opacity 450ms var(--ease-out), transform 450ms var(--ease-out);
 }
 .reveal.visible { opacity: 1; transform: none; }
 
@@ -146,12 +150,13 @@ img { display: block; max-width: 100%; }
   padding: 11px 22px;
   font-size: 14px;
   font-weight: 500;
-  transition: background 0.15s;
+  transition: background 150ms var(--ease-out), transform 150ms var(--ease-out);
   cursor: pointer;
   font-family: var(--font-body);
   display: inline-block;
 }
 .btn-primary:hover { background: var(--blue-hover); }
+.btn-primary:active { transform: scale(0.97); }
 
 .btn-ghost {
   background: none;
@@ -160,12 +165,13 @@ img { display: block; max-width: 100%; }
   padding: 11px 22px;
   font-size: 14px;
   color: var(--text2);
-  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  transition: border-color 150ms var(--ease-out), color 150ms var(--ease-out), background 150ms var(--ease-out), transform 150ms var(--ease-out);
   cursor: pointer;
   font-family: var(--font-body);
   display: inline-block;
 }
 .btn-ghost:hover { border-color: var(--text); color: var(--text); background: var(--bg2); }
+.btn-ghost:active { transform: scale(0.97); }
 
 /* ── FORM ────────────────────────────────────────────────────────────────────── */
 .form-label {

@@ -82,9 +82,10 @@ const initials = computed(() => {
   border-radius: var(--r-md);
   font-size: 13px;
   font-weight: 500;
-  transition: all 0.15s;
+  transition: background 150ms var(--ease-out), border-color 150ms var(--ease-out), color 150ms var(--ease-out), transform 150ms var(--ease-out);
   font-family: var(--font-body);
 }
+.nav-btn:active { transform: scale(0.97); }
 .nav-btn-ghost {
   background: none;
   border: 1px solid var(--border2);
