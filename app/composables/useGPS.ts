@@ -28,11 +28,18 @@ export const useGPS = () => {
       coords.value = { lat: latitude, lng: longitude, accuracy }
 
       // Reverse geocode with Nominatim (free, no API key)
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&accept-language=en`,
-        { headers: { 'User-Agent': 'Kerb/1.0 (parking guide app)' } }
-      )
-      const geo = await res.json()
+      const controller = new AbortController()
+      const nominatimTimeout = setTimeout(() => controller.abort(), 8000)
+      let res: Response
+      try {
+        res = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&accept-language=en`,
+          { headers: { 'User-Agent': 'Kerb/1.0 (parking guide app)' }, signal: controller.signal }
+        )
+      } finally {
+        clearTimeout(nominatimTimeout)
+      }
+      const geo = await res!.json()
       const rawCity = geo.address?.city || geo.address?.town || geo.address?.village || null
 
       if (!rawCity) {
@@ -56,7 +63,8 @@ export const useGPS = () => {
       return null
     } catch (e: any) {
       if (e?.code === 1) gpsError.value = 'Location access denied. Enable it in browser settings.'
-      else if (e?.code === 3) gpsError.value = 'Location request timed out.'
+      else if (e?.code === 2) gpsError.value = 'Location unavailable. Check your device settings.'
+      else if (e?.code === 3 || e?.name === 'AbortError') gpsError.value = 'Location request timed out. Check your connection.'
       else gpsError.value = 'Could not detect location.'
       return null
     } finally {
