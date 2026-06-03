@@ -319,8 +319,12 @@ const steps = [
 ]
 
 onMounted(() => {
-  // user is set async by the Supabase plugin — watch so we catch both immediate and delayed init
-  let stopWatch = watch(user, (u) => { if (u) { detectCity(); stopWatch() } }, { immediate: true })
+  // user is set async by the Supabase plugin — handle both already-set and delayed cases
+  if (user.value) {
+    detectCity()
+  } else {
+    const stopWatch = watch(user, (u) => { if (u) { detectCity(); stopWatch() } })
+  }
 
   const obs = new IntersectionObserver(
     (entries) => {
