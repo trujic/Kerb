@@ -5,12 +5,10 @@
 [build.environment]
   NODE_VERSION = "22"
   NITRO_PRESET = "netlify"
+  SECRETS_SCAN_OMIT_KEYS = "SUPABASE_URL,SUPABASE_KEY"
 
 [build.processing]
   skip_processing = false
-
-[build.secrets_scanning]
-  omit_keys = ["SUPABASE_URL", "SUPABASE_KEY"]
 
 [[redirects]]
   from = "/*"
