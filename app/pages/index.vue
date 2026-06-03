@@ -260,8 +260,8 @@ const openZoneSMS = (zone: any) => {
   window.location.href = `sms:${zone.sms_number}?body=${body}`
 }
 
-const { data: cities, pending, error } = await useAsyncData('cities', getCities, { lazy: true })
-
+// All reactive state and handlers must be declared before the await so they
+// are defined during any Suspense-pending render triggered by async setup.
 const searchQuery = ref('')
 const searchResults = ref<any[]>([])
 const searchFocused = ref(false)
@@ -317,6 +317,8 @@ const steps = [
     body: 'Each city guide tells you exactly how to pay — SMS, app, meter, or card. Confirm with local signage.',
   },
 ]
+
+const { data: cities, pending, error } = await useAsyncData('cities', getCities, { lazy: true })
 
 onMounted(() => {
   // user is set async by the Supabase plugin — handle both already-set and delayed cases
