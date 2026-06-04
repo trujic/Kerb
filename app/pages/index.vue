@@ -23,42 +23,70 @@
 
         <!-- Zone cards -->
         <div class="gps-zones">
-          <p class="section-label">Parking zones</p>
-          <div class="zone-pay-list">
+
+          <!-- ── Suggested zone (hero card) ── -->
+          <template v-if="suggestedZone">
+            <p class="section-label">📍 Likely your zone</p>
             <div
-              v-for="zone in cityDetail.zones"
+              class="zone-hero-card"
+              :style="{ borderColor: suggestedZone.color, background: suggestedZone.color + '0d' }"
+            >
+              <div class="zhc-stripe" :style="{ background: suggestedZone.color }" />
+              <div class="zhc-body">
+                <div class="zhc-top">
+                  <span class="zhc-name">{{ suggestedZone.name }}</span>
+                  <span class="zhc-price" :style="{ color: suggestedZone.color }">{{ suggestedZone.price }}</span>
+                </div>
+                <p class="zhc-rules">{{ suggestedZone.rules }}</p>
+                <a
+                  v-if="suggestedZone.sms_shortcode"
+                  :href="smsLink(suggestedZone)"
+                  class="zhc-sms-btn"
+                  :style="{ background: suggestedZone.color }"
+                >
+                  <span>💬</span>
+                  <span v-if="defaultPlate">Send {{ defaultPlate }} · {{ suggestedZone.sms_shortcode }}</span>
+                  <span v-else>Pay via SMS · {{ suggestedZone.sms_shortcode }}</span>
+                  <span class="zhc-sms-arrow">→</span>
+                </a>
+                <p v-if="suggestedZone.sms_shortcode && !defaultPlate" class="zpc-sms-hint">
+                  <NuxtLink to="/profile">Add a plate</NuxtLink> for one-tap SMS
+                </p>
+              </div>
+            </div>
+          </template>
+
+          <!-- ── Other zones (compact) ── -->
+          <p class="section-label" :style="{ marginTop: suggestedZone ? '24px' : '0' }">
+            {{ suggestedZone ? 'Other zones' : 'Parking zones' }}
+          </p>
+          <div class="zone-pay-list" :class="{ 'zone-pay-list--grid': !!suggestedZone }">
+            <div
+              v-for="zone in otherZones"
               :key="zone.id"
               class="zone-pay-card"
-              :class="{ 'zone-pay-card--suggested': isSuggested(zone) }"
+              :class="{ 'zone-pay-card--compact': !!suggestedZone }"
             >
               <div class="zpc-stripe" :style="{ background: zone.color }" />
               <div class="zpc-body">
-                <div v-if="isSuggested(zone)" class="zpc-suggested-badge">📍 Likely your zone</div>
                 <div class="zpc-top">
                   <span class="zpc-name">{{ zone.name }}</span>
                   <span class="zpc-price">{{ zone.price }}</span>
                 </div>
                 <p class="zpc-rules">{{ zone.rules }}</p>
-                <div class="zpc-methods">
-                  <span v-for="pm in cityDetail.payment_methods" :key="pm.id" class="tag">{{ pm.label }}</span>
-                </div>
                 <a
                   v-if="zone.sms_shortcode"
                   :href="smsLink(zone)"
                   class="zpc-sms-btn"
-                  :class="{ 'zpc-sms-btn--primary': isSuggested(zone) }"
                 >
                   <span class="zpc-sms-icon">💬</span>
-                  <span v-if="defaultPlate">Send {{ defaultPlate }} · {{ zone.sms_shortcode }}</span>
-                  <span v-else>Pay via SMS · {{ zone.sms_shortcode }}</span>
+                  <span>{{ zone.sms_shortcode }}</span>
                   <span class="zpc-sms-arrow">→</span>
                 </a>
-                <p v-if="zone.sms_shortcode && !defaultPlate" class="zpc-sms-hint">
-                  <NuxtLink to="/profile">Add a plate</NuxtLink> for one-tap SMS
-                </p>
               </div>
             </div>
           </div>
+
         </div>
 
         <!-- Fine warning -->
@@ -245,6 +273,14 @@ const defaultPlate = computed(() => {
 
 const isSuggested = (zone: any) =>
   !!suggestedZoneName.value && zone.name === suggestedZoneName.value
+
+const suggestedZone = computed(() =>
+  cityDetail.value?.zones?.find((z: any) => isSuggested(z)) ?? null
+)
+
+const otherZones = computed(() =>
+  cityDetail.value?.zones?.filter((z: any) => !isSuggested(z)) ?? cityDetail.value?.zones ?? []
+)
 
 const smsLink = (zone: any) => {
   const body = defaultPlate.value
@@ -755,45 +791,104 @@ h2 {
   gap: 5px;
 }
 
-/* Suggested zone */
-.zone-pay-card--suggested {
-  border-color: var(--blue-border);
-  box-shadow: 0 0 0 1px var(--blue-border), var(--shadow-sm);
+/* ── Hero zone card (suggested) ── */
+.zone-hero-card {
+  display: flex;
+  align-items: stretch;
+  border: 2px solid;
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  margin-top: 12px;
+  box-shadow: var(--shadow-md);
 }
-.zpc-suggested-badge {
-  font-size: 11px;
-  font-family: var(--font-mono);
-  font-weight: 600;
-  color: var(--blue);
-  letter-spacing: 0.3px;
+.zhc-stripe {
+  width: 8px;
+  flex-shrink: 0;
+}
+.zhc-body {
+  flex: 1;
+  padding: 18px 20px;
+}
+.zhc-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
   margin-bottom: 8px;
 }
+.zhc-name {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  color: var(--text);
+}
+.zhc-price {
+  font-size: 28px;
+  font-weight: 800;
+  font-family: var(--font-mono);
+  letter-spacing: -1px;
+  flex-shrink: 0;
+}
+.zhc-rules {
+  font-size: 13px;
+  color: var(--text2);
+  line-height: 1.55;
+  margin-bottom: 14px;
+}
+.zhc-sms-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-radius: var(--r-md);
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  text-decoration: none;
+  transition: filter 150ms var(--ease-out);
+}
+.zhc-sms-btn:hover { filter: brightness(0.88); }
+.zhc-sms-arrow { margin-left: auto; opacity: 0.8; }
 
-/* SMS button */
+/* ── Compact other-zone cards ── */
+.zone-pay-list--grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.zone-pay-card--compact {
+  opacity: 0.72;
+  transition: opacity 200ms var(--ease-out), box-shadow 200ms var(--ease-out);
+}
+.zone-pay-card--compact:hover {
+  opacity: 1;
+  box-shadow: var(--shadow-sm);
+  border-color: var(--border2);
+}
+.zone-pay-card--compact .zpc-body { padding: 10px 12px; }
+.zone-pay-card--compact .zpc-name { font-size: 12px; }
+.zone-pay-card--compact .zpc-price { font-size: 14px; }
+.zone-pay-card--compact .zpc-rules { font-size: 11px; margin-bottom: 8px; }
+
+/* SMS button (compact cards) */
 .zpc-sms-btn {
   display: flex;
   align-items: center;
-  gap: 7px;
-  margin-top: 12px;
-  padding: 9px 12px;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 6px 10px;
   background: var(--bg2);
   border: 1px solid var(--border);
-  border-radius: var(--r-md);
-  font-size: 13px;
+  border-radius: var(--r-sm);
+  font-size: 12px;
   font-weight: 500;
   color: var(--text2);
   text-decoration: none;
-  transition: background 150ms var(--ease-out), border-color 150ms var(--ease-out);
+  transition: background 150ms var(--ease-out);
 }
-.zpc-sms-btn:hover { background: var(--bg3); border-color: var(--border2); }
-.zpc-sms-btn--primary {
-  background: var(--blue);
-  border-color: var(--blue);
-  color: #fff;
-}
-.zpc-sms-btn--primary:hover { background: var(--blue-hover); border-color: var(--blue-hover); }
-.zpc-sms-icon { font-size: 14px; flex-shrink: 0; }
-.zpc-sms-arrow { margin-left: auto; opacity: 0.7; }
+.zpc-sms-btn:hover { background: var(--bg3); }
+.zpc-sms-icon { font-size: 12px; flex-shrink: 0; }
+.zpc-sms-arrow { margin-left: auto; opacity: 0.5; }
 .zpc-sms-hint {
   font-size: 11px;
   color: var(--muted2);
@@ -801,6 +896,10 @@ h2 {
 }
 .zpc-sms-hint a { color: var(--blue); }
 .zpc-sms-hint a:hover { text-decoration: underline; }
+
+@media (max-width: 600px) {
+  .zone-pay-list--grid { grid-template-columns: 1fr 1fr; }
+}
 
 /* Fine warning */
 .gps-fine {
