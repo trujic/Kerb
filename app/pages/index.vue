@@ -25,9 +25,15 @@
         <div class="gps-zones">
           <p class="section-label">Parking zones</p>
           <div class="zone-pay-list">
-            <div v-for="zone in cityDetail.zones" :key="zone.id" class="zone-pay-card">
+            <div
+              v-for="zone in cityDetail.zones"
+              :key="zone.id"
+              class="zone-pay-card"
+              :class="{ 'zone-pay-card--suggested': isSuggested(zone) }"
+            >
               <div class="zpc-stripe" :style="{ background: zone.color }" />
               <div class="zpc-body">
+                <div v-if="isSuggested(zone)" class="zpc-suggested-badge">📍 Likely your zone</div>
                 <div class="zpc-top">
                   <span class="zpc-name">{{ zone.name }}</span>
                   <span class="zpc-price">{{ zone.price }}</span>
@@ -36,6 +42,20 @@
                 <div class="zpc-methods">
                   <span v-for="pm in cityDetail.payment_methods" :key="pm.id" class="tag">{{ pm.label }}</span>
                 </div>
+                <a
+                  v-if="zone.sms_shortcode"
+                  :href="smsLink(zone)"
+                  class="zpc-sms-btn"
+                  :class="{ 'zpc-sms-btn--primary': isSuggested(zone) }"
+                >
+                  <span class="zpc-sms-icon">💬</span>
+                  <span v-if="defaultPlate">Send {{ defaultPlate }} · {{ zone.sms_shortcode }}</span>
+                  <span v-else>Pay via SMS · {{ zone.sms_shortcode }}</span>
+                  <span class="zpc-sms-arrow">→</span>
+                </a>
+                <p v-if="zone.sms_shortcode && !defaultPlate" class="zpc-sms-hint">
+                  <NuxtLink to="/profile">Add a plate</NuxtLink> for one-tap SMS
+                </p>
               </div>
             </div>
           </div>
@@ -211,11 +231,27 @@
 
 <script setup lang="ts">
 const { getCities, searchCities, getCity } = useCity()
-const { user } = useAuth()
-const { detectCity, detectedCity, coords, detecting, gpsError } = useGPS()
+const { user, getProfile } = useAuth()
+const { detectCity, detectedCity, coords, detecting, gpsError, suggestedZoneName } = useGPS()
 
 const cityDetail = ref<any>(null)
 const loadingCityDetail = ref(false)
+const userProfile = ref<any>(null)
+
+const defaultPlate = computed(() => {
+  const plates = userProfile.value?.plates ?? []
+  return (plates.find((p: any) => p.is_default) ?? plates[0])?.plate ?? null
+})
+
+const isSuggested = (zone: any) =>
+  !!suggestedZoneName.value && zone.name === suggestedZoneName.value
+
+const smsLink = (zone: any) => {
+  const body = defaultPlate.value
+    ? `?body=${encodeURIComponent(defaultPlate.value)}`
+    : ''
+  return `sms:${zone.sms_shortcode}${body}`
+}
 
 watch(detectedCity, async (city) => {
   if (!city) return
@@ -223,6 +259,15 @@ watch(detectedCity, async (city) => {
   try { cityDetail.value = await getCity(city.id) }
   finally { loadingCityDetail.value = false }
 })
+
+watch(
+  () => !!user.value && !!cityDetail.value,
+  async (active) => {
+    if (active && !userProfile.value) {
+      userProfile.value = await getProfile()
+    }
+  }
+)
 
 const gpsMode = computed(() => !!(user.value && detectedCity.value && cityDetail.value))
 
@@ -286,7 +331,11 @@ const steps = [
 
 onMounted(() => {
   // user is set async by the Supabase plugin — watch so we catch both immediate and delayed init
-  const stopWatch = watch(user, (u) => { if (u) { detectCity(); stopWatch() } }, { immediate: true })
+  if (user.value) {
+    detectCity()
+  } else {
+    const stopWatch = watch(user, (u) => { if (u) { detectCity(); stopWatch() } })
+  }
 
   const obs = new IntersectionObserver(
     (entries) => {
@@ -705,6 +754,53 @@ h2 {
   flex-wrap: wrap;
   gap: 5px;
 }
+
+/* Suggested zone */
+.zone-pay-card--suggested {
+  border-color: var(--blue-border);
+  box-shadow: 0 0 0 1px var(--blue-border), var(--shadow-sm);
+}
+.zpc-suggested-badge {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--blue);
+  letter-spacing: 0.3px;
+  margin-bottom: 8px;
+}
+
+/* SMS button */
+.zpc-sms-btn {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 12px;
+  padding: 9px 12px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text2);
+  text-decoration: none;
+  transition: background 150ms var(--ease-out), border-color 150ms var(--ease-out);
+}
+.zpc-sms-btn:hover { background: var(--bg3); border-color: var(--border2); }
+.zpc-sms-btn--primary {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: #fff;
+}
+.zpc-sms-btn--primary:hover { background: var(--blue-hover); border-color: var(--blue-hover); }
+.zpc-sms-icon { font-size: 14px; flex-shrink: 0; }
+.zpc-sms-arrow { margin-left: auto; opacity: 0.7; }
+.zpc-sms-hint {
+  font-size: 11px;
+  color: var(--muted2);
+  margin-top: 6px;
+}
+.zpc-sms-hint a { color: var(--blue); }
+.zpc-sms-hint a:hover { text-decoration: underline; }
 
 /* Fine warning */
 .gps-fine {

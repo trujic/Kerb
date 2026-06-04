@@ -23,6 +23,33 @@ if (!serviceKey) {
 }
 const supabase = createClient(env.SUPABASE_URL, serviceKey)
 
+// ── NORMALIZATION ─────────────────────────────────────────────────────────────
+// Produces a consistent lookup key: lowercase Latin, no diacritics, no section numbers.
+// Used to match Nominatim reverse-geocode output against stored street names.
+
+function normalizeStreet(name) {
+  const cyr = {
+    'А':'a','Б':'b','В':'v','Г':'g','Д':'d','Ђ':'dj','Е':'e','Ж':'z',
+    'З':'z','И':'i','Ј':'j','К':'k','Л':'l','Љ':'lj','М':'m','Н':'n',
+    'Њ':'nj','О':'o','П':'p','Р':'r','С':'s','Т':'t','Ћ':'c','У':'u',
+    'Ф':'f','Х':'h','Ц':'c','Ч':'c','Џ':'dz','Ш':'s',
+    'а':'a','б':'b','в':'v','г':'g','д':'d','ђ':'dj','е':'e','ж':'z',
+    'з':'z','и':'i','ј':'j','к':'k','л':'l','љ':'lj','м':'m','н':'n',
+    'њ':'nj','о':'o','п':'p','р':'r','с':'s','т':'t','ћ':'c','у':'u',
+    'ф':'f','х':'h','ц':'c','ч':'c','џ':'dz','ш':'s',
+  }
+  const latin = name.split('').map(c => cyr[c] ?? c).join('')
+  return latin
+    .toLowerCase()
+    .replace(/[čć]/g, 'c')
+    .replace(/š/g, 's')
+    .replace(/ž/g, 'z')
+    .replace(/đ/g, 'dj')
+    // Strip trailing Roman numeral section numbers (e.g. "Bulevar oslobođenja III" → "bulevar oslobodjenja")
+    .replace(/\s+(i{1,3}|iv|vi{0,3}|ix|xl|l|xc|c{1,3})$/i, '')
+    .trim()
+}
+
 // ── CITY DATA ─────────────────────────────────────────────────────────────────
 
 const CITY_ID = 'novi-sad'
@@ -48,6 +75,7 @@ const zones = [
     rules: 'Max 60 min. After expiry you must leave the zone — cannot re-pay for the next 60 min. Mon–Sat 8:00–21:00, Sun 7:30–13:30.',
     price: '80 RSD/h',
     sort_order: 1,
+    sms_shortcode: '8210',
   },
   {
     name: 'Red Zone',
@@ -55,6 +83,7 @@ const zones = [
     rules: 'Max 120 min. After expiry you must leave the zone for at least 30 min before paying again. Mon–Sat 8:00–21:00, Sun 7:30–13:30.',
     price: '60 RSD/h',
     sort_order: 2,
+    sms_shortcode: '8211',
   },
   {
     name: 'Blue Zone',
@@ -62,6 +91,7 @@ const zones = [
     rules: 'No time limit. Daily card available for 95 RSD. Weekdays 7:00–21:00, Saturday 7:00–14:00.',
     price: '50 RSD/h',
     sort_order: 3,
+    sms_shortcode: '8212',
   },
   {
     name: 'White Zone',
@@ -69,6 +99,7 @@ const zones = [
     rules: 'No time limit. Daily card available for 95 RSD. Weekdays 7:00–21:00, Saturday 7:00–14:00.',
     price: '30 RSD/h',
     sort_order: 4,
+    sms_shortcode: '8218',
   },
 ]
 
@@ -98,6 +129,188 @@ const tags = [
   { label: 'Free evenings' },
 ]
 
+// ── STREET → ZONE MAPPING ─────────────────────────────────────────────────────
+// Source: https://parkingns.rs/parkiralista/
+// Street names stored in Serbian Latin. The normalized form is used for GPS lookup.
+
+const streetZones = [
+  // Extra Zone (8210) — city centre core, 60-min limit
+  { street: 'Bulevar Mihajla Pupina', zone: 'Extra Zone' },
+  { street: 'Ignjata Pavlasa', zone: 'Extra Zone' },
+  { street: 'Ilije Ognjanovića', zone: 'Extra Zone' },
+  { street: 'Narodnih heroja', zone: 'Extra Zone' },
+  { street: 'Trg Republike', zone: 'Extra Zone' },
+
+  // Red Zone (8211) — city centre, 120-min limit
+  { street: 'Bulevar kralja Petra Prvog', zone: 'Red Zone' },
+  { street: 'Bulevar oslobođenja', zone: 'Red Zone' },
+  { street: 'Vojvode Putnika', zone: 'Red Zone' },
+  { street: 'Grčkoškolska', zone: 'Red Zone' },
+  { street: 'Daničićeva', zone: 'Red Zone' },
+  { street: 'Dr Laze Stanojević', zone: 'Red Zone' },
+  { street: 'Dunavska', zone: 'Red Zone' },
+  { street: 'Đure Jakšića', zone: 'Red Zone' },
+  { street: 'Železnička', zone: 'Red Zone' },
+  { street: 'Žitni trg', zone: 'Red Zone' },
+  { street: 'Ive Lole Ribara', zone: 'Red Zone' },
+  { street: 'Jevrejska', zone: 'Red Zone' },
+  { street: 'Maksima Gorkog', zone: 'Red Zone' },
+  { street: 'Natošević', zone: 'Red Zone' },
+  { street: 'Nikolajevska', zone: 'Red Zone' },
+  { street: 'Nikole Pašića', zone: 'Red Zone' },
+  { street: 'Njegoševa', zone: 'Red Zone' },
+  { street: 'Pionirska', zone: 'Red Zone' },
+  { street: 'Svetozara Miletića', zone: 'Red Zone' },
+  { street: 'Sutjeska', zone: 'Red Zone' },
+  { street: 'Trg galerija', zone: 'Red Zone' },
+  { street: 'Trg Marije Trandafil', zone: 'Red Zone' },
+  { street: 'Trg mladenaca', zone: 'Red Zone' },
+  { street: 'Trifkovićev trg', zone: 'Red Zone' },
+  { street: 'Hilandarska', zone: 'Red Zone' },
+
+  // Blue Zone (8212) — wider city area, no time limit
+  { street: 'Alberta Toma', zone: 'Blue Zone' },
+  { street: 'Aleksandra Tišme', zone: 'Blue Zone' },
+  { street: 'Alekse Šantića', zone: 'Blue Zone' },
+  { street: 'Almaška', zone: 'Blue Zone' },
+  { street: 'Antona Čehova', zone: 'Blue Zone' },
+  { street: 'Arse Teodorovića', zone: 'Blue Zone' },
+  { street: 'Arhimandrita Rajića', zone: 'Blue Zone' },
+  { street: 'Augusta Cesarca', zone: 'Blue Zone' },
+  { street: 'Baranjska', zone: 'Blue Zone' },
+  { street: 'Bačka', zone: 'Blue Zone' },
+  { street: 'Beogradski kej', zone: 'Blue Zone' },
+  { street: 'Berislava Berića', zone: 'Blue Zone' },
+  { street: 'Bogdana Garabantina', zone: 'Blue Zone' },
+  { street: 'Bore Prodanovića', zone: 'Blue Zone' },
+  { street: 'Branimira Ćosića', zone: 'Blue Zone' },
+  { street: 'Branislava Nušića', zone: 'Blue Zone' },
+  { street: 'Braće Jovandić', zone: 'Blue Zone' },
+  { street: 'Braće Ribnikar', zone: 'Blue Zone' },
+  { street: 'Bulevar Jaše Tomića', zone: 'Blue Zone' },
+  { street: 'Bulevar cara Lazara', zone: 'Blue Zone' },
+  { street: 'Valentina Vodnika', zone: 'Blue Zone' },
+  { street: 'Vase Pelagića', zone: 'Blue Zone' },
+  { street: 'Vase Stajića', zone: 'Blue Zone' },
+  { street: 'Vere Pavlović', zone: 'Blue Zone' },
+  { street: 'Vladike Platona', zone: 'Blue Zone' },
+  { street: 'Vladimira Nikolića', zone: 'Blue Zone' },
+  { street: 'Vojvode Bojovića', zone: 'Blue Zone' },
+  { street: 'Vojvode Mišića', zone: 'Blue Zone' },
+  { street: 'Vojvode Šupljikca', zone: 'Blue Zone' },
+  { street: 'Vojvođanska', zone: 'Blue Zone' },
+  { street: 'Vojvođanskih brigada', zone: 'Blue Zone' },
+  { street: 'Vuka Karadžića', zone: 'Blue Zone' },
+  { street: 'Gagarinova', zone: 'Blue Zone' },
+  { street: 'Gajeva', zone: 'Blue Zone' },
+  { street: 'Gogoljeva', zone: 'Blue Zone' },
+  { street: 'Gundulićeva', zone: 'Blue Zone' },
+  { street: 'Danila Kiša', zone: 'Blue Zone' },
+  { street: 'Devet Jugović', zone: 'Blue Zone' },
+  { street: 'Dimitrija Avramovića', zone: 'Blue Zone' },
+  { street: 'Dimitrija Tucovića', zone: 'Blue Zone' },
+  { street: 'Doža Đerđa', zone: 'Blue Zone' },
+  { street: 'Dostojevskog', zone: 'Blue Zone' },
+  { street: 'Dr Đorđa Jovanovića', zone: 'Blue Zone' },
+  { street: 'Dušana Vasiljeva', zone: 'Blue Zone' },
+  { street: 'Đorđa Markovića Kodera', zone: 'Blue Zone' },
+  { street: 'Đorđa Rajkovića', zone: 'Blue Zone' },
+  { street: 'Episkopa Visariona', zone: 'Blue Zone' },
+  { street: 'Žarka Vasiljevića', zone: 'Blue Zone' },
+  { street: 'Žarka Zrenjanina', zone: 'Blue Zone' },
+  { street: 'Žike Popovića', zone: 'Blue Zone' },
+  { street: 'Zaharija Orfelina', zone: 'Blue Zone' },
+  { street: 'Zemljane ćuprije', zone: 'Blue Zone' },
+  { street: 'Zmaj Ognjeva Vuka', zone: 'Blue Zone' },
+  { street: 'Zorana Petrovića', zone: 'Blue Zone' },
+  { street: 'Ilije Vučetića', zone: 'Blue Zone' },
+  { street: 'Jaše Ignjatovića', zone: 'Blue Zone' },
+  { street: 'Jovana Boškovića', zone: 'Blue Zone' },
+  { street: 'Jovana Đorđevića', zone: 'Blue Zone' },
+  { street: 'Jovana Hranilovića', zone: 'Blue Zone' },
+  { street: 'Kej žrtava racije', zone: 'Blue Zone' },
+  { street: 'Kisačka', zone: 'Blue Zone' },
+  { street: 'Kozačinskog', zone: 'Blue Zone' },
+  { street: 'Kosančić Ivana', zone: 'Blue Zone' },
+  { street: 'Kosovska', zone: 'Blue Zone' },
+  { street: 'Koste Hadži Mlađeg', zone: 'Blue Zone' },
+  { street: 'Koče Kolarova', zone: 'Blue Zone' },
+  { street: 'Kraljevića Marka', zone: 'Blue Zone' },
+  { street: 'Laze Kostića', zone: 'Blue Zone' },
+  { street: 'Lasla Gala', zone: 'Blue Zone' },
+  { street: 'Lilike Bem', zone: 'Blue Zone' },
+  { street: 'Lovćenska', zone: 'Blue Zone' },
+  { street: 'Lončarska', zone: 'Blue Zone' },
+  { street: 'Lukijana Mušickog', zone: 'Blue Zone' },
+  { street: 'Majevička', zone: 'Blue Zone' },
+  { street: 'Marka Maljanova', zone: 'Blue Zone' },
+  { street: 'Marka Nešića', zone: 'Blue Zone' },
+  { street: 'Masarikova', zone: 'Blue Zone' },
+  { street: 'Matice srpske', zone: 'Blue Zone' },
+  { street: 'Milana Rakića', zone: 'Blue Zone' },
+  { street: 'Milete Jakšića', zone: 'Blue Zone' },
+  { street: 'Mileševska', zone: 'Blue Zone' },
+  { street: 'Milovana Glišića', zone: 'Blue Zone' },
+  { street: 'Miloša Bajića', zone: 'Blue Zone' },
+  { street: 'Miroslava Antića', zone: 'Blue Zone' },
+  { street: 'Mičurinova', zone: 'Blue Zone' },
+  { street: 'Miše Dimitrijevića', zone: 'Blue Zone' },
+  { street: 'Nikole Tesle', zone: 'Blue Zone' },
+  { street: 'Novosadskog sajma', zone: 'Blue Zone' },
+  { street: 'Ognjene Price', zone: 'Blue Zone' },
+  { street: 'Omladinskog pokreta', zone: 'Blue Zone' },
+  { street: 'Pavla Papa', zone: 'Blue Zone' },
+  { street: 'Pavla Simića', zone: 'Blue Zone' },
+  { street: 'Pavla Stamatovića', zone: 'Blue Zone' },
+  { street: 'Paje Markovića Adamova', zone: 'Blue Zone' },
+  { street: 'Pariške komune', zone: 'Blue Zone' },
+  { street: 'Pasterova', zone: 'Blue Zone' },
+  { street: 'Petra Drapšina', zone: 'Blue Zone' },
+  { street: 'Petra Kočića', zone: 'Blue Zone' },
+  { street: 'Pećka', zone: 'Blue Zone' },
+  { street: 'Podunskog odreda', zone: 'Blue Zone' },
+  { street: 'Puškinova', zone: 'Blue Zone' },
+  { street: 'Radnička', zone: 'Blue Zone' },
+  { street: 'Rumenačka', zone: 'Blue Zone' },
+  { street: 'Save Vuković', zone: 'Blue Zone' },
+  { street: 'Save Kovačevića', zone: 'Blue Zone' },
+  { street: 'Save Ljubojeva', zone: 'Blue Zone' },
+  { street: 'Sestara Ninković', zone: 'Blue Zone' },
+  { street: 'Slobodana Bajića', zone: 'Blue Zone' },
+  { street: 'Slovačka', zone: 'Blue Zone' },
+  { street: 'Sonje Marinković', zone: 'Blue Zone' },
+  { street: 'Stevana Branovačkog', zone: 'Blue Zone' },
+  { street: 'Stevana Milovanova', zone: 'Blue Zone' },
+  { street: 'Stevana Mokranjca', zone: 'Blue Zone' },
+  { street: 'Stevana Musića', zone: 'Blue Zone' },
+  { street: 'Stevana Sremca', zone: 'Blue Zone' },
+  { street: 'Sterijina', zone: 'Blue Zone' },
+  { street: 'Stefana Stefanovića', zone: 'Blue Zone' },
+  { street: 'Stjepana Mitra Ljubiše', zone: 'Blue Zone' },
+  { street: 'Stražilovska', zone: 'Blue Zone' },
+  { street: 'Takovska', zone: 'Blue Zone' },
+  { street: 'Tekelijina', zone: 'Blue Zone' },
+  { street: 'Temerinska', zone: 'Blue Zone' },
+  { street: 'Tolstojeva', zone: 'Blue Zone' },
+  { street: 'Toplice Milana', zone: 'Blue Zone' },
+  { street: 'Trg 1. maja', zone: 'Blue Zone' },
+  { street: 'Trg neznanog junaka', zone: 'Blue Zone' },
+  { street: 'Trg Ferenca Fehéra', zone: 'Blue Zone' },
+  { street: 'Trg carice Milice', zone: 'Blue Zone' },
+  { street: 'Turgenjevа', zone: 'Blue Zone' },
+  { street: 'Čirpanova', zone: 'Blue Zone' },
+  { street: 'Uroša Predića', zone: 'Blue Zone' },
+  { street: 'Feješa Tivadara', zone: 'Blue Zone' },
+  { street: 'Franje Štefanovića', zone: 'Blue Zone' },
+  { street: 'Fruškogorskog odreda', zone: 'Blue Zone' },
+  { street: 'Šafarikova', zone: 'Blue Zone' },
+  { street: 'Šumadijska', zone: 'Blue Zone' },
+
+  // White Zone (8218) — outskirts / railway station
+  { street: 'Železnička stanica', zone: 'White Zone' },
+  { street: 'Hajduk Veljkova', zone: 'White Zone' },
+]
+
 // ── SEED ──────────────────────────────────────────────────────────────────────
 
 async function seed() {
@@ -111,7 +324,7 @@ async function seed() {
   console.log('✓ City upserted')
 
   // Clear existing related records
-  for (const table of ['zones', 'payment_methods', 'tips', 'tags']) {
+  for (const table of ['zones', 'payment_methods', 'tips', 'tags', 'street_zones']) {
     const { error } = await supabase.from(table).delete().eq('city_id', CITY_ID)
     if (error) throw new Error(`Clear ${table} failed: ${error.message}`)
   }
@@ -145,7 +358,20 @@ async function seed() {
   if (tagsErr) throw new Error(`Tags insert failed: ${tagsErr.message}`)
   console.log(`✓ ${tags.length} tags inserted`)
 
-  console.log('\nDone! Review at https://parkingns.rs and set verified=true when confirmed.')
+  // Insert street → zone mappings
+  const streetRows = streetZones.map(({ street, zone }) => ({
+    city_id: CITY_ID,
+    street_name: street,
+    street_normalized: normalizeStreet(street),
+    zone_name: zone,
+  }))
+  const { error: streetErr } = await supabase
+    .from('street_zones')
+    .insert(streetRows)
+  if (streetErr) throw new Error(`Street zones insert failed: ${streetErr.message}`)
+  console.log(`✓ ${streetRows.length} street zones inserted`)
+
+  console.log('\nDone!')
 }
 
 seed().catch(err => {
