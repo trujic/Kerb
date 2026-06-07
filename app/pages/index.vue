@@ -12,6 +12,7 @@
               :accuracy="coords!.accuracy"
               :heading="heading"
               :height="260"
+              :zones="zoneBoundaries"
               @compass-tap="onMapTap"
             />
           </div>
@@ -275,6 +276,7 @@ const { heading, start: startOrientation, stop: stopOrientation, onMapTap } = us
 const cityDetail = ref<any>(null)
 const loadingCityDetail = ref(false)
 const userProfile = ref<any>(null)
+const zoneBoundaries = ref<any[]>([])
 
 const defaultPlate = computed(() => {
   const plates = userProfile.value?.plates ?? []
@@ -304,6 +306,15 @@ watch(detectedCity, async (city) => {
   loadingCityDetail.value = true
   try { cityDetail.value = await getCity(city.id) }
   finally { loadingCityDetail.value = false }
+
+  // Load zone boundary GeoJSON if available for this city
+  try {
+    const res = await fetch(`/zones/${city.id}.json`)
+    if (res.ok) {
+      const data = await res.json()
+      zoneBoundaries.value = data.zones ?? []
+    }
+  } catch { /* no boundaries file, that's fine */ }
 })
 
 watch(
