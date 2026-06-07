@@ -14,10 +14,12 @@ const props = defineProps<{
 
 const emit = defineEmits<{ compassTap: [] }>()
 
-const mapEl     = ref<HTMLElement | null>(null)
-const mapRef    = shallowRef<any>(null)
-const markerRef = shallowRef<any>(null)
-const circleRef = shallowRef<any>(null)
+const mapEl      = ref<HTMLElement | null>(null)
+const mapRef     = shallowRef<any>(null)
+const markerRef  = shallowRef<any>(null)
+const circleRef  = shallowRef<any>(null)
+const LRef       = shallowRef<any>(null)
+const zoneLayers = shallowRef<any[]>([])
 
 const CONE_SVG = `
   <svg class="lm-heading" width="60" height="60" viewBox="0 0 60 60"
@@ -26,10 +28,9 @@ const CONE_SVG = `
   </svg>
 `
 
-// Emit compassTap so parent can request iOS orientation permission on user gesture
 const onMapTap = () => emit('compassTap')
 
-// ── Live position — watchEffect tracks all deps and re-runs on any change ─────
+// ── Live position ─────────────────────────────────────────────────────────────
 watchEffect(() => {
   const lat = props.lat
   const lng = props.lng
@@ -44,7 +45,7 @@ watchEffect(() => {
   }
 })
 
-// ── Compass heading — patch SVG directly without recreating icon ──────────────
+// ── Compass heading ───────────────────────────────────────────────────────────
 watchEffect(() => {
   const h = props.heading
   const svg = mapEl.value?.querySelector('.lm-heading') as SVGElement | null
@@ -57,11 +58,41 @@ watchEffect(() => {
   }
 })
 
+// ── Zone overlays — fires whenever zones prop arrives or map initialises ──────
+watch([() => props.zones, mapRef], ([zones, map]) => {
+  const L = LRef.value
+  if (!L || !map || !zones) return
+
+  // Remove old layers
+  for (const layer of zoneLayers.value) map.removeLayer(layer)
+  zoneLayers.value = []
+
+  const features = zones.features ?? []
+  for (const feature of features) {
+    if (feature.geometry?.type !== 'Polygon') continue
+    if (feature.geometry.coordinates[0].length < 3) continue
+    const color = (feature.properties?.color ?? '#3B82F6').trim()
+    const name  = feature.properties?.name  ?? ''
+    const latlngs = feature.geometry.coordinates[0]
+      .map(([lng, lat]: [number, number]) => [lat, lng] as [number, number])
+    const layer = L.polygon(latlngs, {
+      color,
+      fillColor: color,
+      fillOpacity: 0.13,
+      weight: 2,
+      opacity: 0.55,
+    }).addTo(map)
+    if (name) layer.bindTooltip(name, { sticky: true, className: 'zone-tooltip' })
+    zoneLayers.value = [...zoneLayers.value, layer]
+  }
+}, { deep: true })
+
 onMounted(async () => {
   if (!mapEl.value) return
 
   await import('leaflet/dist/leaflet.css')
   const L = (await import('leaflet')).default
+  LRef.value = L
 
   const map = L.map(mapEl.value, {
     center: [props.lat, props.lng],
@@ -79,29 +110,6 @@ onMounted(async () => {
     subdomains: 'abcd',
     maxZoom: 19,
   }).addTo(map)
-
-  // Zone boundary overlays — accepts standard GeoJSON FeatureCollection
-  const features = props.zones?.features ?? props.zones?.zones?.map((z: any) => ({
-    type: 'Feature',
-    properties: { name: z.name, color: z.color },
-    geometry: { type: 'Polygon', coordinates: z.coordinates },
-  })) ?? []
-
-  for (const feature of features) {
-    if (feature.geometry?.type !== 'Polygon') continue
-    const color = feature.properties?.color ?? '#3B82F6'
-    const name  = feature.properties?.name  ?? ''
-    // GeoJSON: [lng, lat] → Leaflet: [lat, lng]
-    const latlngs = feature.geometry.coordinates[0]
-      .map(([lng, lat]: [number, number]) => [lat, lng] as [number, number])
-    L.polygon(latlngs, {
-      color,
-      fillColor: color,
-      fillOpacity: 0.13,
-      weight: 2,
-      opacity: 0.55,
-    }).bindTooltip(name, { sticky: true, className: 'zone-tooltip' }).addTo(map)
-  }
 
   if (props.accuracy && props.accuracy < 500) {
     circleRef.value = L.circle([props.lat, props.lng], {
@@ -122,13 +130,15 @@ onMounted(async () => {
   })
 
   markerRef.value = L.marker([props.lat, props.lng], { icon }).addTo(map)
-  mapRef.value    = map
+  mapRef.value    = map  // triggers zone watcher if zones already loaded
 
   onUnmounted(() => {
     map.remove()
     mapRef.value    = null
     markerRef.value = null
     circleRef.value = null
+    LRef.value      = null
+    zoneLayers.value = []
   })
 })
 </script>
@@ -147,7 +157,6 @@ onMounted(async () => {
   border-radius: 6px;
 }
 .zone-tooltip::before { display: none; }
-
 .lm-dot {
   position: relative;
   width: 60px;
