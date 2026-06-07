@@ -1,5 +1,14 @@
 <template>
-  <div ref="mapEl" class="location-map" @click="onMapTap" />
+  <div class="location-map-root" :style="rootStyle">
+    <div ref="mapEl" class="location-map" @click="onMapTap" />
+    <button
+      v-if="interactive && !follow"
+      class="lm-recenter"
+      type="button"
+      aria-label="Recenter on my location"
+      @click="recenter"
+    >◎</button>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -10,9 +19,19 @@ const props = defineProps<{
   heading?: number | null
   height?: number
   zones?: any // GeoJSON FeatureCollection
+  interactive?: boolean // enable pan/zoom (fullscreen mode)
+  fill?: boolean        // fill parent height instead of fixed px
 }>()
 
 const emit = defineEmits<{ compassTap: [] }>()
+
+// When interactive, the map follows the user until they drag; then a
+// recenter button re-arms follow. Non-interactive maps always follow.
+const follow = ref(true)
+
+const rootStyle = computed(() => ({
+  height: props.fill ? '100%' : `${props.height ?? 200}px`,
+}))
 
 const mapEl      = ref<HTMLElement | null>(null)
 const mapRef     = shallowRef<any>(null)
@@ -28,7 +47,15 @@ const CONE_SVG = `
   </svg>
 `
 
-const onMapTap = () => emit('compassTap')
+// Tap recenters the compass only on the locked preview; in interactive
+// mode taps are drags, so don't hijack them.
+const onMapTap = () => { if (!props.interactive) emit('compassTap') }
+
+const recenter = () => {
+  if (!mapRef.value || !markerRef.value) return
+  follow.value = true
+  mapRef.value.setView(markerRef.value.getLatLng(), mapRef.value.getZoom(), { animate: true })
+}
 
 // ── Live position ─────────────────────────────────────────────────────────────
 watchEffect(() => {
@@ -38,7 +65,7 @@ watchEffect(() => {
   if (!markerRef.value || !mapRef.value) return
   const ll: [number, number] = [lat, lng]
   markerRef.value.setLatLng(ll)
-  mapRef.value.panTo(ll, { animate: true, duration: 0.5 })
+  if (follow.value) mapRef.value.panTo(ll, { animate: true, duration: 0.5 })
   if (circleRef.value) {
     circleRef.value.setLatLng(ll)
     if (acc) circleRef.value.setRadius(acc)
@@ -96,21 +123,32 @@ onMounted(async () => {
   const L = (await import('leaflet')).default
   LRef.value = L
 
+  const i = props.interactive ?? false
   const map = L.map(mapEl.value, {
     center: [props.lat, props.lng],
     zoom: 17,
-    zoomControl: false,
-    attributionControl: false,
-    dragging: false,
-    scrollWheelZoom: false,
-    doubleClickZoom: false,
-    touchZoom: false,
-    keyboard: false,
+    zoomControl: i,
+    attributionControl: i,
+    dragging: i,
+    scrollWheelZoom: i,
+    doubleClickZoom: i,
+    touchZoom: i,
+    keyboard: i,
   })
+
+  // Once the user pans/zooms an interactive map, stop auto-following GPS
+  // so we don't yank them back on the next position update.
+  if (i) {
+    map.on('dragstart', () => { follow.value = false })
+    // Container is freshly shown (e.g. fullscreen overlay) — ensure Leaflet
+    // measures the real size after layout.
+    requestAnimationFrame(() => map.invalidateSize())
+  }
 
   L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
     subdomains: 'abcd',
     maxZoom: 19,
+    attribution: '&copy; OpenStreetMap &copy; CARTO',
   }).addTo(map)
 
   if (props.accuracy && props.accuracy < 500) {
@@ -192,9 +230,34 @@ onMounted(async () => {
 </style>
 
 <style scoped>
-.location-map {
+.location-map-root {
+  position: relative;
   width: 100%;
-  height: v-bind('`${props.height ?? 200}px`');
   overflow: hidden;
 }
+.location-map {
+  width: 100%;
+  height: 100%;
+}
+.lm-recenter {
+  position: absolute;
+  bottom: 14px;
+  right: 14px;
+  z-index: 1000;
+  width: 42px;
+  height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  line-height: 1;
+  background: rgba(255, 255, 255, 0.95);
+  color: #2563EB;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 50%;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  backdrop-filter: blur(6px);
+  cursor: pointer;
+}
+.lm-recenter:active { transform: scale(0.94); }
 </style>

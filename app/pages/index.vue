@@ -15,7 +15,45 @@
               :zones="zoneBoundaries"
               @compass-tap="onMapTap"
             />
+            <button
+              class="map-expand-btn"
+              type="button"
+              aria-label="Expand map"
+              @click="mapExpanded = true"
+            >
+              <span>⤢</span> Explore zones
+            </button>
           </div>
+        </ClientOnly>
+
+        <!-- Fullscreen interactive map -->
+        <ClientOnly>
+          <Teleport to="body">
+            <div v-if="mapExpanded" class="map-fs" role="dialog" aria-label="Zone map">
+              <div class="map-fs-bar">
+                <span class="map-fs-title">
+                  {{ detectedCity!.flag }} {{ detectedCity!.name }} · parking zones
+                </span>
+                <button
+                  class="map-fs-close"
+                  type="button"
+                  aria-label="Close map"
+                  @click="mapExpanded = false"
+                >✕</button>
+              </div>
+              <div class="map-fs-body">
+                <LocationMap
+                  :lat="coords!.lat"
+                  :lng="coords!.lng"
+                  :accuracy="coords!.accuracy"
+                  :heading="heading"
+                  :zones="zoneBoundaries"
+                  fill
+                  interactive
+                />
+              </div>
+            </div>
+          </Teleport>
         </ClientOnly>
 
         <!-- City badge -->
@@ -277,6 +315,21 @@ const cityDetail = ref<any>(null)
 const loadingCityDetail = ref(false)
 const userProfile = ref<any>(null)
 const zoneBoundaries = ref<any>(null)
+const mapExpanded = ref(false)
+
+// Lock body scroll + close on Escape while the fullscreen map is open
+watch(mapExpanded, (open) => {
+  if (import.meta.server) return
+  document.body.style.overflow = open ? 'hidden' : ''
+})
+const onKeydown = (e: KeyboardEvent) => {
+  if (e.key === 'Escape') mapExpanded.value = false
+}
+onMounted(() => window.addEventListener('keydown', onKeydown))
+onUnmounted(() => {
+  window.removeEventListener('keydown', onKeydown)
+  document.body.style.overflow = ''
+})
 
 const defaultPlate = computed(() => {
   const plates = userProfile.value?.plates ?? []
@@ -719,6 +772,73 @@ h2 {
   border-radius: var(--r-lg);
   overflow: hidden;
   margin-bottom: 0;
+}
+.map-expand-btn {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  z-index: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 13px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text2);
+  background: rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+  transition: background 150ms;
+}
+.map-expand-btn span { font-size: 15px; line-height: 1; }
+.map-expand-btn:hover { background: #fff; }
+
+/* ── Fullscreen interactive map ── */
+.map-fs {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+}
+.map-fs-bar {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  padding-top: max(14px, env(safe-area-inset-top));
+  border-bottom: 1px solid var(--border);
+}
+.map-fs-title {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  color: var(--text);
+}
+.map-fs-close {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  color: var(--text2);
+  background: var(--bg2, #f3f4f6);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  cursor: pointer;
+}
+.map-fs-close:hover { color: var(--text); }
+.map-fs-body {
+  flex: 1 1 auto;
+  min-height: 0;
 }
 .compass-btn {
   position: absolute;
