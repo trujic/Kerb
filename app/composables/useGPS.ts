@@ -118,5 +118,30 @@ export const useGPS = () => {
     }
   }
 
-  return { detectCity, detectedCity, coords, detecting, gpsError, suggestedZoneName }
+  let _watchId: number | null = null
+
+  const startTracking = () => {
+    if (!import.meta.client || !navigator.geolocation) return
+    if (_watchId !== null) return
+    _watchId = navigator.geolocation.watchPosition(
+      (pos) => {
+        coords.value = {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+        }
+      },
+      null,
+      { enableHighAccuracy: true, maximumAge: 10000 }
+    )
+  }
+
+  const stopTracking = () => {
+    if (_watchId !== null) {
+      navigator.geolocation.clearWatch(_watchId)
+      _watchId = null
+    }
+  }
+
+  return { detectCity, detectedCity, coords, detecting, gpsError, suggestedZoneName, startTracking, stopTracking }
 }

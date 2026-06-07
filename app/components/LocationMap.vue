@@ -3,9 +3,30 @@
 </template>
 
 <script setup lang="ts">
-const props = defineProps<{ lat: number; lng: number; accuracy?: number; height?: number }>()
+const props = defineProps<{
+  lat: number
+  lng: number
+  accuracy?: number
+  heading?: number | null
+  height?: number
+}>()
 
 const mapEl = ref<HTMLElement | null>(null)
+
+// SVG cone pointing North (up), rotated by heading degrees
+// Path: from center (30,30), left edge at -20° from North, arc to right edge at +20°
+const CONE_SVG = `
+  <svg class="lm-heading" width="60" height="60" viewBox="0 0 60 60" style="opacity:0;transition:opacity 0.3s,transform 0.15s linear;transform-origin:30px 30px">
+    <path d="M 30 30 L 21 6 A 26 26 0 0 1 39 6 Z" fill="rgba(37,99,235,0.35)" />
+  </svg>
+`
+
+const buildIcon = (L: any) => L.divIcon({
+  className: '',
+  html: `<div class="lm-dot">${CONE_SVG}<div class="lm-pulse"></div><div class="lm-inner"></div></div>`,
+  iconSize: [60, 60],
+  iconAnchor: [30, 30],
+})
 
 onMounted(async () => {
   if (!mapEl.value) return
@@ -15,7 +36,7 @@ onMounted(async () => {
 
   const map = L.map(mapEl.value, {
     center: [props.lat, props.lng],
-    zoom: 16,
+    zoom: 17,
     zoomControl: false,
     attributionControl: false,
     dragging: false,
@@ -30,9 +51,9 @@ onMounted(async () => {
     maxZoom: 19,
   }).addTo(map)
 
-  // Accuracy circle
+  let circle: any = null
   if (props.accuracy && props.accuracy < 500) {
-    L.circle([props.lat, props.lng], {
+    circle = L.circle([props.lat, props.lng], {
       radius: props.accuracy,
       color: '#2563EB',
       fillColor: '#2563EB',
@@ -42,25 +63,45 @@ onMounted(async () => {
     }).addTo(map)
   }
 
-  // Google Maps-style blue dot
-  const dot = L.divIcon({
-    className: '',
-    html: `<div class="lm-dot"><div class="lm-pulse"></div><div class="lm-inner"></div></div>`,
-    iconSize: [40, 40],
-    iconAnchor: [20, 20],
+  const marker = L.marker([props.lat, props.lng], { icon: buildIcon(L) }).addTo(map)
+
+  // ── Live position updates ──────────────────────────────────────────────────
+  watch([() => props.lat, () => props.lng, () => props.accuracy], ([lat, lng, acc]) => {
+    const ll: [number, number] = [lat, lng]
+    marker.setLatLng(ll)
+    map.panTo(ll, { animate: true, duration: 0.6 })
+    if (circle) {
+      circle.setLatLng(ll)
+      if (acc) circle.setRadius(acc)
+    }
   })
-  L.marker([props.lat, props.lng], { icon: dot }).addTo(map)
+
+  // ── Heading — update SVG transform directly (no icon recreation) ───────────
+  watch(() => props.heading, (h) => {
+    const svg = mapEl.value?.querySelector('.lm-heading') as SVGElement | null
+    if (!svg) return
+    if (h !== null && h !== undefined) {
+      svg.style.opacity = '1'
+      svg.style.transform = `rotate(${h}deg)`
+    } else {
+      svg.style.opacity = '0'
+    }
+  }, { immediate: true })
 
   onUnmounted(() => map.remove())
 })
 </script>
 
 <style>
-/* Dot styles must be global since they're injected as raw HTML by Leaflet */
 .lm-dot {
   position: relative;
-  width: 40px;
-  height: 40px;
+  width: 60px;
+  height: 60px;
+}
+.lm-heading {
+  position: absolute;
+  top: 0; left: 0;
+  pointer-events: none;
 }
 .lm-inner {
   position: absolute;
@@ -70,21 +111,22 @@ onMounted(async () => {
   background: #2563EB;
   border: 2.5px solid #fff;
   border-radius: 50%;
-  box-shadow: 0 2px 6px rgba(37,99,235,0.5);
-  z-index: 1;
+  box-shadow: 0 2px 8px rgba(37,99,235,0.55);
+  z-index: 2;
 }
 .lm-pulse {
   position: absolute;
   top: 50%; left: 50%;
   transform: translate(-50%, -50%) scale(0.4);
   width: 40px; height: 40px;
-  background: rgba(37, 99, 235, 0.25);
+  background: rgba(37, 99, 235, 0.2);
   border-radius: 50%;
   animation: lm-pulse 2s ease-out infinite;
+  z-index: 1;
 }
 @keyframes lm-pulse {
   0%   { transform: translate(-50%, -50%) scale(0.4); opacity: 1; }
-  100% { transform: translate(-50%, -50%) scale(1.6); opacity: 0; }
+  100% { transform: translate(-50%, -50%) scale(1.8); opacity: 0; }
 }
 </style>
 

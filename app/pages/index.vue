@@ -5,7 +5,18 @@
       <div class="container">
         <!-- Map -->
         <ClientOnly>
-          <LocationMap :lat="coords!.lat" :lng="coords!.lng" :accuracy="coords!.accuracy" :height="260" class="gps-hero-map" />
+          <div class="gps-map-wrap">
+            <LocationMap
+              :lat="coords!.lat"
+              :lng="coords!.lng"
+              :accuracy="coords!.accuracy"
+              :heading="heading"
+              :height="260"
+            />
+            <button v-if="needsPermission" class="compass-btn" @click="requestPermission">
+              🧭 Enable compass
+            </button>
+          </div>
         </ClientOnly>
 
         <!-- City badge -->
@@ -260,7 +271,8 @@
 <script setup lang="ts">
 const { getCities, searchCities, getCity } = useCity()
 const { user, getProfile } = useAuth()
-const { detectCity, detectedCity, coords, detecting, gpsError, suggestedZoneName } = useGPS()
+const { detectCity, detectedCity, coords, detecting, gpsError, suggestedZoneName, startTracking, stopTracking } = useGPS()
+const { heading, needsPermission, start: startOrientation, requestPermission, stop: stopOrientation } = useDeviceOrientation()
 
 const cityDetail = ref<any>(null)
 const loadingCityDetail = ref(false)
@@ -305,7 +317,19 @@ watch(
   }
 )
 
+
 const gpsMode = computed(() => !!(user.value && detectedCity.value && cityDetail.value))
+
+// Start live GPS tracking + compass when GPS mode activates
+watch(gpsMode, (active) => {
+  if (active) {
+    startTracking()
+    startOrientation()
+  } else {
+    stopTracking()
+    stopOrientation()
+  }
+})
 
 const { data: cities, pending, error } = await useAsyncData('cities', getCities, { lazy: true })
 
@@ -681,6 +705,30 @@ h2 {
 }
 
 /* ── GPS DASHBOARD ── */
+.gps-map-wrap {
+  position: relative;
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  margin-bottom: 0;
+}
+.compass-btn {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  background: rgba(255,255,255,0.92);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text2);
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition: background 150ms;
+}
+.compass-btn:hover { background: #fff; }
+
 .hero-gps {
   padding: 80px 0 40px;
   border-bottom: 1px solid var(--border);
