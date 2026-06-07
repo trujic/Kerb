@@ -276,7 +276,7 @@ const { heading, start: startOrientation, stop: stopOrientation, onMapTap } = us
 const cityDetail = ref<any>(null)
 const loadingCityDetail = ref(false)
 const userProfile = ref<any>(null)
-const zoneBoundaries = ref<any[]>([])
+const zoneBoundaries = ref<any>(null)
 
 const defaultPlate = computed(() => {
   const plates = userProfile.value?.plates ?? []
@@ -312,7 +312,7 @@ watch(detectedCity, async (city) => {
     const res = await fetch(`/zones/${city.id}.json`)
     if (res.ok) {
       const data = await res.json()
-      zoneBoundaries.value = data.zones ?? []
+      zoneBoundaries.value = data
     }
   } catch { /* no boundaries file, that's fine */ }
 })
