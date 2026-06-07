@@ -329,7 +329,7 @@ watch(gpsMode, (active) => {
     stopTracking()
     stopOrientation()
   }
-})
+}, { immediate: true })
 
 const { data: cities, pending, error } = await useAsyncData('cities', getCities, { lazy: true })
 

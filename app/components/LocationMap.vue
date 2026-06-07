@@ -11,21 +11,40 @@ const props = defineProps<{
   height?: number
 }>()
 
-const mapEl = ref<HTMLElement | null>(null)
+const mapEl    = ref<HTMLElement | null>(null)
+const mapRef    = shallowRef<any>(null)
+const markerRef = shallowRef<any>(null)
+const circleRef = shallowRef<any>(null)
 
-// SVG cone pointing North (up), rotated by heading degrees
-// Path: from center (30,30), left edge at -20° from North, arc to right edge at +20°
 const CONE_SVG = `
-  <svg class="lm-heading" width="60" height="60" viewBox="0 0 60 60" style="opacity:0;transition:opacity 0.3s,transform 0.15s linear;transform-origin:30px 30px">
+  <svg class="lm-heading" width="60" height="60" viewBox="0 0 60 60"
+    style="opacity:0;transition:opacity 0.3s,transform 0.15s linear;transform-origin:30px 30px;position:absolute;top:0;left:0;pointer-events:none">
     <path d="M 30 30 L 21 6 A 26 26 0 0 1 39 6 Z" fill="rgba(37,99,235,0.35)" />
   </svg>
 `
 
-const buildIcon = (L: any) => L.divIcon({
-  className: '',
-  html: `<div class="lm-dot">${CONE_SVG}<div class="lm-pulse"></div><div class="lm-inner"></div></div>`,
-  iconSize: [60, 60],
-  iconAnchor: [30, 30],
+// ── Live position — top-level watcher, always associated with component ───────
+watch([() => props.lat, () => props.lng, () => props.accuracy], ([lat, lng, acc]) => {
+  if (!mapRef.value || !markerRef.value) return
+  const ll: [number, number] = [lat, lng]
+  markerRef.value.setLatLng(ll)
+  mapRef.value.panTo(ll, { animate: true, duration: 0.6 })
+  if (circleRef.value) {
+    circleRef.value.setLatLng(ll)
+    if (acc) circleRef.value.setRadius(acc)
+  }
+})
+
+// ── Compass heading — patch SVG directly without recreating the icon ──────────
+watch(() => props.heading, (h) => {
+  const svg = mapEl.value?.querySelector('.lm-heading') as SVGElement | null
+  if (!svg) return
+  if (h !== null && h !== undefined) {
+    svg.style.opacity = '1'
+    svg.style.transform = `rotate(${h}deg)`
+  } else {
+    svg.style.opacity = '0'
+  }
 })
 
 onMounted(async () => {
@@ -51,9 +70,8 @@ onMounted(async () => {
     maxZoom: 19,
   }).addTo(map)
 
-  let circle: any = null
   if (props.accuracy && props.accuracy < 500) {
-    circle = L.circle([props.lat, props.lng], {
+    circleRef.value = L.circle([props.lat, props.lng], {
       radius: props.accuracy,
       color: '#2563EB',
       fillColor: '#2563EB',
@@ -63,32 +81,22 @@ onMounted(async () => {
     }).addTo(map)
   }
 
-  const marker = L.marker([props.lat, props.lng], { icon: buildIcon(L) }).addTo(map)
-
-  // ── Live position updates ──────────────────────────────────────────────────
-  watch([() => props.lat, () => props.lng, () => props.accuracy], ([lat, lng, acc]) => {
-    const ll: [number, number] = [lat, lng]
-    marker.setLatLng(ll)
-    map.panTo(ll, { animate: true, duration: 0.6 })
-    if (circle) {
-      circle.setLatLng(ll)
-      if (acc) circle.setRadius(acc)
-    }
+  const icon = L.divIcon({
+    className: '',
+    html: `<div class="lm-dot">${CONE_SVG}<div class="lm-pulse"></div><div class="lm-inner"></div></div>`,
+    iconSize: [60, 60],
+    iconAnchor: [30, 30],
   })
 
-  // ── Heading — update SVG transform directly (no icon recreation) ───────────
-  watch(() => props.heading, (h) => {
-    const svg = mapEl.value?.querySelector('.lm-heading') as SVGElement | null
-    if (!svg) return
-    if (h !== null && h !== undefined) {
-      svg.style.opacity = '1'
-      svg.style.transform = `rotate(${h}deg)`
-    } else {
-      svg.style.opacity = '0'
-    }
-  }, { immediate: true })
+  markerRef.value = L.marker([props.lat, props.lng], { icon }).addTo(map)
+  mapRef.value    = map
 
-  onUnmounted(() => map.remove())
+  onUnmounted(() => {
+    map.remove()
+    mapRef.value = null
+    markerRef.value = null
+    circleRef.value = null
+  })
 })
 </script>
 
@@ -97,11 +105,6 @@ onMounted(async () => {
   position: relative;
   width: 60px;
   height: 60px;
-}
-.lm-heading {
-  position: absolute;
-  top: 0; left: 0;
-  pointer-events: none;
 }
 .lm-inner {
   position: absolute;
