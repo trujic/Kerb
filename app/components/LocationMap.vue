@@ -86,6 +86,11 @@ watchEffect(() => {
 })
 
 // ── Zone overlays — watchEffect re-runs whenever zones, map, or L change ──────
+// Renders both filled area Polygons and colored street LineStrings. The Novi Sad
+// data is per-street lines (each parking street drawn in its zone color).
+const toLatLngs = (coords: [number, number][]) =>
+  coords.map(([lng, lat]) => [lat, lng] as [number, number])
+
 watchEffect((onCleanup) => {
   const zones = props.zones
   const map   = mapRef.value
@@ -94,19 +99,29 @@ watchEffect((onCleanup) => {
 
   const layers: any[] = []
   for (const feature of zones.features) {
-    if (feature.geometry?.type !== 'Polygon') continue
-    if (feature.geometry.coordinates[0].length < 3) continue
+    const g = feature.geometry
+    if (!g) continue
     const color = (feature.properties?.color ?? '#3B82F6').trim()
     const name  = feature.properties?.name ?? ''
-    const latlngs = feature.geometry.coordinates[0]
-      .map(([lng, lat]: [number, number]) => [lat, lng] as [number, number])
-    const layer = L.polygon(latlngs, {
-      color,
-      fillColor: color,
-      fillOpacity: 0.13,
-      weight: 2,
-      opacity: 0.55,
-    }).addTo(map)
+
+    let layer: any = null
+    if (g.type === 'Polygon') {
+      if (g.coordinates[0].length < 3) continue
+      layer = L.polygon(toLatLngs(g.coordinates[0]), {
+        color, fillColor: color, fillOpacity: 0.13, weight: 2, opacity: 0.55,
+      })
+    } else if (g.type === 'LineString') {
+      layer = L.polyline(toLatLngs(g.coordinates), {
+        color, weight: 5, opacity: 0.85, lineCap: 'round', lineJoin: 'round',
+      })
+    } else if (g.type === 'MultiLineString') {
+      layer = L.polyline(g.coordinates.map(toLatLngs), {
+        color, weight: 5, opacity: 0.85, lineCap: 'round', lineJoin: 'round',
+      })
+    }
+    if (!layer) continue
+
+    layer.addTo(map)
     if (name) layer.bindTooltip(name, { sticky: true, className: 'zone-tooltip' })
     layers.push(layer)
   }
