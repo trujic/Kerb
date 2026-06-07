@@ -42,7 +42,7 @@
 const { signIn, signUp, user } = useAuth()
 
 // Redirect if already logged in
-if (user.value) await navigateTo('/profile')
+if (user.value) await navigateTo('/')
 
 const isRegister = ref(false)
 const loading = ref(false)
@@ -68,7 +68,7 @@ const handleSubmit = async () => {
       isRegister.value = false
     } else {
       await signIn(form.email, form.password)
-      await navigateTo('/profile')
+      await navigateTo('/')
     }
   } catch (e: any) {
     authError.value = e?.message ?? 'Something went wrong.'
