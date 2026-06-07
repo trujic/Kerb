@@ -3,19 +3,13 @@
 </template>
 
 <script setup lang="ts">
-interface ZoneFeature {
-  name: string
-  color: string
-  coordinates: [number, number][][] // GeoJSON polygon rings [lng, lat]
-}
-
 const props = defineProps<{
   lat: number
   lng: number
   accuracy?: number
   heading?: number | null
   height?: number
-  zones?: ZoneFeature[]
+  zones?: any // GeoJSON FeatureCollection
 }>()
 
 const emit = defineEmits<{ compassTap: [] }>()
@@ -86,19 +80,27 @@ onMounted(async () => {
     maxZoom: 19,
   }).addTo(map)
 
-  // Zone boundary overlays
-  if (props.zones?.length) {
-    for (const zone of props.zones) {
-      // GeoJSON uses [lng, lat], Leaflet uses [lat, lng]
-      const latlngs = zone.coordinates[0].map(([lng, lat]) => [lat, lng] as [number, number])
-      L.polygon(latlngs, {
-        color: zone.color,
-        fillColor: zone.color,
-        fillOpacity: 0.12,
-        weight: 2,
-        opacity: 0.5,
-      }).bindTooltip(zone.name, { sticky: true, className: 'zone-tooltip' }).addTo(map)
-    }
+  // Zone boundary overlays — accepts standard GeoJSON FeatureCollection
+  const features = props.zones?.features ?? props.zones?.zones?.map((z: any) => ({
+    type: 'Feature',
+    properties: { name: z.name, color: z.color },
+    geometry: { type: 'Polygon', coordinates: z.coordinates },
+  })) ?? []
+
+  for (const feature of features) {
+    if (feature.geometry?.type !== 'Polygon') continue
+    const color = feature.properties?.color ?? '#3B82F6'
+    const name  = feature.properties?.name  ?? ''
+    // GeoJSON: [lng, lat] → Leaflet: [lat, lng]
+    const latlngs = feature.geometry.coordinates[0]
+      .map(([lng, lat]: [number, number]) => [lat, lng] as [number, number])
+    L.polygon(latlngs, {
+      color,
+      fillColor: color,
+      fillOpacity: 0.13,
+      weight: 2,
+      opacity: 0.55,
+    }).bindTooltip(name, { sticky: true, className: 'zone-tooltip' }).addTo(map)
   }
 
   if (props.accuracy && props.accuracy < 500) {
