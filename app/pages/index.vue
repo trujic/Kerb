@@ -69,6 +69,9 @@
           <NuxtLink :to="`/${detectedCity!.id}`" class="gps-full-link">Full guide →</NuxtLink>
         </div>
 
+        <!-- Hours (live free/paid status) -->
+        <ParkingHours :city-id="detectedCity!.id" compact class="gps-hours" />
+
         <!-- Zone cards -->
         <div class="gps-zones">
 
@@ -918,6 +921,7 @@ h2 {
 .gps-full-link:hover { color: var(--blue-hover); }
 
 /* Zone pay cards */
+.gps-hours { margin-bottom: 20px; }
 .gps-zones { margin-bottom: 20px; }
 .zone-pay-list {
   display: flex;

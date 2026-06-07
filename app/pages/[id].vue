@@ -108,6 +108,9 @@
 
           <!-- RIGHT (sidebar) -->
           <div class="right-col">
+            <!-- Hours -->
+            <ParkingHours :city-id="city.id" style="margin-bottom: 10px" />
+
             <!-- Fine -->
             <div class="sidebar-card">
               <p class="section-label">Fine if unpaid</p>

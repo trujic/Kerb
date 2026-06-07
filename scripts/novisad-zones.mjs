@@ -29,10 +29,12 @@ export function normalizeStreet(name) {
 }
 
 export const zones = [
+  // Hours are city-wide (see Parking hours / useParkingHours) — zone rules cover
+  // only what differs per zone: price, time limits, and daily-ticket availability.
   {
     name: 'Extra Zone',
     color: '#F97316',
-    rules: 'Max 60 min. After expiry you must leave the zone — cannot re-pay for the next 60 min. Mon–Sat 8:00–21:00, Sun 7:30–13:30.',
+    rules: 'Max 60 min. After expiry you must leave the zone — you cannot re-pay for the next 60 min.',
     price: '80 RSD/h',
     sort_order: 1,
     sms_shortcode: '8210',
@@ -40,7 +42,7 @@ export const zones = [
   {
     name: 'Red Zone',
     color: '#EF4444',
-    rules: 'Max 120 min. After expiry you must leave the zone for at least 30 min before paying again. Mon–Sat 8:00–21:00, Sun 7:30–13:30.',
+    rules: 'Max 120 min. After expiry you must leave the zone for at least 30 min before paying again.',
     price: '60 RSD/h',
     sort_order: 2,
     sms_shortcode: '8211',
@@ -48,7 +50,7 @@ export const zones = [
   {
     name: 'Blue Zone',
     color: '#3B82F6',
-    rules: 'No time limit. Daily card available for 95 RSD. Weekdays 7:00–21:00, Saturday 7:00–14:00.',
+    rules: 'No time limit. A daily ticket is offered only at certain lots — look for an extra sign at the spot; if available, pay it to 8215 (95 RSD).',
     price: '50 RSD/h',
     sort_order: 3,
     sms_shortcode: '8212',
@@ -56,7 +58,7 @@ export const zones = [
   {
     name: 'White Zone',
     color: '#9CA3AF',
-    rules: 'No time limit. Daily card available for 95 RSD. Weekdays 7:00–21:00, Saturday 7:00–14:00.',
+    rules: 'No time limit. Daily ticket available across the zone — 95 RSD, paid to 8215.',
     price: '30 RSD/h',
     sort_order: 4,
     sms_shortcode: '8218',
