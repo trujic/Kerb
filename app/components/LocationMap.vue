@@ -1,5 +1,5 @@
 <template>
-  <div ref="mapEl" class="location-map" />
+  <div ref="mapEl" class="location-map" @click="onMapTap" />
 </template>
 
 <script setup lang="ts">
@@ -11,7 +11,9 @@ const props = defineProps<{
   height?: number
 }>()
 
-const mapEl    = ref<HTMLElement | null>(null)
+const emit = defineEmits<{ compassTap: [] }>()
+
+const mapEl     = ref<HTMLElement | null>(null)
 const mapRef    = shallowRef<any>(null)
 const markerRef = shallowRef<any>(null)
 const circleRef = shallowRef<any>(null)
@@ -19,24 +21,31 @@ const circleRef = shallowRef<any>(null)
 const CONE_SVG = `
   <svg class="lm-heading" width="60" height="60" viewBox="0 0 60 60"
     style="opacity:0;transition:opacity 0.3s,transform 0.15s linear;transform-origin:30px 30px;position:absolute;top:0;left:0;pointer-events:none">
-    <path d="M 30 30 L 21 6 A 26 26 0 0 1 39 6 Z" fill="rgba(37,99,235,0.35)" />
+    <path d="M 30 30 L 21 6 A 26 26 0 0 1 39 6 Z" fill="rgba(37,99,235,0.38)" />
   </svg>
 `
 
-// ── Live position — top-level watcher, always associated with component ───────
-watch([() => props.lat, () => props.lng, () => props.accuracy], ([lat, lng, acc]) => {
-  if (!mapRef.value || !markerRef.value) return
+// Emit compassTap so parent can request iOS orientation permission on user gesture
+const onMapTap = () => emit('compassTap')
+
+// ── Live position — watchEffect tracks all deps and re-runs on any change ─────
+watchEffect(() => {
+  const lat = props.lat
+  const lng = props.lng
+  const acc = props.accuracy
+  if (!markerRef.value || !mapRef.value) return
   const ll: [number, number] = [lat, lng]
   markerRef.value.setLatLng(ll)
-  mapRef.value.panTo(ll, { animate: true, duration: 0.6 })
+  mapRef.value.panTo(ll, { animate: true, duration: 0.5 })
   if (circleRef.value) {
     circleRef.value.setLatLng(ll)
     if (acc) circleRef.value.setRadius(acc)
   }
 })
 
-// ── Compass heading — patch SVG directly without recreating the icon ──────────
-watch(() => props.heading, (h) => {
+// ── Compass heading — patch SVG directly without recreating icon ──────────────
+watchEffect(() => {
+  const h = props.heading
   const svg = mapEl.value?.querySelector('.lm-heading') as SVGElement | null
   if (!svg) return
   if (h !== null && h !== undefined) {
@@ -93,7 +102,7 @@ onMounted(async () => {
 
   onUnmounted(() => {
     map.remove()
-    mapRef.value = null
+    mapRef.value    = null
     markerRef.value = null
     circleRef.value = null
   })

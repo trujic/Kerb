@@ -12,10 +12,8 @@
               :accuracy="coords!.accuracy"
               :heading="heading"
               :height="260"
+              @compass-tap="onMapTap"
             />
-            <button v-if="needsPermission" class="compass-btn" @click="requestPermission">
-              🧭 Enable compass
-            </button>
           </div>
         </ClientOnly>
 
@@ -272,7 +270,7 @@
 const { getCities, searchCities, getCity } = useCity()
 const { user, getProfile } = useAuth()
 const { detectCity, detectedCity, coords, detecting, gpsError, suggestedZoneName, startTracking, stopTracking } = useGPS()
-const { heading, needsPermission, start: startOrientation, requestPermission, stop: stopOrientation } = useDeviceOrientation()
+const { heading, start: startOrientation, stop: stopOrientation, onMapTap } = useDeviceOrientation()
 
 const cityDetail = ref<any>(null)
 const loadingCityDetail = ref(false)

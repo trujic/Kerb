@@ -131,8 +131,8 @@ export const useGPS = () => {
           accuracy: pos.coords.accuracy,
         }
       },
-      null,
-      { enableHighAccuracy: true, maximumAge: 10000 }
+      (err) => console.warn('[Kerb] watchPosition error:', err.code, err.message),
+      { enableHighAccuracy: true, maximumAge: 0 }
     )
   }
 
