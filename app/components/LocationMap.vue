@@ -58,21 +58,19 @@ watchEffect(() => {
   }
 })
 
-// ── Zone overlays — fires whenever zones prop arrives or map initialises ──────
-watch([() => props.zones, mapRef], ([zones, map]) => {
-  const L = LRef.value
-  if (!L || !map || !zones) return
+// ── Zone overlays — watchEffect re-runs whenever zones, map, or L change ──────
+watchEffect((onCleanup) => {
+  const zones = props.zones
+  const map   = mapRef.value
+  const L     = LRef.value
+  if (!L || !map || !zones?.features?.length) return
 
-  // Remove old layers
-  for (const layer of zoneLayers.value) map.removeLayer(layer)
-  zoneLayers.value = []
-
-  const features = zones.features ?? []
-  for (const feature of features) {
+  const layers: any[] = []
+  for (const feature of zones.features) {
     if (feature.geometry?.type !== 'Polygon') continue
     if (feature.geometry.coordinates[0].length < 3) continue
     const color = (feature.properties?.color ?? '#3B82F6').trim()
-    const name  = feature.properties?.name  ?? ''
+    const name  = feature.properties?.name ?? ''
     const latlngs = feature.geometry.coordinates[0]
       .map(([lng, lat]: [number, number]) => [lat, lng] as [number, number])
     const layer = L.polygon(latlngs, {
@@ -83,9 +81,13 @@ watch([() => props.zones, mapRef], ([zones, map]) => {
       opacity: 0.55,
     }).addTo(map)
     if (name) layer.bindTooltip(name, { sticky: true, className: 'zone-tooltip' })
-    zoneLayers.value = [...zoneLayers.value, layer]
+    layers.push(layer)
   }
-}, { deep: true })
+
+  onCleanup(() => {
+    for (const layer of layers) { try { map.removeLayer(layer) } catch {} }
+  })
+})
 
 onMounted(async () => {
   if (!mapEl.value) return
