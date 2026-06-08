@@ -13,6 +13,7 @@
               :heading="heading"
               :height="260"
               :zones="zoneBoundaries"
+              :highlight="highlightPoint"
               @compass-tap="onMapTap"
             />
             <button
@@ -48,6 +49,7 @@
                   :accuracy="coords!.accuracy"
                   :heading="heading"
                   :zones="zoneBoundaries"
+                  :highlight="highlightPoint"
                   fill
                   interactive
                 />
@@ -72,12 +74,31 @@
         <!-- Hours (live free/paid status) -->
         <ParkingHours :city-id="detectedCity!.id" compact class="gps-hours" />
 
+        <!-- No paid parking at the user's spot -->
+        <div v-if="parkingState === 'none' && nearest" class="gps-noparking">
+          <div class="np-icon">🅿️</div>
+          <div class="np-text">
+            <p class="np-title">No paid zone where you're standing</p>
+            <p class="np-sub">
+              Parking here is likely free. Nearest paid parking is
+              <strong>~{{ formatDist(nearest.distanceM) }}</strong> away —
+              <span :style="{ color: zoneColor(nearest.zoneName) }">{{ nearest.zoneName }}</span>
+              on {{ nearest.streetName }}.
+            </p>
+          </div>
+        </div>
+
         <!-- Zone cards -->
         <div class="gps-zones">
 
           <!-- ── Suggested zone (hero card) ── -->
           <template v-if="suggestedZone">
-            <p class="section-label">📍 Likely your zone</p>
+            <p class="section-label">
+              <template v-if="parkingState === 'near' && nearest">
+                📍 Closest paid parking · ~{{ formatDist(nearest.distanceM) }} away
+              </template>
+              <template v-else>📍 Likely your zone</template>
+            </p>
             <div
               class="zone-hero-card"
               :style="{ borderColor: suggestedZone.color, background: suggestedZone.color + '0d' }"
@@ -89,6 +110,9 @@
                   <span class="zhc-price" :style="{ color: suggestedZone.color }">{{ suggestedZone.price }}</span>
                 </div>
                 <p class="zhc-rules">{{ suggestedZone.rules }}</p>
+                <p v-if="parkingState === 'near'" class="zhc-caution">
+                  ⚠️ You may be just outside this zone — check the curb sign before paying.
+                </p>
                 <a
                   v-if="suggestedZone.sms_shortcode"
                   :href="smsLink(suggestedZone)"
@@ -339,15 +363,54 @@ const defaultPlate = computed(() => {
   return (plates.find((p: any) => p.is_default) ?? plates[0])?.plate ?? null
 })
 
-const isSuggested = (zone: any) =>
-  !!suggestedZoneName.value && zone.name === suggestedZoneName.value
+// Geometry-based detection: distance to the nearest paid-parking segment.
+const { nearest } = useNearestParking(coords, zoneBoundaries)
+
+// on  = standing on a paid street · near = just off one · none = no paid parking
+const parkingState = computed<'on' | 'near' | 'none' | null>(() => {
+  const n = nearest.value
+  if (!n) return null
+  const acc = coords.value?.accuracy ?? 0
+  const onT = Math.min(Math.max(25, acc), 60)   // widen when GPS is imprecise
+  const nearT = Math.max(75, onT + 50)
+  if (n.distanceM <= onT) return 'on'
+  if (n.distanceM <= nearT) return 'near'
+  return 'none'
+})
+
+const formatDist = (m: number) => {
+  if (m >= 1000) return `${(m / 1000).toFixed(1)} km`
+  return `${Math.max(5, Math.round(m / 5) * 5)} m`
+}
+
+const zoneColor = (name: string) =>
+  cityDetail.value?.zones?.find((z: any) => z.name === name)?.color ?? 'var(--text2)'
+
+// Which zone to surface as the hero. Prefer geometry; fall back to the street-
+// name match only when boundary geometry isn't loaded.
+const activeSuggestedName = computed<string | null>(() => {
+  if (nearest.value) {
+    return parkingState.value === 'on' || parkingState.value === 'near'
+      ? nearest.value.zoneName
+      : null
+  }
+  return suggestedZoneName.value
+})
 
 const suggestedZone = computed(() =>
-  cityDetail.value?.zones?.find((z: any) => isSuggested(z)) ?? null
+  cityDetail.value?.zones?.find((z: any) => z.name === activeSuggestedName.value) ?? null
 )
 
 const otherZones = computed(() =>
-  cityDetail.value?.zones?.filter((z: any) => !isSuggested(z)) ?? cityDetail.value?.zones ?? []
+  cityDetail.value?.zones?.filter((z: any) => z.name !== activeSuggestedName.value)
+    ?? cityDetail.value?.zones ?? []
+)
+
+// Point at the nearest segment on the map unless we're already on it
+const highlightPoint = computed(() =>
+  parkingState.value === 'near' || parkingState.value === 'none'
+    ? nearest.value?.point ?? null
+    : null,
 )
 
 const smsLink = (zone: any) => {
@@ -923,6 +986,35 @@ h2 {
 /* Zone pay cards */
 .gps-hours { margin-bottom: 20px; }
 .gps-zones { margin-bottom: 20px; }
+
+/* No paid parking at the user's spot */
+.gps-noparking {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  margin-bottom: 20px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--green);
+  border-radius: var(--r-md);
+}
+.np-icon {
+  font-size: 24px;
+  line-height: 1;
+  flex-shrink: 0;
+  filter: grayscale(0.3);
+}
+.np-title { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 2px; }
+.np-sub { font-size: 13px; color: var(--muted); line-height: 1.5; }
+.np-sub strong { color: var(--text); font-weight: 600; }
+
+.zhc-caution {
+  font-size: 12px;
+  color: var(--amber);
+  line-height: 1.45;
+  margin-top: 8px;
+}
 .zone-pay-list {
   display: flex;
   flex-direction: column;

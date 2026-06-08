@@ -21,6 +21,7 @@ const props = defineProps<{
   zones?: any // GeoJSON FeatureCollection
   interactive?: boolean // enable pan/zoom (fullscreen mode)
   fill?: boolean        // fill parent height instead of fixed px
+  highlight?: { lat: number; lng: number } | null // nearest-parking point to point at
 }>()
 
 const emit = defineEmits<{ compassTap: [] }>()
@@ -128,6 +129,26 @@ watchEffect((onCleanup) => {
 
   onCleanup(() => {
     for (const layer of layers) { try { map.removeLayer(layer) } catch {} }
+  })
+})
+
+// ── Nearest-parking pointer — dashed connector from the user to the target ────
+watchEffect((onCleanup) => {
+  const h   = props.highlight
+  const map = mapRef.value
+  const L   = LRef.value
+  if (!L || !map || !h) return
+
+  const line = L.polyline(
+    [[props.lat, props.lng], [h.lat, h.lng]],
+    { color: '#111827', weight: 2, opacity: 0.55, dashArray: '3 6', interactive: false },
+  ).addTo(map)
+  const dot = L.circleMarker([h.lat, h.lng], {
+    radius: 6, color: '#111827', weight: 2, fillColor: '#fff', fillOpacity: 1, interactive: false,
+  }).addTo(map)
+
+  onCleanup(() => {
+    try { map.removeLayer(line); map.removeLayer(dot) } catch {}
   })
 })
 
