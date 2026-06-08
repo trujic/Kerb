@@ -15,8 +15,11 @@ export default async () => {
     VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT,
   } = process.env
 
-  if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY || !VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
-    return new Response('Missing env', { status: 500 })
+  const missing = Object.entries({ SUPABASE_URL, SUPABASE_SERVICE_KEY, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY })
+    .filter(([, v]) => !v).map(([k]) => k)
+  if (missing.length) {
+    console.error('[reminders] MISSING ENV:', missing.join(', '))
+    return new Response('Missing env: ' + missing.join(', '), { status: 500 })
   }
 
   webpush.setVapidDetails(VAPID_SUBJECT || 'mailto:admin@example.com', VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY)
@@ -30,7 +33,11 @@ export default async () => {
     .select('*')
     .is('ended_at', null)
     .or('reminder_sent_at.is.null,limit_reminder_sent_at.is.null')
-  if (error) return new Response(`query failed: ${error.message}`, { status: 500 })
+  if (error) {
+    console.error('[reminders] query failed:', error.message)
+    return new Response(`query failed: ${error.message}`, { status: 500 })
+  }
+  console.log(`[reminders] candidate sessions: ${sessions?.length ?? 0}`)
 
   let sent = 0
 
@@ -68,12 +75,15 @@ export default async () => {
       })
     }
 
+    const mins = expiryMs ? Math.round((expiryMs - now) / 60_000) : null
+    console.log(`[reminders] session ${s.id}: expires in ${mins}m, limit=${s.max_limit_min ?? '∞'}, due=[${due.map(d => d.kind).join(',') || 'none'}]`)
     if (!due.length) continue
 
     const { data: subs } = await supabase
       .from('push_subscriptions')
       .select('*')
       .eq('user_id', s.user_id)
+    console.log(`[reminders] session ${s.id}: ${subs?.length ?? 0} push subscription(s)`)
     if (!subs?.length) {
       // No device to notify — still mark as handled so we don't reprocess forever
       await markSent(supabase, s.id, due)
@@ -89,7 +99,9 @@ export default async () => {
             payload,
           )
           sent++
+          console.log(`[reminders] sent ${n.kind} to ${sub.endpoint.slice(0, 40)}…`)
         } catch (e: any) {
+          console.error(`[reminders] send failed (status ${e?.statusCode}):`, e?.body || e?.message)
           // Subscription gone (unsubscribed / expired) → clean it up
           if (e?.statusCode === 404 || e?.statusCode === 410) {
             await supabase.from('push_subscriptions').delete().eq('endpoint', sub.endpoint)
@@ -101,6 +113,7 @@ export default async () => {
     await markSent(supabase, s.id, due)
   }
 
+  console.log(`[reminders] done — ${sent} notification(s) sent`)
   return new Response(`ok — ${sent} notifications`)
 }
 
