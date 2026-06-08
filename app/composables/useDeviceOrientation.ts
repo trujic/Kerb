@@ -2,6 +2,7 @@ export const useDeviceOrientation = () => {
   const heading = ref<number | null>(null)
   let _handler: ((e: DeviceOrientationEvent) => void) | null = null
   let _attached = false
+  let _disarmGesture: (() => void) | null = null
 
   const _attach = () => {
     if (_attached) return
@@ -20,35 +21,62 @@ export const useDeviceOrientation = () => {
     window.addEventListener('deviceorientation', _handler as EventListener, true)
   }
 
+  const _needsPermission = () =>
+    typeof (DeviceOrientationEvent as any)?.requestPermission === 'function'
+
+  // Calls iOS's requestPermission. MUST start synchronously inside a user
+  // gesture on iOS (the requestPermission() call itself is sync; only the
+  // result is awaited). Returns true once orientation events are attached.
+  const _request = async (): Promise<boolean> => {
+    if (_attached) return true
+    if (!_needsPermission()) { _attach(); return true }
+    try {
+      const perm = await (DeviceOrientationEvent as any).requestPermission()
+      if (perm === 'granted') { _attach(); return true }
+    } catch { /* called outside a gesture, or denied */ }
+    return false
+  }
+
+  // iOS only: prompt on the user's first interaction *anywhere*, so the compass
+  // turns on without the user having to find the map. One-shot — Safari only
+  // shows the dialog once per origin anyway.
+  const _armGesture = () => {
+    if (_disarmGesture || _attached || !import.meta.client) return
+    const events = ['pointerdown', 'touchend', 'click', 'keydown']
+    const onGesture = () => {
+      _disarm()                 // one-shot: detach before awaiting the result
+      void _request()
+    }
+    for (const ev of events) {
+      window.addEventListener(ev, onGesture, { capture: true, passive: true })
+    }
+    _disarmGesture = () => {
+      for (const ev of events) window.removeEventListener(ev, onGesture, true)
+      _disarmGesture = null
+    }
+  }
+
+  const _disarm = () => { _disarmGesture?.() }
+
   const start = async () => {
     if (!import.meta.client || !window.DeviceOrientationEvent) return
 
-    if (typeof (DeviceOrientationEvent as any).requestPermission === 'function') {
-      // iOS 13+: permission required — try silently first, activate on map tap via onMapTap()
-      try {
-        const perm = await (DeviceOrientationEvent as any).requestPermission()
-        if (perm === 'granted') _attach()
-      } catch {
-        // Will be retried on user gesture via onMapTap
-      }
+    if (_needsPermission()) {
+      // Try silently (succeeds if already granted this session); otherwise arm
+      // the first-gesture prompt. Either way the user never hunts for the map.
+      const granted = await _request()
+      if (!granted) _armGesture()
       return
     }
 
-    _attach()
+    _attach() // Android & others: no permission needed, starts immediately
   }
 
-  // Call this from a user gesture (map tap) — works for iOS permission
-  const onMapTap = async () => {
-    if (_attached || !import.meta.client) return
-    if (typeof (DeviceOrientationEvent as any).requestPermission === 'function') {
-      try {
-        const perm = await (DeviceOrientationEvent as any).requestPermission()
-        if (perm === 'granted') _attach()
-      } catch { /* denied */ }
-    }
-  }
+  // Optional explicit retry from a known gesture (e.g. tapping the map).
+  const onMapTap = async () => { await _request() }
 
   const stop = () => {
+    _disarm()
     if (_handler) {
       window.removeEventListener('deviceorientationabsolute', _handler as EventListener, true)
       window.removeEventListener('deviceorientation', _handler as EventListener, true)
