@@ -119,7 +119,8 @@ export const useParkingSession = () => {
         }
         await supabase
           .from('parking_sessions')
-          .update({ expires_at: new Date(next).toISOString() })
+          // clear reminder_sent_at so a fresh expiry reminder fires for the new time
+          .update({ expires_at: new Date(next).toISOString(), reminder_sent_at: null })
           .eq('id', a.id)
       } else {
         if (a && !a.ended_at) await endSession(a.id)

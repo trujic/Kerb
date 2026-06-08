@@ -9,6 +9,25 @@
         <NuxtLink to="/" class="btn-ghost">← Dashboard</NuxtLink>
       </div>
 
+      <!-- Reminder toggle -->
+      <section v-if="pushSupported || pushError" class="reminders">
+        <div class="rem-text">
+          <p class="rem-title">🔔 Expiry reminders</p>
+          <p class="rem-sub">{{ reminderSub }}</p>
+        </div>
+        <button
+          class="rem-btn"
+          :class="{ 'is-on': pushEnabled }"
+          :disabled="pushBusy"
+          @click="toggleReminders"
+        >
+          {{ pushBusy ? '…' : pushEnabled ? 'On' : 'Enable' }}
+        </button>
+      </section>
+      <p v-else class="rem-ios-note">
+        💡 On iPhone, add Kerb to your Home Screen (Share → Add to Home Screen) to get parking reminders.
+      </p>
+
       <!-- Active session -->
       <section v-if="active" class="active-wrap">
         <SessionCard
@@ -74,6 +93,20 @@ const {
 } = useParkingSession()
 
 onMounted(() => { loadActive(); loadHistory() })
+
+// ── Push reminders ──────────────────────────────────────────────────────────
+const {
+  supported: pushSupported, enabled: pushEnabled, busy: pushBusy, error: pushError,
+  enable: enablePush, disable: disablePush,
+} = usePushNotifications()
+
+const toggleReminders = () => (pushEnabled.value ? disablePush() : enablePush())
+
+const reminderSub = computed(() => {
+  if (pushError.value) return pushError.value
+  if (pushEnabled.value) return 'On — we’ll ping you ~10 min before your parking runs out.'
+  return 'Get a heads-up ~10 min before expiry (and before the zone limit).'
+})
 
 // ── Active-session actions ──────────────────────────────────────────────────
 // Extend needs the zone's shortcode + rules, which aren't on the session row —
@@ -160,6 +193,44 @@ useSeoMeta({ title: 'Your parking sessions — Kerb' })
   margin-bottom: 28px;
 }
 h1 { font-size: clamp(28px, 5vw, 44px); font-weight: 700; letter-spacing: -0.5px; line-height: 1.1; }
+.reminders {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 16px;
+  margin-bottom: 24px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+}
+.rem-title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
+.rem-sub { font-size: 13px; color: var(--muted); line-height: 1.45; }
+.rem-btn {
+  flex-shrink: 0;
+  padding: 8px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--blue);
+  border: none;
+  border-radius: var(--r-md);
+  cursor: pointer;
+  transition: background 150ms, opacity 150ms;
+}
+.rem-btn.is-on { background: var(--green); }
+.rem-btn:disabled { opacity: 0.6; cursor: default; }
+.rem-ios-note {
+  font-size: 13px;
+  color: var(--muted);
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 12px 14px;
+  margin-bottom: 24px;
+  line-height: 1.5;
+}
+
 .active-wrap { margin-bottom: 32px; }
 
 .history { max-width: 620px; }

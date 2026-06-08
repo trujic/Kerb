@@ -7,6 +7,13 @@ export default defineNuxtConfig({
     '@nuxtjs/google-fonts',
   ],
 
+  runtimeConfig: {
+    public: {
+      // VAPID public key for Web Push (safe to expose; private key stays server-side)
+      vapidPublicKey: process.env.VAPID_PUBLIC_KEY || '',
+    },
+  },
+
   supabase: {
     redirect: false,
   },
