@@ -22,7 +22,10 @@ export default async () => {
     return new Response('Missing env: ' + missing.join(', '), { status: 500 })
   }
 
-  webpush.setVapidDetails(VAPID_SUBJECT || 'mailto:admin@example.com', VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY)
+  // web-push requires a mailto: or https: subject — tolerate a bare email
+  let subject = (VAPID_SUBJECT || 'admin@example.com').trim()
+  if (!/^(https?:|mailto:)/i.test(subject)) subject = `mailto:${subject}`
+  webpush.setVapidDetails(subject, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY)
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
   const now = Date.now()
