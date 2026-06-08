@@ -71,6 +71,18 @@
           <NuxtLink :to="`/${detectedCity!.id}`" class="gps-full-link">Full guide →</NuxtLink>
         </div>
 
+        <!-- Active parking session -->
+        <SessionCard
+          v-if="activeSession"
+          :session="activeSession"
+          :remaining-ms="remainingMs"
+          :at-zone-limit="atZoneLimit"
+          :can-extend="canExtend"
+          @extend="onExtend"
+          @end="onEndSession"
+          @locate="onLocateCar"
+        />
+
         <!-- Hours (live free/paid status) -->
         <ParkingHours :city-id="detectedCity!.id" compact class="gps-hours" />
 
@@ -118,6 +130,7 @@
                   :href="smsLink(suggestedZone)"
                   class="zhc-sms-btn"
                   :style="{ background: suggestedZone.color }"
+                  @click="onPay(suggestedZone)"
                 >
                   <span>💬</span>
                   <span v-if="defaultPlate">Send {{ defaultPlate }} · {{ suggestedZone.sms_shortcode }}</span>
@@ -153,6 +166,7 @@
                   v-if="zone.sms_shortcode"
                   :href="smsLink(zone)"
                   class="zpc-sms-btn"
+                  @click="onPay(zone)"
                 >
                   <span class="zpc-sms-icon">💬</span>
                   <span>{{ zone.sms_shortcode }}</span>
@@ -168,6 +182,23 @@
         <div v-if="cityDetail.fine" class="gps-fine">
           <span class="gps-fine-label">Fine if unpaid</span>
           <span class="gps-fine-amount">{{ cityDetail.fine }}</span>
+        </div>
+
+        <!-- Recent sessions -->
+        <div v-if="pastSessions.length" class="gps-history">
+          <p class="section-label">Recent sessions</p>
+          <div
+            v-for="s in pastSessions"
+            :key="s.id"
+            class="hist-row"
+          >
+            <span class="hist-dot" :style="{ background: s.zone_color || 'var(--text2)' }" />
+            <span class="hist-main">
+              <span class="hist-zone">{{ s.zone_name }}</span>
+              <span v-if="s.street_name" class="hist-street"> · {{ s.street_name }}</span>
+            </span>
+            <span class="hist-when">{{ relTime(s.started_at) }}</span>
+          </div>
         </div>
       </div>
     </section>
@@ -343,11 +374,24 @@ const loadingCityDetail = ref(false)
 const userProfile = ref<any>(null)
 const zoneBoundaries = ref<any>(null)
 const mapExpanded = ref(false)
+const locateCar = ref(false) // "find my car" — point the map at the saved session
+
+// Parking session tracking (logs each pay, geotagged)
+const {
+  active: activeSession, history: sessionHistory,
+  remainingMs, atZoneLimit, canExtend,
+  loadActive, loadHistory, startOrExtend, endSession,
+} = useParkingSession()
+
+watch(user, (u) => {
+  if (u) { loadActive(); loadHistory() }
+}, { immediate: true })
 
 // Lock body scroll + close on Escape while the fullscreen map is open
 watch(mapExpanded, (open) => {
   if (import.meta.server) return
   document.body.style.overflow = open ? 'hidden' : ''
+  if (!open) locateCar.value = false // reset find-my-car when the map closes
 })
 const onKeydown = (e: KeyboardEvent) => {
   if (e.key === 'Escape') mapExpanded.value = false
@@ -406,12 +450,54 @@ const otherZones = computed(() =>
     ?? cityDetail.value?.zones ?? []
 )
 
-// Point at the nearest segment on the map unless we're already on it
-const highlightPoint = computed(() =>
-  parkingState.value === 'near' || parkingState.value === 'none'
+// Map pointer: the saved car when "find my car" is on, else the nearest
+// segment when we're near / off paid parking.
+const highlightPoint = computed(() => {
+  if (locateCar.value && activeSession.value?.lat != null && activeSession.value?.lng != null) {
+    return { lat: activeSession.value.lat, lng: activeSession.value.lng }
+  }
+  return parkingState.value === 'near' || parkingState.value === 'none'
     ? nearest.value?.point ?? null
-    : null,
+    : null
+})
+
+// ── Session actions ───────────────────────────────────────────────────────────
+const sessionPayload = (zone: any) => ({
+  cityId: detectedCity.value!.id,
+  zone: { name: zone.name, color: zone.color, price: zone.price, rules: zone.rules },
+  street: nearest.value?.streetName ?? null,
+  lat: coords.value?.lat ?? null,
+  lng: coords.value?.lng ?? null,
+  plate: defaultPlate.value,
+})
+
+// Tapping a pay button opens the SMS composer (the <a href>) AND logs the session
+const onPay = (zone: any) => { startOrExtend(sessionPayload(zone)) }
+
+const onExtend = () => {
+  const z = cityDetail.value?.zones?.find((x: any) => x.name === activeSession.value?.zone_name)
+  if (!z) return
+  startOrExtend(sessionPayload(z))
+  if (import.meta.client && z.sms_shortcode) window.location.href = smsLink(z) // pay again
+}
+
+const onEndSession = () => { if (activeSession.value) endSession(activeSession.value.id) }
+const onLocateCar = () => { locateCar.value = true; mapExpanded.value = true }
+
+const pastSessions = computed(() =>
+  sessionHistory.value.filter((s: any) => s.id !== activeSession.value?.id).slice(0, 5),
 )
+
+const relTime = (iso: string) => {
+  const diff = Date.now() - new Date(iso).getTime()
+  const min = Math.round(diff / 60000)
+  if (min < 1) return 'just now'
+  if (min < 60) return `${min} min ago`
+  const h = Math.round(min / 60)
+  if (h < 24) return `${h}h ago`
+  const d = Math.round(h / 24)
+  return d === 1 ? 'yesterday' : `${d} days ago`
+}
 
 const smsLink = (zone: any) => {
   const body = defaultPlate.value
@@ -986,6 +1072,22 @@ h2 {
 /* Zone pay cards */
 .gps-hours { margin-bottom: 20px; }
 .gps-zones { margin-bottom: 20px; }
+
+/* Recent sessions */
+.gps-history { margin-top: 24px; }
+.hist-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border);
+}
+.hist-row:last-child { border-bottom: none; }
+.hist-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.hist-main { flex: 1; min-width: 0; font-size: 13px; color: var(--text2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hist-zone { font-weight: 600; }
+.hist-street { color: var(--muted); }
+.hist-when { font-size: 12px; color: var(--muted2); font-family: var(--font-mono); flex-shrink: 0; }
 
 /* No paid parking at the user's spot */
 .gps-noparking {

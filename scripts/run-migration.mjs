@@ -34,7 +34,9 @@ const connectionString = process.env.DATABASE_URL || (() => {
 
 const client = new Client({ connectionString, ssl: { rejectUnauthorized: false } })
 
-const sql = readFileSync(resolve(__dir, 'migration-street-zones.sql'), 'utf8')
+const migrationFile = process.argv[2] || 'migration-street-zones.sql'
+const sql = readFileSync(resolve(__dir, migrationFile), 'utf8')
+console.log(`Migration file: ${migrationFile}`)
 const statements = sql
   .split(';')
   .map(s => s.trim())
