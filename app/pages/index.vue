@@ -167,18 +167,37 @@
                 <NuxtLink to="/login">Create an account</NuxtLink> to sync it.
               </span>
             </div>
-            <a
-              v-if="selectedZone.sms_shortcode"
-              :href="smsLink(selectedZone)"
-              class="zone-act-btn"
-              :style="{ background: selectedZone.color }"
-              @click="onPay(selectedZone)"
-            >
-              <span>💬</span>
-              <span v-if="defaultPlate">Send {{ defaultPlate }} to {{ selectedZone.sms_shortcode }}</span>
-              <span v-else>Send SMS to {{ selectedZone.sms_shortcode }}</span>
-              <span class="zone-act-arrow">→</span>
-            </a>
+            <template v-if="selectedZone.sms_shortcode">
+              <!-- Default: the slide IS the sign-confirmation — it can't fire by accident -->
+              <SlideToConfirm
+                v-if="!skipConfirm"
+                :key="selectedZone.name"
+                :label="`I checked the sign — slide to pay ${selectedZone.name}`"
+                done-label="Opening SMS…"
+                :color="selectedZone.color"
+                @confirm="pay(selectedZone)"
+              />
+              <!-- Responsibility mode: fast tap, no per-pay confirm -->
+              <button
+                v-else
+                type="button"
+                class="zone-act-btn"
+                :style="{ background: selectedZone.color }"
+                @click="pay(selectedZone)"
+              >
+                <span v-if="defaultPlate">Pay {{ selectedZone.name }} · {{ defaultPlate }}</span>
+                <span v-else>Pay {{ selectedZone.name }}</span>
+                <span class="zone-act-arrow">→ {{ selectedZone.sms_shortcode }}</span>
+              </button>
+
+              <!-- Persisted opt-out: take responsibility, skip the per-pay slide -->
+              <label class="zone-resp" :class="{ 'zone-resp--on': skipConfirm }">
+                <input v-model="skipConfirm" type="checkbox" class="zone-resp-box" />
+                <span v-if="!skipConfirm">Don't ask each time — I'll check the sign myself and take responsibility</span>
+                <span v-else>Sign-check off — you choose the zone and are responsible. Tap to turn confirmation back on.</span>
+              </label>
+            </template>
+
             <p class="zone-act-foot">
               <NuxtLink
                 v-if="user && selectedZone.sms_shortcode && !defaultPlate"
@@ -186,7 +205,7 @@
                 class="zone-act-link"
               >Add a plate for one-tap SMS</NuxtLink>
               <span class="zone-act-src">
-                Your phone sends the SMS to the parking operator · confirm the sign first
+                Your phone sends the SMS to the parking operator.
               </span>
             </p>
           </div>
@@ -439,6 +458,13 @@ watch(guestPlate, (v) => {
   else localStorage.removeItem(GUEST_PLATE_KEY)
 })
 
+// Persisted "I self-check the sign" opt-out — swaps the per-pay slide for a fast tap.
+const SKIP_CONFIRM_KEY = 'kerb_skip_sign_confirm'
+const skipConfirm = ref(false)
+watch(skipConfirm, (v) => {
+  if (import.meta.client) localStorage.setItem(SKIP_CONFIRM_KEY, v ? '1' : '0')
+})
+
 const defaultPlate = computed(() => {
   const plates = userProfile.value?.plates ?? []
   const saved = (plates.find((p: any) => p.is_default) ?? plates[0])?.plate
@@ -527,6 +553,13 @@ const sessionPayload = (zone: any) => ({
 
 // Tapping a pay button opens the SMS composer (the <a href>) AND logs the session
 const onPay = (zone: any) => { startOrExtend(sessionPayload(zone)) }
+
+// Confirmed (slide or fast tap) → log the geotagged session, then hand off to the
+// phone's SMS composer. The confirmation is the user's; Kerb only relays the SMS.
+const pay = (zone: any) => {
+  onPay(zone)
+  if (import.meta.client && zone.sms_shortcode) window.location.href = smsLink(zone)
+}
 
 const onExtend = () => {
   const z = cityDetail.value?.zones?.find((x: any) => x.name === activeSession.value?.zone_name)
@@ -661,7 +694,10 @@ const steps = [
 
 onMounted(() => {
   // Guest-first: detect the city for everyone, logged in or not.
-  if (import.meta.client) guestPlate.value = localStorage.getItem(GUEST_PLATE_KEY) ?? ''
+  if (import.meta.client) {
+    guestPlate.value = localStorage.getItem(GUEST_PLATE_KEY) ?? ''
+    skipConfirm.value = localStorage.getItem(SKIP_CONFIRM_KEY) === '1'
+  }
   detectCity()
 
   const obs = new IntersectionObserver(
@@ -1332,6 +1368,20 @@ h2 {
 .guest-upsell-text { font-size: 13px; color: var(--text2); line-height: 1.5; }
 .guest-upsell-text a { color: var(--blue); font-weight: 500; }
 .guest-upsell-text a:hover { text-decoration: underline; }
+
+/* Responsibility opt-out under the pay control */
+.zone-resp {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.45;
+  cursor: pointer;
+}
+.zone-resp-box { margin-top: 1px; flex-shrink: 0; cursor: pointer; }
+.zone-resp--on { color: var(--amber); }
 
 .gps-finecheck { margin-bottom: 20px; }
 
