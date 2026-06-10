@@ -102,81 +102,107 @@
 
         <!-- Zone cards -->
         <div class="gps-zones">
-
-          <!-- ── Suggested zone (hero card) ── -->
-          <template v-if="suggestedZone">
-            <p class="section-label">
-              <template v-if="parkingState === 'near' && nearest">
-                📍 Closest paid parking · ~{{ formatDist(nearest.distanceM) }} away
+          <!-- ── Honest framing: GPS narrows it down, the sign decides ── -->
+          <div class="zone-pick-head">
+            <p class="zone-pick-title">
+              <template v-if="parkingState === 'on'">You're in a paid parking area</template>
+              <template v-else-if="parkingState === 'near' && nearest">
+                Paid parking ~{{ formatDist(nearest.distanceM) }} away
               </template>
-              <template v-else>📍 Likely your zone</template>
+              <template v-else>Parking zones in {{ detectedCity!.name }}</template>
             </p>
-            <div
-              class="zone-hero-card"
-              :style="{ borderColor: suggestedZone.color, background: suggestedZone.color + '0d' }"
-            >
-              <div class="zhc-stripe" :style="{ background: suggestedZone.color }" />
-              <div class="zhc-body">
-                <div class="zhc-top">
-                  <span class="zhc-name">{{ suggestedZone.name }}</span>
-                  <span class="zhc-price" :style="{ color: suggestedZone.color }">{{ suggestedZone.price }}</span>
-                </div>
-                <p class="zhc-rules">{{ suggestedZone.rules }}</p>
-                <p v-if="parkingState === 'near'" class="zhc-caution">
-                  ⚠️ You may be just outside this zone — check the curb sign before paying.
-                </p>
-                <a
-                  v-if="suggestedZone.sms_shortcode"
-                  :href="smsLink(suggestedZone)"
-                  class="zhc-sms-btn"
-                  :style="{ background: suggestedZone.color }"
-                  @click="onPay(suggestedZone)"
-                >
-                  <span>💬</span>
-                  <span v-if="defaultPlate">Send {{ defaultPlate }} · {{ suggestedZone.sms_shortcode }}</span>
-                  <span v-else>Pay via SMS · {{ suggestedZone.sms_shortcode }}</span>
-                  <span class="zhc-sms-arrow">→</span>
-                </a>
-                <p v-if="suggestedZone.sms_shortcode && !defaultPlate" class="zpc-sms-hint">
-                  <NuxtLink to="/profile">Add a plate</NuxtLink> for one-tap SMS
-                </p>
-              </div>
-            </div>
-          </template>
-
-          <!-- ── Other zones (compact) ── -->
-          <p class="section-label" :style="{ marginTop: suggestedZone ? '24px' : '0' }">
-            {{ suggestedZone ? 'Other zones' : 'Parking zones' }}
-          </p>
-          <div class="zone-pay-list" :class="{ 'zone-pay-list--grid': !!suggestedZone }">
-            <div
-              v-for="zone in otherZones"
-              :key="zone.id"
-              class="zone-pay-card"
-              :class="{ 'zone-pay-card--compact': !!suggestedZone }"
-            >
-              <div class="zpc-stripe" :style="{ background: zone.color }" />
-              <div class="zpc-body">
-                <div class="zpc-top">
-                  <span class="zpc-name">{{ zone.name }}</span>
-                  <span class="zpc-price">{{ zone.price }}</span>
-                </div>
-                <p class="zpc-rules">{{ zone.rules }}</p>
-                <a
-                  v-if="zone.sms_shortcode"
-                  :href="smsLink(zone)"
-                  class="zpc-sms-btn"
-                  @click="onPay(zone)"
-                >
-                  <span class="zpc-sms-icon">💬</span>
-                  <span>{{ zone.sms_shortcode }}</span>
-                  <span class="zpc-sms-arrow">→</span>
-                </a>
-              </div>
-            </div>
+            <p class="zone-pick-hint">
+              🪧 Tap the zone printed on the sign next to your car — that's the one that counts.
+            </p>
           </div>
 
+          <!-- Selectable zones — likely one floats up, but it's never auto-committed -->
+          <div class="zone-pick-list">
+            <button
+              v-for="zone in orderedZones"
+              :key="zone.id"
+              type="button"
+              class="zone-pick"
+              :class="{ 'zone-pick--active': zone.name === selectedZoneName }"
+              :style="zone.name === selectedZoneName
+                ? { borderColor: zone.color, background: zone.color + '0d' }
+                : null"
+              @click="selectedZoneName = zone.name"
+            >
+              <span class="zone-pick-stripe" :style="{ background: zone.color }" />
+              <span class="zone-pick-info">
+                <span class="zone-pick-name">{{ zone.name }}</span>
+                <span v-if="zone.name === likelyZoneName" class="zone-pick-tag">📍 likely yours</span>
+              </span>
+              <span class="zone-pick-price" :style="{ color: zone.color }">{{ zone.price }}</span>
+              <span class="zone-pick-radio" :class="{ on: zone.name === selectedZoneName }">
+                <span v-if="zone.name === selectedZoneName">✓</span>
+              </span>
+            </button>
+          </div>
+
+          <!-- Selected zone — rules + honest pay action -->
+          <div
+            v-if="selectedZone"
+            class="zone-act"
+            :style="{ borderColor: selectedZone.color }"
+          >
+            <p class="zone-act-rules">{{ selectedZone.rules }}</p>
+            <p v-if="parkingState === 'near'" class="zone-act-caution">
+              ⚠️ GPS puts you near a boundary — only pay this zone if the sign says
+              <strong>{{ selectedZone.name }}</strong>.
+            </p>
+            <div v-if="!user" class="zone-plate">
+              <input
+                v-model="guestPlate"
+                class="zone-plate-input"
+                type="text"
+                autocapitalize="characters"
+                autocomplete="off"
+                placeholder="Your plate — NS123AB"
+                @input="guestPlate = guestPlate.toUpperCase()"
+              />
+              <span class="zone-plate-hint">
+                Saved on this device · prefilled into the SMS.
+                <NuxtLink to="/login">Create an account</NuxtLink> to sync it.
+              </span>
+            </div>
+            <a
+              v-if="selectedZone.sms_shortcode"
+              :href="smsLink(selectedZone)"
+              class="zone-act-btn"
+              :style="{ background: selectedZone.color }"
+              @click="onPay(selectedZone)"
+            >
+              <span>💬</span>
+              <span v-if="defaultPlate">Send {{ defaultPlate }} to {{ selectedZone.sms_shortcode }}</span>
+              <span v-else>Send SMS to {{ selectedZone.sms_shortcode }}</span>
+              <span class="zone-act-arrow">→</span>
+            </a>
+            <p class="zone-act-foot">
+              <NuxtLink
+                v-if="user && selectedZone.sms_shortcode && !defaultPlate"
+                to="/profile"
+                class="zone-act-link"
+              >Add a plate for one-tap SMS</NuxtLink>
+              <span class="zone-act-src">
+                Your phone sends the SMS to the parking operator · confirm the sign first
+              </span>
+            </p>
+          </div>
         </div>
+
+        <!-- Guest → account nudge (memory + reminders + fine alerts) -->
+        <div v-if="!user" class="guest-upsell">
+          <span class="guest-upsell-icon">🔔</span>
+          <p class="guest-upsell-text">
+            You're paying as a guest. <NuxtLink to="/login">Create a free account</NuxtLink>
+            to track your session, get an expiry reminder, and watch your plate for fines.
+          </p>
+        </div>
+
+        <!-- Personal fine check (manual) — works for guests too -->
+        <FineCheck :initial-plate="defaultPlate" class="gps-finecheck" />
 
         <!-- Fine warning -->
         <div v-if="cityDetail.fine" class="gps-fine">
@@ -402,9 +428,21 @@ onUnmounted(() => {
   document.body.style.overflow = ''
 })
 
+// Guest plate — saved on the device so anonymous users get one-tap SMS too,
+// with no account. Synced into a real profile plate if they sign up later.
+const GUEST_PLATE_KEY = 'kerb_guest_plate'
+const guestPlate = ref('')
+watch(guestPlate, (v) => {
+  if (!import.meta.client) return
+  const clean = v.trim().toUpperCase()
+  if (clean) localStorage.setItem(GUEST_PLATE_KEY, clean)
+  else localStorage.removeItem(GUEST_PLATE_KEY)
+})
+
 const defaultPlate = computed(() => {
   const plates = userProfile.value?.plates ?? []
-  return (plates.find((p: any) => p.is_default) ?? plates[0])?.plate ?? null
+  const saved = (plates.find((p: any) => p.is_default) ?? plates[0])?.plate
+  return saved ?? (guestPlate.value.trim() ? guestPlate.value.trim().toUpperCase() : null)
 })
 
 // Geometry-based detection: distance to the nearest paid-parking segment.
@@ -441,14 +479,30 @@ const activeSuggestedName = computed<string | null>(() => {
   return suggestedZoneName.value
 })
 
-const suggestedZone = computed(() =>
-  cityDetail.value?.zones?.find((z: any) => z.name === activeSuggestedName.value) ?? null
+// GPS gives a best guess — never a verdict. The user taps the zone on the sign.
+const likelyZoneName = computed(() => activeSuggestedName.value)
+const allZones = computed<any[]>(() => cityDetail.value?.zones ?? [])
+
+// Likely zone floats to the top; the rest keep their original order.
+const orderedZones = computed(() => {
+  const likely = likelyZoneName.value
+  if (!likely) return allZones.value
+  return [...allZones.value].sort(
+    (a, b) => (a.name === likely ? -1 : b.name === likely ? 1 : 0),
+  )
+})
+
+// What the user is about to pay for. Seeded from the likely zone, but theirs to change.
+const selectedZoneName = ref<string | null>(null)
+const selectedZone = computed(
+  () => allZones.value.find((z: any) => z.name === selectedZoneName.value) ?? null,
 )
 
-const otherZones = computed(() =>
-  cityDetail.value?.zones?.filter((z: any) => z.name !== activeSuggestedName.value)
-    ?? cityDetail.value?.zones ?? []
-)
+// Seed/repair the selection without ever overriding an explicit, still-valid choice.
+watch([likelyZoneName, allZones], () => {
+  const valid = allZones.value.some((z: any) => z.name === selectedZoneName.value)
+  if (!valid) selectedZoneName.value = likelyZoneName.value ?? allZones.value[0]?.name ?? null
+}, { immediate: true })
 
 // Map pointer: the saved car when "find my car" is on, else the nearest
 // segment when we're near / off paid parking.
@@ -532,7 +586,9 @@ watch(
 )
 
 
-const gpsMode = computed(() => !!(user.value && detectedCity.value && cityDetail.value))
+// Guest-first: the live dashboard is available to anyone once a city is detected.
+// Login only adds memory (session tracking, reminders, fine alerts).
+const gpsMode = computed(() => !!(detectedCity.value && cityDetail.value))
 
 // Start live GPS tracking + compass when GPS mode activates
 watch(gpsMode, (active) => {
@@ -604,12 +660,9 @@ const steps = [
 ]
 
 onMounted(() => {
-  // user is set async by the Supabase plugin — watch so we catch both immediate and delayed init
-  if (user.value) {
-    detectCity()
-  } else {
-    const stopWatch = watch(user, (u) => { if (u) { detectCity(); stopWatch() } })
-  }
+  // Guest-first: detect the city for everyone, logged in or not.
+  if (import.meta.client) guestPlate.value = localStorage.getItem(GUEST_PLATE_KEY) ?? ''
+  detectCity()
 
   const obs = new IntersectionObserver(
     (entries) => {
@@ -1111,110 +1164,113 @@ h2 {
 .np-sub { font-size: 13px; color: var(--muted); line-height: 1.5; }
 .np-sub strong { color: var(--text); font-weight: 600; }
 
-.zhc-caution {
-  font-size: 12px;
-  color: var(--amber);
-  line-height: 1.45;
-  margin-top: 8px;
-}
-.zone-pay-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 12px;
-}
-.zone-pay-card {
-  display: flex;
-  align-items: stretch;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
-  overflow: hidden;
-  transition: box-shadow 200ms var(--ease-out), border-color 200ms var(--ease-out);
-}
-.zone-pay-card:hover { box-shadow: var(--shadow-sm); border-color: var(--border2); }
-.zpc-stripe { width: 5px; flex-shrink: 0; }
-.zpc-body { flex: 1; padding: 14px 16px; }
-.zpc-top {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 5px;
-}
-.zpc-name {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text);
-}
-.zpc-price {
-  font-size: 18px;
+/* ── Zone picker (GPS narrows, the sign decides) ── */
+.zone-pick-head { margin-bottom: 12px; }
+.zone-pick-title {
+  font-size: 15px;
   font-weight: 700;
-  font-family: var(--font-mono);
-  color: var(--blue);
-  letter-spacing: -0.5px;
+  letter-spacing: -0.2px;
+  color: var(--text);
+  margin-bottom: 4px;
 }
-.zpc-rules {
-  font-size: 12px;
+.zone-pick-hint {
+  font-size: 13px;
   color: var(--muted);
   line-height: 1.5;
-  margin-bottom: 10px;
 }
-.zpc-methods {
+.zone-pick-list {
   display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
+  flex-direction: column;
+  gap: 6px;
 }
-
-/* ── Hero zone card (suggested) ── */
-.zone-hero-card {
+.zone-pick {
   display: flex;
-  align-items: stretch;
-  border: 2px solid;
-  border-radius: var(--r-lg);
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  padding: 0;
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  border-radius: var(--r-md);
   overflow: hidden;
-  margin-top: 12px;
-  box-shadow: var(--shadow-md);
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 150ms var(--ease-out), background 150ms var(--ease-out);
 }
-.zhc-stripe {
-  width: 8px;
-  flex-shrink: 0;
-}
-.zhc-body {
+.zone-pick:hover { border-color: var(--border2); }
+.zone-pick--active { box-shadow: var(--shadow-sm); }
+.zone-pick-stripe { width: 5px; align-self: stretch; flex-shrink: 0; }
+.zone-pick-info {
   flex: 1;
-  padding: 18px 20px;
-}
-.zhc-top {
+  min-width: 0;
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
+  align-items: center;
   gap: 8px;
-  margin-bottom: 8px;
+  flex-wrap: wrap;
+  padding: 13px 0;
 }
-.zhc-name {
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: -0.3px;
-  color: var(--text);
-}
-.zhc-price {
-  font-size: 28px;
-  font-weight: 800;
+.zone-pick-name { font-size: 14px; font-weight: 600; color: var(--text); }
+.zone-pick-tag {
+  font-size: 10px;
   font-family: var(--font-mono);
-  letter-spacing: -1px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text2);
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  padding: 2px 7px;
+  border-radius: 20px;
+}
+.zone-pick-price {
+  font-size: 16px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  letter-spacing: -0.5px;
   flex-shrink: 0;
 }
-.zhc-rules {
+.zone-pick-radio {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  margin-right: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--border2);
+  border-radius: 50%;
+  font-size: 12px;
+  color: #fff;
+  transition: background 150ms, border-color 150ms;
+}
+.zone-pick-radio.on { background: var(--text); border-color: var(--text); }
+
+/* Selected zone — rules + honest pay */
+.zone-act {
+  margin-top: 12px;
+  padding: 16px;
+  border: 1.5px solid;
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-sm);
+}
+.zone-act-rules {
   font-size: 13px;
   color: var(--text2);
   line-height: 1.55;
   margin-bottom: 14px;
 }
-.zhc-sms-btn {
+.zone-act-caution {
+  font-size: 12px;
+  color: var(--amber);
+  line-height: 1.45;
+  margin: -6px 0 14px;
+}
+.zone-act-caution strong { font-weight: 700; }
+.zone-act-btn {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 12px 16px;
+  padding: 13px 16px;
   border-radius: var(--r-md);
   font-size: 14px;
   font-weight: 600;
@@ -1222,59 +1278,62 @@ h2 {
   text-decoration: none;
   transition: filter 150ms var(--ease-out);
 }
-.zhc-sms-btn:hover { filter: brightness(0.88); }
-.zhc-sms-arrow { margin-left: auto; opacity: 0.8; }
-
-/* ── Compact other-zone cards ── */
-.zone-pay-list--grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-}
-.zone-pay-card--compact {
-  opacity: 0.72;
-  transition: opacity 200ms var(--ease-out), box-shadow 200ms var(--ease-out);
-}
-.zone-pay-card--compact:hover {
-  opacity: 1;
-  box-shadow: var(--shadow-sm);
-  border-color: var(--border2);
-}
-.zone-pay-card--compact .zpc-body { padding: 10px 12px; }
-.zone-pay-card--compact .zpc-name { font-size: 12px; }
-.zone-pay-card--compact .zpc-price { font-size: 14px; }
-.zone-pay-card--compact .zpc-rules { font-size: 11px; margin-bottom: 8px; }
-
-/* SMS button (compact cards) */
-.zpc-sms-btn {
+.zone-act-btn:hover { filter: brightness(0.9); }
+.zone-act-arrow { margin-left: auto; opacity: 0.85; }
+.zone-act-foot {
   display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 8px;
-  padding: 6px 10px;
-  background: var(--bg2);
-  border: 1px solid var(--border);
-  border-radius: var(--r-sm);
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text2);
-  text-decoration: none;
-  transition: background 150ms var(--ease-out);
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 12px;
 }
-.zpc-sms-btn:hover { background: var(--bg3); }
-.zpc-sms-icon { font-size: 12px; flex-shrink: 0; }
-.zpc-sms-arrow { margin-left: auto; opacity: 0.5; }
-.zpc-sms-hint {
-  font-size: 11px;
-  color: var(--muted2);
-  margin-top: 6px;
-}
-.zpc-sms-hint a { color: var(--blue); }
-.zpc-sms-hint a:hover { text-decoration: underline; }
+.zone-act-link { font-size: 12px; color: var(--blue); font-weight: 500; }
+.zone-act-link:hover { text-decoration: underline; }
+.zone-act-src { font-size: 11px; color: var(--muted2); line-height: 1.45; }
 
-@media (max-width: 600px) {
-  .zone-pay-list--grid { grid-template-columns: 1fr 1fr; }
+/* Guest plate entry (no account) */
+.zone-plate { margin: 0 0 12px; }
+.zone-plate-input {
+  width: 100%;
+  padding: 11px 14px;
+  font-family: var(--font-mono);
+  font-size: 15px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text);
+  background: var(--bg);
+  border: 1.5px solid var(--border2);
+  border-radius: var(--r-md);
+  outline: none;
+  transition: border-color 150ms var(--ease-out), box-shadow 150ms var(--ease-out);
 }
+.zone-plate-input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-bg); }
+.zone-plate-input::placeholder {
+  font-family: var(--font-body);
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--muted2);
+}
+.zone-plate-hint { display: block; margin-top: 6px; font-size: 11px; color: var(--muted2); line-height: 1.45; }
+.zone-plate-hint a { color: var(--blue); }
+.zone-plate-hint a:hover { text-decoration: underline; }
+
+/* Guest → account nudge */
+.guest-upsell {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 20px;
+  padding: 12px 14px;
+  background: var(--blue-bg);
+  border: 1px solid var(--blue-border);
+  border-radius: var(--r-md);
+}
+.guest-upsell-icon { font-size: 16px; line-height: 1.4; flex-shrink: 0; }
+.guest-upsell-text { font-size: 13px; color: var(--text2); line-height: 1.5; }
+.guest-upsell-text a { color: var(--blue); font-weight: 500; }
+.guest-upsell-text a:hover { text-decoration: underline; }
+
+.gps-finecheck { margin-bottom: 20px; }
 
 /* Fine warning */
 .gps-fine {
