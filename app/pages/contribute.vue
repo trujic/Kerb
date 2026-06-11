@@ -13,6 +13,21 @@
 
     <section class="page-body">
       <div class="container">
+        <!-- On-location? The fastest, most accurate contribution is a sign scan. -->
+        <NuxtLink to="/" class="scan-promo">
+          <span class="scan-promo-icon">📸</span>
+          <span class="scan-promo-text">
+            <span class="scan-promo-title">Standing next to a parking sign? Scan it.</span>
+            <span class="scan-promo-sub">
+              The sign is ground truth. On the home screen, tap <strong>Scan the sign</strong> —
+              we read the zone and price off your photo, pin it on the map, and prefill the payment.
+            </span>
+          </span>
+          <span class="scan-promo-arrow">→</span>
+        </NuxtLink>
+
+        <p class="contrib-or">or submit details manually</p>
+
         <form class="contrib-form" @submit.prevent="handleSubmit">
           <div v-if="success" class="success-msg">
             Thanks! Your contribution has been received.
@@ -127,6 +142,35 @@ h1 {
 }
 .page-sub { font-size: 15px; color: var(--muted); max-width: 500px; line-height: 1.7; }
 .page-body { padding: 48px 0 80px; }
+.scan-promo {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: 540px;
+  margin-bottom: 24px;
+  padding: 16px 18px;
+  background: var(--blue-bg);
+  border: 1.5px solid var(--blue-border);
+  border-radius: var(--r-lg);
+  transition: border-color 150ms var(--ease-out), transform 150ms var(--ease-out);
+}
+.scan-promo:hover { border-color: var(--blue); }
+.scan-promo:active { transform: scale(0.995); }
+.scan-promo-icon { font-size: 26px; line-height: 1; flex-shrink: 0; }
+.scan-promo-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.scan-promo-title { font-size: 15px; font-weight: 700; color: var(--text); letter-spacing: -0.2px; }
+.scan-promo-sub { font-size: 13px; color: var(--muted); line-height: 1.5; }
+.scan-promo-sub strong { color: var(--text2); font-weight: 600; }
+.scan-promo-arrow { font-size: 18px; color: var(--blue); flex-shrink: 0; }
+.contrib-or {
+  max-width: 540px;
+  margin-bottom: 18px;
+  font-size: 12px;
+  color: var(--muted2);
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
 .contrib-form { max-width: 540px; display: flex; flex-direction: column; gap: 18px; }
 .form-group { display: flex; flex-direction: column; }
 .success-msg {

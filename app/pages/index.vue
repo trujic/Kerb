@@ -14,6 +14,7 @@
               :height="260"
               :zones="zoneBoundaries"
               :highlight="highlightPoint"
+              :signs="signReports"
               @compass-tap="onMapTap"
             />
             <button
@@ -50,6 +51,7 @@
                   :heading="heading"
                   :zones="zoneBoundaries"
                   :highlight="highlightPoint"
+                  :signs="signReports"
                   fill
                   interactive
                 />
@@ -115,6 +117,16 @@
               🪧 Tap the zone printed on the sign next to your car — that's the one that counts.
             </p>
           </div>
+
+          <!-- Scan the sign — the sign is ground truth: read it, confirm, pin it, pay -->
+          <button type="button" class="scan-cta" @click="showScan = true">
+            <span class="scan-cta-icon">📸</span>
+            <span class="scan-cta-text">
+              <span class="scan-cta-title">Scan the sign</span>
+              <span class="scan-cta-sub">Read the zone off the sign, confirm it on the map, then pay</span>
+            </span>
+            <span class="scan-cta-arrow">→</span>
+          </button>
 
           <!-- Selectable zones — likely one floats up, but it's never auto-committed -->
           <div class="zone-pick-list">
@@ -246,6 +258,22 @@
           </div>
         </div>
       </div>
+
+      <!-- Scan the sign — capture → read → confirm → pin + prefill pay -->
+      <ClientOnly>
+        <ScanSign
+          v-if="showScan"
+          :city-id="detectedCity!.id"
+          :zones="allZones"
+          :coords="coords"
+          :heading="heading"
+          :street="nearest?.streetName ?? null"
+          :likely-zone-name="likelyZoneName"
+          @close="showScan = false"
+          @submitted="onSignSubmitted"
+          @pay="onScanPay"
+        />
+      </ClientOnly>
     </section>
 
     <!-- ── HERO (default, non-GPS) ── -->
@@ -419,6 +447,9 @@ const loadingCityDetail = ref(false)
 const userProfile = ref<any>(null)
 const zoneBoundaries = ref<any>(null)
 const mapExpanded = ref(false)
+const showScan = ref(false)              // scan-the-sign modal
+const signReports = ref<any[]>([])       // confirmed sign scans → map pins
+const { loadForCity: loadSignReports } = useSignScan()
 const locateCar = ref(false) // "find my car" — point the map at the saved session
 
 // Parking session tracking (logs each pay, geotagged)
@@ -607,7 +638,24 @@ watch(detectedCity, async (city) => {
       zoneBoundaries.value = data
     }
   } catch { /* no boundaries file, that's fine */ }
+
+  // Load community sign scans for this city (verified pins on the map)
+  signReports.value = await loadSignReports(city.id)
 })
+
+// A new confirmed scan: pin it immediately and make it the selected pay zone.
+const onSignSubmitted = (report: any) => {
+  signReports.value = [report, ...signReports.value]
+  if (allZones.value.some((z: any) => z.name === report.zone_name)) {
+    selectedZoneName.value = report.zone_name
+  }
+}
+
+// Pay straight from the scan result — reuse the normal pay path (logs + SMS).
+const onScanPay = (zone: any) => {
+  showScan.value = false
+  pay(zone)
+}
 
 watch(
   () => !!user.value && !!cityDetail.value,
@@ -1214,6 +1262,30 @@ h2 {
   color: var(--muted);
   line-height: 1.5;
 }
+/* Scan-the-sign CTA */
+.scan-cta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  margin-bottom: 12px;
+  padding: 13px 14px;
+  background: var(--blue-bg);
+  border: 1.5px solid var(--blue-border);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 150ms var(--ease-out), background 150ms var(--ease-out), transform 150ms var(--ease-out);
+}
+.scan-cta:hover { border-color: var(--blue); }
+.scan-cta:active { transform: scale(0.99); }
+.scan-cta-icon { font-size: 22px; line-height: 1; flex-shrink: 0; }
+.scan-cta-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.scan-cta-title { font-size: 14px; font-weight: 700; color: var(--text); letter-spacing: -0.2px; }
+.scan-cta-sub { font-size: 12px; color: var(--muted); line-height: 1.4; }
+.scan-cta-arrow { font-size: 16px; color: var(--blue); flex-shrink: 0; }
+
 .zone-pick-list {
   display: flex;
   flex-direction: column;

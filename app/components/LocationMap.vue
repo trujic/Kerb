@@ -22,6 +22,7 @@ const props = defineProps<{
   interactive?: boolean // enable pan/zoom (fullscreen mode)
   fill?: boolean        // fill parent height instead of fixed px
   highlight?: { lat: number; lng: number } | null // nearest-parking point to point at
+  signs?: { lat: number; lng: number; zone_color?: string | null; zone_name?: string }[] // confirmed sign scans
 }>()
 
 const emit = defineEmits<{ compassTap: [] }>()
@@ -152,6 +153,33 @@ watchEffect((onCleanup) => {
   })
 })
 
+// ── Confirmed sign scans — verified community pins (✓ in the zone colour) ──────
+watchEffect((onCleanup) => {
+  const signs = props.signs
+  const map   = mapRef.value
+  const L     = LRef.value
+  if (!L || !map || !signs?.length) return
+
+  const markers: any[] = []
+  for (const s of signs) {
+    if (s.lat == null || s.lng == null) continue
+    const color = (s.zone_color ?? '#2563EB').trim()
+    const icon = L.divIcon({
+      className: '',
+      html: `<div class="lm-sign" style="--sign:${color}">🪧</div>`,
+      iconSize: [26, 26],
+      iconAnchor: [13, 13],
+    })
+    const m = L.marker([s.lat, s.lng], { icon, interactive: true }).addTo(map)
+    if (s.zone_name) m.bindTooltip(`✓ ${s.zone_name}`, { direction: 'top', className: 'zone-tooltip' })
+    markers.push(m)
+  }
+
+  onCleanup(() => {
+    for (const m of markers) { try { map.removeLayer(m) } catch {} }
+  })
+})
+
 onMounted(async () => {
   if (!mapEl.value) return
 
@@ -233,6 +261,19 @@ onMounted(async () => {
   border-radius: 6px;
 }
 .zone-tooltip::before { display: none; }
+.lm-sign {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  line-height: 1;
+  background: #fff;
+  border: 2px solid var(--sign, #2563EB);
+  border-radius: 50%;
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.3);
+}
 .lm-dot {
   position: relative;
   width: 60px;

@@ -37,10 +37,15 @@ const client = new Client({ connectionString, ssl: { rejectUnauthorized: false }
 const migrationFile = process.argv[2] || 'migration-street-zones.sql'
 const sql = readFileSync(resolve(__dir, migrationFile), 'utf8')
 console.log(`Migration file: ${migrationFile}`)
+// Strip full-line `--` comments first, THEN split — otherwise a statement
+// preceded by a comment ends up in a chunk starting with `--` and gets dropped.
 const statements = sql
+  .split('\n')
+  .filter(l => !l.trim().startsWith('--'))
+  .join('\n')
   .split(';')
   .map(s => s.trim())
-  .filter(s => s.length > 0 && !s.startsWith('--'))
+  .filter(s => s.length > 0)
 
 console.log(`Connecting to Supabase...`)
 
