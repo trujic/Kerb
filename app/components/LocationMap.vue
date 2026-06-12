@@ -22,7 +22,11 @@ const props = defineProps<{
   interactive?: boolean // enable pan/zoom (fullscreen mode)
   fill?: boolean        // fill parent height instead of fixed px
   highlight?: { lat: number; lng: number } | null // nearest-parking point to point at
-  signs?: { lat: number; lng: number; zone_color?: string | null; zone_name?: string }[] // confirmed sign scans
+  signs?: {
+    lat: number; lng: number
+    zone_color?: string | null; zone_name?: string; price?: string | null
+    heading?: number | null; created_at?: string; photo_url?: string | null
+  }[] // confirmed sign scans
 }>()
 
 const emit = defineEmits<{ compassTap: [] }>()
@@ -153,7 +157,22 @@ watchEffect((onCleanup) => {
   })
 })
 
+// Relative "last confirmed" age, e.g. "today", "yesterday", "5 days ago".
+const relAge = (iso?: string): string => {
+  if (!iso) return ''
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000)
+  if (days <= 0) return 'today'
+  if (days === 1) return 'yesterday'
+  if (days < 7) return `${days} days ago`
+  if (days < 30) return `${Math.floor(days / 7)} wk ago`
+  return `${Math.floor(days / 30)} mo ago`
+}
+const esc = (s: string) => s.replace(/[&<>"]/g, (c) => (
+  { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string))
+
 // ── Confirmed sign scans — verified community pins (✓ in the zone colour) ──────
+// Each pin carries a heading arrow (the way the sign faced when scanned) and a
+// popup with zone, price, the photo, and how recently it was confirmed.
 watchEffect((onCleanup) => {
   const signs = props.signs
   const map   = mapRef.value
@@ -164,14 +183,28 @@ watchEffect((onCleanup) => {
   for (const s of signs) {
     if (s.lat == null || s.lng == null) continue
     const color = (s.zone_color ?? '#2563EB').trim()
+    const arrow = s.heading != null
+      ? `<span class="lm-sign-arrow" style="transform:rotate(${s.heading}deg) translateY(-15px)"></span>`
+      : ''
     const icon = L.divIcon({
       className: '',
-      html: `<div class="lm-sign" style="--sign:${color}">🪧</div>`,
-      iconSize: [26, 26],
-      iconAnchor: [13, 13],
+      html: `<div class="lm-sign-wrap" style="--sign:${color}">${arrow}<span class="lm-sign">🪧</span></div>`,
+      iconSize: [40, 40],
+      iconAnchor: [20, 20],
     })
     const m = L.marker([s.lat, s.lng], { icon, interactive: true }).addTo(map)
-    if (s.zone_name) m.bindTooltip(`✓ ${s.zone_name}`, { direction: 'top', className: 'zone-tooltip' })
+
+    const name = s.zone_name ? esc(s.zone_name) : 'Confirmed sign'
+    const photo = s.photo_url ? `<img class="lm-pop-img" src="${esc(s.photo_url)}" alt="${name}" />` : ''
+    const price = s.price ? `<span class="lm-pop-price">${esc(s.price)}</span>` : ''
+    const age = relAge(s.created_at)
+    m.bindPopup(
+      `<div class="lm-pop">${photo}` +
+      `<div class="lm-pop-head"><span class="lm-pop-zone" style="color:${color}">✓ ${name}</span>${price}</div>` +
+      (age ? `<div class="lm-pop-age">Confirmed ${age}</div>` : '') +
+      `</div>`,
+      { className: 'lm-pop-wrap', closeButton: true },
+    )
     markers.push(m)
   }
 
@@ -261,6 +294,14 @@ onMounted(async () => {
   border-radius: 6px;
 }
 .zone-tooltip::before { display: none; }
+.lm-sign-wrap {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 .lm-sign {
   width: 26px;
   height: 26px;
@@ -274,6 +315,25 @@ onMounted(async () => {
   border-radius: 50%;
   box-shadow: 0 1px 5px rgba(0, 0, 0, 0.3);
 }
+.lm-sign-arrow {
+  position: absolute;
+  top: 50%; left: 50%;
+  margin: -5px 0 0 -6px;
+  width: 0; height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-bottom: 9px solid var(--sign, #2563EB);
+  transform-origin: center;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.25));
+}
+/* Sign popup */
+.lm-pop-wrap .leaflet-popup-content-wrapper { border-radius: 12px; padding: 0; overflow: hidden; }
+.lm-pop-wrap .leaflet-popup-content { margin: 0; width: 180px !important; }
+.lm-pop-img { display: block; width: 100%; height: 110px; object-fit: cover; }
+.lm-pop-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 11px 2px; }
+.lm-pop-zone { font-size: 13px; font-weight: 700; font-family: var(--font-mono, monospace); }
+.lm-pop-price { font-size: 13px; font-weight: 700; color: #374151; font-family: var(--font-mono, monospace); }
+.lm-pop-age { padding: 0 11px 10px; font-size: 11px; color: #6b7280; }
 .lm-dot {
   position: relative;
   width: 60px;

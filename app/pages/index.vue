@@ -128,6 +128,30 @@
             <span class="scan-cta-arrow">→</span>
           </button>
 
+          <!-- Nearest confirmed sign — lead the user to verified ground truth -->
+          <button
+            v-if="nearestSign"
+            type="button"
+            class="nsign"
+            :style="{ borderColor: (nearestSign.report.zone_color || 'var(--blue)') + '66' }"
+            @click="onLeadToSign"
+          >
+            <span
+              class="nsign-arrow"
+              :style="{ transform: `rotate(${nearestSignArrow - 90}deg)`, color: nearestSign.report.zone_color || 'var(--blue)' }"
+            >➤</span>
+            <span class="nsign-text">
+              <span class="nsign-title">
+                Nearest confirmed sign · {{ formatDist(nearestSign.distanceM) }}
+              </span>
+              <span class="nsign-sub">
+                <span :style="{ color: nearestSign.report.zone_color || 'var(--text2)' }">{{ nearestSign.report.zone_name }}</span>
+                · confirmed {{ relTime(nearestSign.report.created_at) }}
+              </span>
+            </span>
+            <span class="nsign-go">Lead me →</span>
+          </button>
+
           <!-- Selectable zones — likely one floats up, but it's never auto-committed -->
           <div class="zone-pick-list">
             <button
@@ -467,7 +491,10 @@ watch(user, (u) => {
 watch(mapExpanded, (open) => {
   if (import.meta.server) return
   document.body.style.overflow = open ? 'hidden' : ''
-  if (!open) locateCar.value = false // reset find-my-car when the map closes
+  if (!open) {
+    locateCar.value = false      // reset find-my-car when the map closes
+    leadSignPoint.value = null   // and the lead-to-sign pointer
+  }
 })
 const onKeydown = (e: KeyboardEvent) => {
   if (e.key === 'Escape') mapExpanded.value = false
@@ -561,16 +588,65 @@ watch([likelyZoneName, allZones], () => {
   if (!valid) selectedZoneName.value = likelyZoneName.value ?? allZones.value[0]?.name ?? null
 }, { immediate: true })
 
-// Map pointer: the saved car when "find my car" is on, else the nearest
-// segment when we're near / off paid parking.
+// ── Nearest confirmed sign — lead the user to verified ground truth ────────────
+const toRad = (d: number) => (d * Math.PI) / 180
+const haversineM = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => {
+  const R = 6371000
+  const dLat = toRad(b.lat - a.lat)
+  const dLng = toRad(b.lng - a.lng)
+  const s = Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2
+  return 2 * R * Math.asin(Math.sqrt(s))
+}
+const bearingDeg = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => {
+  const y = Math.sin(toRad(b.lng - a.lng)) * Math.cos(toRad(b.lat))
+  const x = Math.cos(toRad(a.lat)) * Math.sin(toRad(b.lat)) -
+    Math.sin(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.cos(toRad(b.lng - a.lng))
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360
+}
+
+// Closest confirmed sign to the user right now (within 1 km), with distance + bearing.
+const nearestSign = computed(() => {
+  const c = coords.value
+  if (!c || !signReports.value.length) return null
+  let best: any = null
+  let bestD = Infinity
+  for (const s of signReports.value) {
+    if (s.lat == null || s.lng == null) continue
+    const d = haversineM(c, { lat: s.lat, lng: s.lng })
+    if (d < bestD) { bestD = d; best = s }
+  }
+  if (!best || bestD > 1000) return null
+  return { report: best, distanceM: bestD, bearing: bearingDeg(c, { lat: best.lat, lng: best.lng }) }
+})
+
+// Arrow rotation for the nearest-sign card: relative to where the user faces when
+// the compass is available, otherwise an absolute (north-up) bearing.
+const nearestSignArrow = computed(() => {
+  const n = nearestSign.value
+  if (!n) return null
+  return heading.value != null ? n.bearing - heading.value : n.bearing
+})
+
+// "Find my car" point, a tapped lead-to-sign point, else the nearest paid segment.
+const leadSignPoint = ref<{ lat: number; lng: number } | null>(null)
 const highlightPoint = computed(() => {
   if (locateCar.value && activeSession.value?.lat != null && activeSession.value?.lng != null) {
     return { lat: activeSession.value.lat, lng: activeSession.value.lng }
   }
+  if (leadSignPoint.value) return leadSignPoint.value
   return parkingState.value === 'near' || parkingState.value === 'none'
     ? nearest.value?.point ?? null
     : null
 })
+
+// Tap the nearest-sign card → draw a line to it and open the map.
+const onLeadToSign = () => {
+  const n = nearestSign.value
+  if (!n) return
+  leadSignPoint.value = { lat: n.report.lat, lng: n.report.lng }
+  mapExpanded.value = true
+}
 
 // ── Session actions ───────────────────────────────────────────────────────────
 const sessionPayload = (zone: any) => ({
@@ -1285,6 +1361,34 @@ h2 {
 .scan-cta-title { font-size: 14px; font-weight: 700; color: var(--text); letter-spacing: -0.2px; }
 .scan-cta-sub { font-size: 12px; color: var(--muted); line-height: 1.4; }
 .scan-cta-arrow { font-size: 16px; color: var(--blue); flex-shrink: 0; }
+
+/* Nearest confirmed sign — lead-me card */
+.nsign {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  margin-bottom: 12px;
+  padding: 11px 14px;
+  background: var(--bg);
+  border: 1.5px solid var(--border2);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 150ms var(--ease-out), transform 150ms var(--ease-out);
+}
+.nsign:active { transform: scale(0.99); }
+.nsign-arrow {
+  flex-shrink: 0;
+  font-size: 20px;
+  line-height: 1;
+  transition: transform 200ms var(--ease-out);
+}
+.nsign-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.nsign-title { font-size: 13px; font-weight: 700; color: var(--text); letter-spacing: -0.1px; }
+.nsign-sub { font-size: 12px; color: var(--muted); }
+.nsign-go { font-size: 12px; font-weight: 600; color: var(--blue); flex-shrink: 0; white-space: nowrap; }
 
 .zone-pick-list {
   display: flex;

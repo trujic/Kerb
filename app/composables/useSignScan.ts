@@ -31,6 +31,7 @@ export interface SignReport {
   street_name: string | null
   lat: number
   lng: number
+  heading: number | null   // compass heading at capture — direction the sign faced
   photo_path: string | null
   photo_url?: string | null
   created_at: string
@@ -174,7 +175,7 @@ export const useSignScan = (engine: 'ocr' | 'claude' = 'ocr') => {
   const loadForCity = async (cityId: string, limit = 200): Promise<SignReport[]> => {
     const { data, error } = await supabase
       .from('sign_reports')
-      .select('id, city_id, zone_name, zone_color, price, sms_shortcode, street_name, lat, lng, photo_path, created_at')
+      .select('id, city_id, zone_name, zone_color, price, sms_shortcode, street_name, lat, lng, heading, photo_path, created_at')
       .eq('city_id', cityId)
       .order('created_at', { ascending: false })
       .limit(limit)
