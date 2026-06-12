@@ -15,7 +15,9 @@
               :zones="zoneBoundaries"
               :highlight="highlightPoint"
               :signs="signReports"
+              :compass-prompt="compassPrompt"
               @compass-tap="onMapTap"
+              @enable-compass="onMapTap"
             />
             <button
               class="map-expand-btn"
@@ -52,8 +54,10 @@
                   :zones="zoneBoundaries"
                   :highlight="highlightPoint"
                   :signs="signReports"
+                  :compass-prompt="compassPrompt"
                   fill
                   interactive
+                  @enable-compass="onMapTap"
                 />
               </div>
             </div>
@@ -464,7 +468,20 @@
 const { getCities, searchCities, getCity } = useCity()
 const { user, getProfile } = useAuth()
 const { detectCity, detectedCity, coords, detecting, gpsError, suggestedZoneName, startTracking, stopTracking } = useGPS()
-const { heading, start: startOrientation, stop: stopOrientation, onMapTap } = useDeviceOrientation()
+const {
+  heading, attached: compassAttached, previouslyEnabled: compassWasEnabled,
+  needsPermission: compassNeedsPerm, start: startOrientation, stop: stopOrientation, onMapTap,
+} = useDeviceOrientation()
+
+// First-time iOS only: offer a one-tap compass enable. Hidden once it's running,
+// and never shown again to anyone who already opted in (persisted in localStorage).
+const compassPrompt = computed(() =>
+  import.meta.client &&
+  compassNeedsPerm.value &&
+  !compassAttached.value &&
+  heading.value == null &&
+  !compassWasEnabled.value,
+)
 
 const cityDetail = ref<any>(null)
 const loadingCityDetail = ref(false)

@@ -1,5 +1,10 @@
+const COMPASS_FLAG = 'kerb_compass_ok' // remembers the user's compass opt-in
+
 export const useDeviceOrientation = () => {
   const heading = ref<number | null>(null)
+  const attached = ref(false)            // listeners live + we expect heading
+  const previouslyEnabled = ref(false)   // granted before (from localStorage)
+  const needsPermission = ref(false)     // iOS gesture-gated requestPermission()
   let _handler: ((e: DeviceOrientationEvent) => void) | null = null
   let _attached = false
   let _disarmGesture: (() => void) | null = null
@@ -7,6 +12,10 @@ export const useDeviceOrientation = () => {
   const _attach = () => {
     if (_attached) return
     _attached = true
+    attached.value = true
+    // Remember the opt-in: next visit we re-attach silently and never prompt again.
+    previouslyEnabled.value = true
+    try { localStorage.setItem(COMPASS_FLAG, '1') } catch { /* private mode */ }
     _handler = (e: DeviceOrientationEvent) => {
       const wkh = (e as any).webkitCompassHeading
       if (typeof wkh === 'number' && !isNaN(wkh)) {
@@ -83,8 +92,15 @@ export const useDeviceOrientation = () => {
       _handler = null
     }
     _attached = false
+    attached.value = false
     heading.value = null
   }
 
-  return { heading, start, stop, onMapTap }
+  // Seed persisted intent + platform capability (client only).
+  if (import.meta.client) {
+    try { previouslyEnabled.value = localStorage.getItem(COMPASS_FLAG) === '1' } catch { /* ignore */ }
+    needsPermission.value = _needsPermission()
+  }
+
+  return { heading, attached, previouslyEnabled, needsPermission, start, stop, onMapTap }
 }

@@ -2,6 +2,12 @@
   <div class="location-map-root" :style="rootStyle">
     <div ref="mapEl" class="location-map" @click="onMapTap" />
     <button
+      v-if="compassPrompt"
+      class="lm-compass"
+      type="button"
+      @click.stop="$emit('enableCompass')"
+    >🧭 Enable compass</button>
+    <button
       v-if="interactive && !follow"
       class="lm-recenter"
       type="button"
@@ -27,9 +33,10 @@ const props = defineProps<{
     zone_color?: string | null; zone_name?: string; price?: string | null
     heading?: number | null; created_at?: string; photo_url?: string | null
   }[] // confirmed sign scans
+  compassPrompt?: boolean // show a one-tap "Enable compass" chip (iOS first-time)
 }>()
 
-const emit = defineEmits<{ compassTap: [] }>()
+const emit = defineEmits<{ compassTap: []; enableCompass: [] }>()
 
 // When interactive, the map follows the user until they drag; then a
 // recenter button re-arms follow. Non-interactive maps always follow.
@@ -376,6 +383,30 @@ onMounted(async () => {
   width: 100%;
   height: 100%;
 }
+.lm-compass {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1200;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #fff;
+  background: #2563EB;
+  border: none;
+  border-radius: 999px;
+  box-shadow: 0 2px 10px rgba(37, 99, 235, 0.4);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: transform 120ms var(--ease-out, ease), filter 120ms ease;
+}
+.lm-compass:active { transform: translateX(-50%) scale(0.96); }
+.lm-compass:hover { filter: brightness(0.95); }
 .lm-recenter {
   position: absolute;
   bottom: 14px;
