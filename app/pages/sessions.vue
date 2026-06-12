@@ -9,20 +9,46 @@
         <NuxtLink to="/" class="btn-ghost">← Dashboard</NuxtLink>
       </div>
 
-      <!-- Reminder toggle -->
-      <section v-if="pushSupported || pushError" class="reminders">
-        <div class="rem-text">
-          <p class="rem-title">🔔 Expiry reminders</p>
-          <p class="rem-sub">{{ reminderSub }}</p>
+      <!-- Reminders + connected devices -->
+      <section v-if="pushSupported || pushError" class="reminders-wrap">
+        <div class="reminders">
+          <div class="rem-text">
+            <p class="rem-title">🔔 Expiry reminders</p>
+            <p class="rem-sub">{{ reminderSub }}</p>
+          </div>
+          <button
+            class="rem-btn"
+            :class="{ 'is-on': pushEnabled }"
+            :disabled="pushBusy"
+            @click="toggleReminders"
+          >
+            {{ pushBusy ? '…' : pushEnabled ? 'On' : 'Enable' }}
+          </button>
         </div>
-        <button
-          class="rem-btn"
-          :class="{ 'is-on': pushEnabled }"
-          :disabled="pushBusy"
-          @click="toggleReminders"
-        >
-          {{ pushBusy ? '…' : pushEnabled ? 'On' : 'Enable' }}
-        </button>
+
+        <!-- Every device the reminder reaches — the sender fans out to all of them -->
+        <div v-if="devices.length" class="devices">
+          <p class="devices-head">Reaches {{ devices.length }} device{{ devices.length > 1 ? 's' : '' }}</p>
+          <div v-for="d in devices" :key="d.endpoint" class="device">
+            <span class="device-icon">{{ deviceLabel(d.user_agent).icon }}</span>
+            <span class="device-name">
+              {{ deviceLabel(d.user_agent).name }}
+              <span v-if="d.endpoint === currentEndpoint" class="device-here">this device</span>
+            </span>
+            <button
+              class="device-x"
+              type="button"
+              :aria-label="`Remove ${deviceLabel(d.user_agent).name}`"
+              @click="removeDevice(d.endpoint)"
+            >✕</button>
+          </div>
+          <p class="devices-watch">
+            ⌚ Apple Watch &amp; Wear OS mirror your phone — reminders reach your wrist automatically.
+          </p>
+        </div>
+
+        <!-- Cover the other form factor too -->
+        <p v-if="nudge" class="devices-nudge">{{ nudge }}</p>
       </section>
       <p v-else class="rem-ios-note">
         💡 On iPhone, add Kerb to your Home Screen (Share → Add to Home Screen) to get parking reminders.
@@ -98,6 +124,7 @@ onMounted(() => { loadActive(); loadHistory() })
 const {
   supported: pushSupported, enabled: pushEnabled, busy: pushBusy, error: pushError,
   enable: enablePush, disable: disablePush,
+  devices, currentEndpoint, removeDevice, deviceLabel,
 } = usePushNotifications()
 
 const toggleReminders = () => (pushEnabled.value ? disablePush() : enablePush())
@@ -106,6 +133,22 @@ const reminderSub = computed(() => {
   if (pushError.value) return pushError.value
   if (pushEnabled.value) return 'On — we’ll ping you ~10 min before your parking runs out.'
   return 'Get a heads-up ~10 min before expiry (and before the zone limit).'
+})
+
+// Nudge the user to cover the form factor they're missing, so a reminder lands
+// whether they're at a laptop or out with just their phone (and watch).
+const isMobile = ref(false)
+onMounted(() => { isMobile.value = /android|iphone|ipad|ipod/i.test(navigator.userAgent) })
+const isMobileUa = (ua?: string | null) => /iphone|ipad|android/i.test(ua || '')
+const nudge = computed(() => {
+  if (!pushEnabled.value) return ''
+  const hasMobile = devices.value.some((d) => isMobileUa(d.user_agent))
+  const hasDesktop = devices.value.some((d) => !isMobileUa(d.user_agent))
+  if (isMobile.value && !hasDesktop)
+    return '💻 Often at a laptop? Open Kerb there and enable reminders — it’ll buzz even while you work.'
+  if (!isMobile.value && !hasMobile)
+    return '📱 Add Kerb to your phone’s Home Screen and enable reminders so they reach you (and your watch) on the go.'
+  return ''
 })
 
 // ── Active-session actions ──────────────────────────────────────────────────
@@ -193,16 +236,72 @@ useSeoMeta({ title: 'Your parking sessions — Kerb' })
   margin-bottom: 28px;
 }
 h1 { font-size: clamp(28px, 5vw, 44px); font-weight: 700; letter-spacing: -0.5px; line-height: 1.1; }
+.reminders-wrap {
+  margin-bottom: 24px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+}
 .reminders {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 14px;
   padding: 14px 16px;
-  margin-bottom: 24px;
-  background: var(--bg2);
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
+}
+
+/* Connected devices */
+.devices {
+  border-top: 1px solid var(--border);
+  padding: 12px 16px 14px;
+}
+.devices-head {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--muted2);
+  margin-bottom: 8px;
+}
+.device {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.device:last-of-type { border-bottom: none; }
+.device-icon { font-size: 17px; line-height: 1; flex-shrink: 0; }
+.device-name { flex: 1; min-width: 0; font-size: 13px; color: var(--text2); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.device-here {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--green);
+  background: var(--green-bg);
+  border: 1px solid var(--green-border);
+  padding: 1px 6px;
+  border-radius: 20px;
+}
+.device-x {
+  flex-shrink: 0;
+  width: 26px; height: 26px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; color: var(--muted2);
+  background: none; border: 1px solid var(--border); border-radius: 50%;
+  cursor: pointer; transition: color 150ms, border-color 150ms;
+}
+.device-x:hover { color: var(--red); border-color: var(--red-border); }
+.devices-watch { font-size: 12px; color: var(--muted); line-height: 1.45; margin-top: 10px; }
+.devices-nudge {
+  padding: 11px 16px;
+  border-top: 1px solid var(--border);
+  font-size: 12.5px;
+  color: var(--text2);
+  line-height: 1.5;
+  background: var(--blue-bg);
 }
 .rem-title { font-size: 14px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
 .rem-sub { font-size: 13px; color: var(--muted); line-height: 1.45; }

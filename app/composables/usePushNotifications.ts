@@ -23,6 +23,22 @@ export const usePushNotifications = () => {
   const busy = ref(false)
   const error = ref<string | null>(null)
 
+  // Every device/browser the user enabled reminders on. The scheduled sender
+  // fans out to all of them, so the panel lets the user see + manage coverage.
+  interface DeviceSub { endpoint: string; user_agent: string | null; created_at: string }
+  const devices = ref<DeviceSub[]>([])
+  const currentEndpoint = ref<string | null>(null)  // this device's subscription
+
+  const loadDevices = async () => {
+    if (!userId.value) { devices.value = []; return }
+    const { data } = await supabase
+      .from('push_subscriptions')
+      .select('endpoint, user_agent, created_at')
+      .eq('user_id', userId.value)
+      .order('created_at', { ascending: true })
+    devices.value = (data as DeviceSub[]) ?? []
+  }
+
   const refresh = async () => {
     if (!import.meta.client) return
     supported.value =
@@ -33,7 +49,46 @@ export const usePushNotifications = () => {
       const reg = await navigator.serviceWorker.getRegistration()
       const sub = await reg?.pushManager.getSubscription()
       enabled.value = !!sub
+      currentEndpoint.value = sub?.endpoint ?? null
     } catch { enabled.value = false }
+    await loadDevices()
+  }
+
+  // Human label + icon from a stored user-agent string.
+  const deviceLabel = (ua?: string | null): { name: string; icon: string } => {
+    const s = (ua || '').toLowerCase()
+    let os = 'device'
+    if (/iphone/.test(s)) os = 'iPhone'
+    else if (/ipad/.test(s)) os = 'iPad'
+    else if (/android/.test(s)) os = 'Android'
+    else if (/windows/.test(s)) os = 'Windows'
+    else if (/mac os|macintosh/.test(s)) os = 'Mac'
+    else if (/linux/.test(s)) os = 'Linux'
+    let browser = ''
+    if (/edg\//.test(s)) browser = 'Edge'
+    else if (/chrome|crios/.test(s)) browser = 'Chrome'
+    else if (/firefox|fxios/.test(s)) browser = 'Firefox'
+    else if (/safari/.test(s)) browser = 'Safari'
+    const mobile = /iphone|ipad|android/.test(s)
+    return { name: browser ? `${browser} · ${os}` : os, icon: mobile ? '📱' : '💻' }
+  }
+
+  // Remove a device's subscription. If it's this device, also unsubscribe locally.
+  const removeDevice = async (endpoint: string) => {
+    if (!import.meta.client) return
+    try {
+      await supabase.from('push_subscriptions').delete().eq('endpoint', endpoint)
+      if (endpoint === currentEndpoint.value) {
+        const reg = await navigator.serviceWorker.getRegistration()
+        const sub = await reg?.pushManager.getSubscription()
+        if (sub) await sub.unsubscribe()
+        enabled.value = false
+        currentEndpoint.value = null
+      }
+    } catch (e) {
+      console.warn('[Kerb] removeDevice failed:', e)
+    }
+    await loadDevices()
   }
 
   const enable = async () => {
@@ -75,6 +130,8 @@ export const usePushNotifications = () => {
       }, { onConflict: 'endpoint' })
 
       enabled.value = true
+      currentEndpoint.value = sub.endpoint
+      await loadDevices()
     } catch (e: any) {
       console.warn('[Kerb] push enable failed:', e)
       error.value = 'Could not enable reminders. Try again.'
@@ -95,6 +152,8 @@ export const usePushNotifications = () => {
         await sub.unsubscribe()
       }
       enabled.value = false
+      currentEndpoint.value = null
+      await loadDevices()
     } catch (e) {
       console.warn('[Kerb] push disable failed:', e)
     } finally {
@@ -104,5 +163,8 @@ export const usePushNotifications = () => {
 
   onMounted(refresh)
 
-  return { supported, permission, enabled, busy, error, enable, disable, refresh }
+  return {
+    supported, permission, enabled, busy, error, enable, disable, refresh,
+    devices, currentEndpoint, loadDevices, removeDevice, deviceLabel,
+  }
 }
