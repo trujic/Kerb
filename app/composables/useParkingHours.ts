@@ -122,6 +122,34 @@ export const useParkingHours = (cityId: MaybeRefOrGetter<string | null | undefin
     return { paid: true, label: 'Paid now', detail: `Free at ${today.end}` }
   })
 
+  const paidNow = computed<boolean | null>(() => status.value?.paid ?? null)
+
+  // When parking is free now: the next window charging opens — for night pre-pay.
+  // `dayLabel` is "today" / "tomorrow" / weekday; `end` is start + 1h (one SMS hour).
+  const nextWindow = computed<{ dayLabel: string; start: string; end: string } | null>(() => {
+    const s = schedule.value
+    const c = cityNow.value
+    if (!s || !c || status.value?.paid) return null
+
+    const today = s.days[c.day]
+    let day = c.day
+    let win: DayWindow | null = null
+    if (today && c.minutes < toMinutes(today.start)) {
+      win = today // free early morning before charging starts today
+    } else {
+      const nxt = nextChargingDay(c.day)
+      if (nxt) { day = nxt.day; win = nxt.window }
+    }
+    if (!win) return null
+
+    const dayLabel =
+      day === c.day ? 'today' : day === (c.day + 1) % 7 ? 'tomorrow' : DAY_ABBR[day]
+    const end = ((m: number) => `${String(Math.floor(m / 60) % 24).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`)(
+      toMinutes(win.start) + 60,
+    )
+    return { dayLabel, start: win.start, end }
+  })
+
   // Compact weekly summary, grouping consecutive identical days (Mon–Fri etc.).
   const summary = computed<ScheduleRow[]>(() => {
     const s = schedule.value
@@ -145,5 +173,5 @@ export const useParkingHours = (cityId: MaybeRefOrGetter<string | null | undefin
     return rows
   })
 
-  return { schedule, status, summary }
+  return { schedule, status, summary, paidNow, nextWindow }
 }

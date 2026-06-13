@@ -77,13 +77,28 @@
           <NuxtLink :to="`/${detectedCity!.id}`" class="gps-full-link">Full guide →</NuxtLink>
         </div>
 
+        <!-- Armed night pre-pay — scheduled for the next paid window, not live yet -->
+        <div v-if="displaySession && displaySession.type === 'armed'" class="armed-card">
+          <div class="armed-main">
+            <span class="armed-moon">🌙</span>
+            <div>
+              <p class="armed-title">Armed for the morning · {{ displaySession.zone_name }}</p>
+              <p class="armed-sub">
+                Pre-paid {{ clockOf(displaySession.started_at) }}–{{ clockOf(displaySession.expires_at) }}.
+                We can't ping you yet — set an alarm to re-check the sign.
+              </p>
+            </div>
+          </div>
+          <button type="button" class="armed-cancel" @click="onEndSession">Cancel</button>
+        </div>
+
         <!-- Active parking session -->
         <SessionCard
-          v-if="activeSession"
-          :session="activeSession"
-          :remaining-ms="remainingMs"
-          :at-zone-limit="atZoneLimit"
-          :can-extend="canExtend"
+          v-else-if="displaySession"
+          :session="displaySession"
+          :remaining-ms="displayRemaining"
+          :at-zone-limit="displayAtLimit"
+          :can-extend="displayCanExtend"
           @extend="onExtend"
           @end="onEndSession"
           @locate="onLocateCar"
@@ -111,14 +126,21 @@
           <!-- ── Honest framing: GPS narrows it down, the sign decides ── -->
           <div class="zone-pick-head">
             <p class="zone-pick-title">
-              <template v-if="parkingState === 'on'">You're in a paid parking area</template>
+              <span v-if="freeNow" class="free-badge">FREE NOW</span>
+              <template v-if="freeNow">Parking is free right now</template>
+              <template v-else-if="parkingState === 'on'">You're in a paid parking area</template>
               <template v-else-if="parkingState === 'near' && nearest">
                 Paid parking ~{{ formatDist(nearest.distanceM) }} away
               </template>
               <template v-else>Parking zones in {{ detectedCity!.name }}</template>
             </p>
             <p class="zone-pick-hint">
-              🪧 Tap the zone printed on the sign next to your car — that's the one that counts.
+              <template v-if="freeNow && nextWindow">
+                🌙 No need to pay until <strong>{{ nextWindow.dayLabel }} {{ nextWindow.start }}</strong>. You can pre-pay the first hour now.
+              </template>
+              <template v-else>
+                🪧 Tap the zone printed on the sign next to your car — that's the one that counts.
+              </template>
             </p>
           </div>
 
@@ -157,7 +179,7 @@
           </button>
 
           <!-- Selectable zones — likely one floats up, but it's never auto-committed -->
-          <div class="zone-pick-list">
+          <div class="zone-pick-list" :class="{ 'zone-pick-list--free': freeNow }">
             <button
               v-for="zone in orderedZones"
               :key="zone.id"
@@ -208,34 +230,52 @@
               </span>
             </div>
             <template v-if="selectedZone.sms_shortcode">
-              <!-- Default: the slide IS the sign-confirmation — it can't fire by accident -->
-              <SlideToConfirm
-                v-if="!skipConfirm"
-                :key="selectedZone.name"
-                :label="`I checked the sign — slide to pay ${selectedZone.name}`"
-                done-label="Opening SMS…"
-                :color="selectedZone.color"
-                @confirm="pay(selectedZone)"
-              />
-              <!-- Responsibility mode: fast tap, no per-pay confirm -->
-              <button
-                v-else
-                type="button"
-                class="zone-act-btn"
-                :style="{ background: selectedZone.color }"
-                @click="pay(selectedZone)"
-              >
-                <span v-if="defaultPlate">Pay {{ selectedZone.name }} · {{ defaultPlate }}</span>
-                <span v-else>Pay {{ selectedZone.name }}</span>
-                <span class="zone-act-arrow">→ {{ selectedZone.sms_shortcode }}</span>
-              </button>
+              <!-- ── Night pre-pay: free now, the SMS carries over to the next window ── -->
+              <div v-if="nightPrepay" class="prepay">
+                <p class="prepay-note">
+                  🌙 Free until <strong>{{ nextWindow!.start }}</strong>. Per the official carry-over rule,
+                  an SMS you send now applies to <strong>{{ nextWindow!.dayLabel }} {{ nextWindow!.start }}–{{ nextWindow!.end }}</strong> —
+                  not the moment you send it.
+                </p>
+                <SlideToConfirm
+                  :key="'pp-' + selectedZone.name"
+                  :label="`I checked the sign — slide to pre-pay ${nextWindow!.start}–${nextWindow!.end}`"
+                  done-label="Opening SMS…"
+                  :color="selectedZone.color"
+                  @confirm="pay(selectedZone, { armed: true })"
+                />
+              </div>
 
-              <!-- Persisted opt-out: take responsibility, skip the per-pay slide -->
-              <label class="zone-resp" :class="{ 'zone-resp--on': skipConfirm }">
-                <input v-model="skipConfirm" type="checkbox" class="zone-resp-box" />
-                <span v-if="!skipConfirm">Don't ask each time — I'll check the sign myself and take responsibility</span>
-                <span v-else>Sign-check off — you choose the zone and are responsible. Tap to turn confirmation back on.</span>
-              </label>
+              <!-- ── Paid hours: the slide IS the sign-confirmation ── -->
+              <template v-else>
+                <SlideToConfirm
+                  v-if="!skipConfirm"
+                  :key="selectedZone.name"
+                  :label="`I checked the sign — slide to pay ${selectedZone.name}`"
+                  done-label="Opening SMS…"
+                  :color="selectedZone.color"
+                  @confirm="pay(selectedZone)"
+                />
+                <!-- Responsibility mode: fast tap, no per-pay confirm -->
+                <button
+                  v-else
+                  type="button"
+                  class="zone-act-btn"
+                  :style="{ background: selectedZone.color }"
+                  @click="pay(selectedZone)"
+                >
+                  <span v-if="defaultPlate">Pay {{ selectedZone.name }} · {{ defaultPlate }}</span>
+                  <span v-else>Pay {{ selectedZone.name }}</span>
+                  <span class="zone-act-arrow">→ {{ selectedZone.sms_shortcode }}</span>
+                </button>
+
+                <!-- Persisted opt-out: take responsibility, skip the per-pay slide -->
+                <label class="zone-resp" :class="{ 'zone-resp--on': skipConfirm }">
+                  <input v-model="skipConfirm" type="checkbox" class="zone-resp-box" />
+                  <span v-if="!skipConfirm">Don't ask each time — I'll check the sign myself and take responsibility</span>
+                  <span v-else>Sign-check off — you choose the zone and are responsible. Tap to turn confirmation back on.</span>
+                </label>
+              </template>
             </template>
 
             <p class="zone-act-foot">
@@ -301,6 +341,25 @@
           @submitted="onSignSubmitted"
           @pay="onScanPay"
         />
+      </ClientOnly>
+
+      <!-- SMS handoff — the web can't verify the send, so we ask -->
+      <ClientOnly>
+        <Teleport to="body">
+          <div v-if="showSentPrompt" class="sent" role="dialog" aria-label="Confirm SMS sent">
+            <div class="sent-sheet">
+              <p class="sent-title">Did your SMS send?</p>
+              <p class="sent-sub">
+                Your phone should have opened a message to <strong>{{ pendingPay?.zone.sms_shortcode }}</strong>.
+                The operator's reply SMS is your official receipt — keep it.
+              </p>
+              <div class="sent-actions">
+                <button type="button" class="sent-no" @click="onSentNo">Not yet</button>
+                <button type="button" class="sent-yes" @click="onSentYes">Yes, sent it</button>
+              </div>
+            </div>
+          </div>
+        </Teleport>
       </ClientOnly>
     </section>
 
@@ -504,6 +563,19 @@ watch(user, (u) => {
   if (u) { loadActive(); loadHistory() }
 }, { immediate: true })
 
+// Time-aware hours — drives free-now desaturation + the night pre-pay path.
+const { paidNow, nextWindow } = useParkingHours(() => detectedCity.value?.id)
+const freeNow = computed(() => paidNow.value === false)
+const nightPrepay = computed(() => freeNow.value && !!nextWindow.value)
+
+// Guest sessions (no account), persisted on-device. Created only AFTER the user
+// confirms they sent the SMS. Logged-in users keep the Supabase-backed session.
+const guest = useGuestSession()
+const displaySession   = computed<any>(() => (user.value ? activeSession.value : guest.active.value))
+const displayRemaining = computed(() => (user.value ? remainingMs.value : guest.remainingMs.value))
+const displayAtLimit   = computed(() => (user.value ? atZoneLimit.value : guest.atZoneLimit.value))
+const displayCanExtend = computed(() => (user.value ? canExtend.value : guest.canExtend.value))
+
 // Lock body scroll + close on Escape while the fullscreen map is open
 watch(mapExpanded, (open) => {
   if (import.meta.server) return
@@ -520,6 +592,7 @@ onMounted(() => window.addEventListener('keydown', onKeydown))
 onUnmounted(() => {
   window.removeEventListener('keydown', onKeydown)
   document.body.style.overflow = ''
+  if (_visHandler) { document.removeEventListener('visibilitychange', _visHandler); _visHandler = null }
 })
 
 // Guest plate — saved on the device so anonymous users get one-tap SMS too,
@@ -648,8 +721,8 @@ const nearestSignArrow = computed(() => {
 // "Find my car" point, a tapped lead-to-sign point, else the nearest paid segment.
 const leadSignPoint = ref<{ lat: number; lng: number } | null>(null)
 const highlightPoint = computed(() => {
-  if (locateCar.value && activeSession.value?.lat != null && activeSession.value?.lng != null) {
-    return { lat: activeSession.value.lat, lng: activeSession.value.lng }
+  if (locateCar.value && displaySession.value?.lat != null && displaySession.value?.lng != null) {
+    return { lat: displaySession.value.lat, lng: displaySession.value.lng }
   }
   if (leadSignPoint.value) return leadSignPoint.value
   return parkingState.value === 'near' || parkingState.value === 'none'
@@ -675,24 +748,83 @@ const sessionPayload = (zone: any) => ({
   plate: defaultPlate.value,
 })
 
-// Tapping a pay button opens the SMS composer (the <a href>) AND logs the session
+// Logged-in users get the Supabase session logged on tap (existing behaviour).
 const onPay = (zone: any) => { startOrExtend(sessionPayload(zone)) }
 
-// Confirmed (slide or fast tap) → log the geotagged session, then hand off to the
-// phone's SMS composer. The confirmation is the user's; Kerb only relays the SMS.
-const pay = (zone: any) => {
-  onPay(zone)
+// The ms epoch a night pre-pay's paid window opens (city time ≈ the user's, in-city).
+const nextStartMs = () => {
+  const nw = nextWindow.value
+  if (!nw) return Date.now()
+  const [h, m] = nw.start.split(':').map(Number)
+  const d = new Date(); d.setHours(h, m, 0, 0)
+  if (nw.dayLabel === 'tomorrow' || d.getTime() <= Date.now()) d.setDate(d.getDate() + 1)
+  return d.getTime()
+}
+
+const guestPayload = (zone: any, armed: boolean) => ({
+  cityId: detectedCity.value!.id,
+  zone: { name: zone.name, color: zone.color, price: zone.price, rules: zone.rules },
+  street: nearest.value?.streetName ?? null,
+  lat: coords.value?.lat ?? null,
+  lng: coords.value?.lng ?? null,
+  plate: defaultPlate.value,
+  armed,
+  startsAt: armed ? nextStartMs() : undefined,
+})
+
+// ── SMS handoff ────────────────────────────────────────────────────────────────
+// The web can't verify an SMS was sent. So: open the composer, and when the user
+// returns to the tab, ask. Only on "yes" do we record a (self-reported) session.
+const pendingPay = ref<{ zone: any; armed: boolean } | null>(null)
+const showSentPrompt = ref(false)
+let _visHandler: (() => void) | null = null
+const armSentPrompt = () => {
+  if (!import.meta.client || _visHandler) return
+  _visHandler = () => {
+    if (document.visibilityState !== 'visible') return
+    document.removeEventListener('visibilitychange', _visHandler!)
+    _visHandler = null
+    if (pendingPay.value) showSentPrompt.value = true
+  }
+  document.addEventListener('visibilitychange', _visHandler)
+}
+
+// Confirmed (slide/tap) → open the SMS composer + arm the "did you send it?" check.
+const pay = (zone: any, opts: { armed?: boolean } = {}) => {
+  if (user.value) {
+    onPay(zone) // logged-in keeps its immediate Supabase log (unchanged)
+  } else {
+    pendingPay.value = { zone, armed: !!opts.armed } // guest: confirm the send first
+    armSentPrompt()
+  }
   if (import.meta.client && zone.sms_shortcode) window.location.href = smsLink(zone)
 }
 
+const onSentYes = () => {
+  const p = pendingPay.value
+  if (p && !user.value) guest.create(guestPayload(p.zone, p.armed), 'self_reported')
+  showSentPrompt.value = false
+  pendingPay.value = null
+}
+const onSentNo = () => { showSentPrompt.value = false; pendingPay.value = null }
+
 const onExtend = () => {
-  const z = cityDetail.value?.zones?.find((x: any) => x.name === activeSession.value?.zone_name)
+  const name = displaySession.value?.zone_name
+  const z = cityDetail.value?.zones?.find((x: any) => x.name === name)
   if (!z) return
-  startOrExtend(sessionPayload(z))
-  if (import.meta.client && z.sms_shortcode) window.location.href = smsLink(z) // pay again
+  if (user.value) {
+    startOrExtend(sessionPayload(z))
+    if (import.meta.client && z.sms_shortcode) window.location.href = smsLink(z)
+  } else {
+    pay(z) // guest: re-open the SMS, confirm, log a fresh hour
+  }
 }
 
-const onEndSession = () => { if (activeSession.value) endSession(activeSession.value.id) }
+const onEndSession = () => {
+  const s = displaySession.value
+  if (!s) return
+  user.value ? endSession(s.id) : guest.end(s.id)
+}
 const onLocateCar = () => { locateCar.value = true; mapExpanded.value = true }
 
 const pastSessions = computed(() =>
@@ -709,6 +841,9 @@ const relTime = (iso: string) => {
   const d = Math.round(h / 24)
   return d === 1 ? 'yesterday' : `${d} days ago`
 }
+
+const clockOf = (iso: string | null) =>
+  iso ? new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : ''
 
 const smsLink = (zone: any) => {
   const body = defaultPlate.value
@@ -1420,6 +1555,116 @@ h2 {
   flex-direction: column;
   gap: 6px;
 }
+/* Free-now: calm the cards but keep them tappable */
+.zone-pick-list--free { opacity: 0.62; filter: saturate(0.65); transition: opacity 150ms var(--ease-out); }
+.zone-pick-list--free:hover { opacity: 1; filter: none; }
+.free-badge {
+  display: inline-block;
+  margin-right: 8px;
+  font-size: 10px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  letter-spacing: 0.5px;
+  color: var(--green);
+  background: var(--green-bg);
+  border: 1px solid var(--green-border);
+  padding: 2px 7px;
+  border-radius: 20px;
+  vertical-align: middle;
+}
+
+/* Night pre-pay */
+.prepay-note {
+  font-size: 12.5px;
+  color: var(--text2);
+  line-height: 1.55;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--amber);
+  border-radius: var(--r-md);
+}
+.prepay-note strong { color: var(--text); font-weight: 700; }
+
+/* Armed (scheduled pre-pay) card */
+.armed-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  padding: 14px 16px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--amber);
+  border-radius: var(--r-lg);
+}
+.armed-main { display: flex; align-items: flex-start; gap: 12px; min-width: 0; }
+.armed-moon { font-size: 22px; line-height: 1; flex-shrink: 0; }
+.armed-title { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 2px; }
+.armed-sub { font-size: 12px; color: var(--muted); line-height: 1.5; }
+.armed-cancel {
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 7px 12px;
+  cursor: pointer;
+}
+.armed-cancel:hover { color: var(--text); }
+
+/* SMS handoff sheet */
+.sent {
+  position: fixed;
+  inset: 0;
+  z-index: 3500;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  padding: 16px;
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+}
+.sent-sheet {
+  width: 100%;
+  max-width: 440px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-xl);
+  padding: 22px 20px;
+  box-shadow: var(--shadow-lg);
+}
+.sent-title { font-size: 18px; font-weight: 700; letter-spacing: -0.2px; color: var(--text); margin-bottom: 8px; }
+.sent-sub { font-size: 13px; color: var(--muted); line-height: 1.6; margin-bottom: 18px; }
+.sent-sub strong { color: var(--text2); font-family: var(--font-mono); }
+.sent-actions { display: flex; gap: 10px; }
+.sent-no {
+  flex: 1;
+  padding: 13px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text2);
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  cursor: pointer;
+}
+.sent-yes {
+  flex: 1;
+  padding: 13px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--on-accent);
+  background: var(--blue);
+  border: none;
+  border-radius: var(--r-md);
+  cursor: pointer;
+}
+.sent-yes:active, .sent-no:active { transform: scale(0.98); }
 .zone-pick {
   display: flex;
   align-items: center;
