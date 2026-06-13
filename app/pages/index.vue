@@ -849,7 +849,9 @@ const onEndSession = () => {
 const onLocateCar = () => { locateCar.value = true; mapExpanded.value = true }
 
 // ── Ask AI — deterministic candidate-set zone resolver ─────────────────────────
-const { verdict: aiVerdict } = useZoneResolver(coords, zoneBoundaries, signReports)
+// Resolve against the HEALED geometry so AI never contradicts the map the user sees
+// (sign-first logic is independent; this just keeps the fallback boundary calc honest).
+const { verdict: aiVerdict } = useZoneResolver(coords, displayZones, signReports)
 const aiSourceName = computed(() => {
   const u = cityDetail.value?.official_url
   if (!u) return 'official city registry'
@@ -892,17 +894,14 @@ watch(detectedCity, async (city) => {
   try { cityDetail.value = await getCity(city.id) }
   finally { loadingCityDetail.value = false }
 
-  // Load zone boundary GeoJSON if available for this city
-  try {
-    const res = await fetch(`/zones/${city.id}.json`)
-    if (res.ok) {
-      const data = await res.json()
-      zoneBoundaries.value = data
-    }
-  } catch { /* no boundaries file, that's fine */ }
-
-  // Load community sign scans for this city (verified pins on the map)
-  signReports.value = await loadSignReports(city.id)
+  // Load signs + geometry together, then set signs FIRST so the map's first paint
+  // is already healed (no old→new flash). displayZones reads both refs.
+  const [geo, reports] = await Promise.all([
+    fetch(`/zones/${city.id}.json`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+    loadSignReports(city.id),
+  ])
+  signReports.value = reports
+  if (geo) zoneBoundaries.value = geo
 })
 
 // A new confirmed scan: pin it immediately and make it the selected pay zone.
