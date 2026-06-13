@@ -1,8 +1,11 @@
 <template>
   <div>
     <div class="back-bar">
-      <div class="container">
+      <div class="container back-bar-inner">
         <NuxtLink to="/" class="back-link">← All cities</NuxtLink>
+        <span v-if="status" class="live-chip" :class="status.paid ? 'is-paid' : 'is-free'">
+          <span class="live-dot" />{{ status.label }}<span class="live-detail"> · {{ status.detail }}</span>
+        </span>
       </div>
     </div>
 
@@ -33,7 +36,9 @@
                 {{ city.verified ? '✓ Verified' : '⚠ Community data' }}
                 <span v-if="city.verified_by"> · {{ city.verified_by }}</span>
               </div>
-              <div class="date-badge">Updated {{ city.last_updated }}</div>
+              <div class="date-badge" :class="{ stale: isStale }">
+                {{ isStale ? '⚠ ' : '' }}Updated {{ city.last_updated }}
+              </div>
             </div>
           </div>
 
@@ -75,6 +80,15 @@
                       <span class="zone-price">{{ zone.price }}</span>
                     </div>
                     <p class="zone-rules">{{ zone.rules }}</p>
+                    <a
+                      v-if="zone.sms_shortcode"
+                      :href="smsHref(zone)"
+                      class="zone-sms"
+                      :style="{ color: zone.color }"
+                    >
+                      Pay by SMS → {{ zone.sms_shortcode }}
+                      <span v-if="guestPlate" class="zone-sms-plate">{{ guestPlate.toUpperCase() }}</span>
+                    </a>
                   </div>
                 </div>
               </div>
@@ -91,6 +105,7 @@
               <div v-if="city.sms_instructions" class="sms-box">
                 <p class="sms-label">Step by step — SMS</p>
                 <p>{{ city.sms_instructions }}</p>
+                <p class="sms-receipt">The operator's reply SMS is your official receipt — keep it.</p>
               </div>
             </div>
 
@@ -154,9 +169,46 @@ const { data: city, pending, error } = await useAsyncData(
   { lazy: true }
 )
 
+// Live paid/free status for the pinned chip.
+const { status } = useParkingHours(() => city.value?.id)
+
+// Data older than 12 months is shown in amber — rules drift.
+const isStale = computed(() => {
+  const raw = city.value?.last_updated
+  const d = raw ? new Date(raw) : null
+  if (!d || isNaN(d.getTime())) return false
+  return Date.now() - d.getTime() > 365 * 86_400_000
+})
+
+// Guest plate (saved on device) prefills the SMS body, matching the home flow.
+const GUEST_PLATE_KEY = 'kerb_guest_plate'
+const guestPlate = ref('')
+onMounted(() => {
+  if (import.meta.client) guestPlate.value = localStorage.getItem(GUEST_PLATE_KEY) ?? ''
+})
+const smsHref = (zone: any) => {
+  const body = guestPlate.value.trim()
+    ? `?body=${encodeURIComponent(guestPlate.value.trim().toUpperCase())}`
+    : ''
+  return `sms:${zone.sms_shortcode}${body}`
+}
+
+const SITE = 'https://kerbo.netlify.app'
+const ogTitle = computed(() =>
+  city.value ? `${city.value.name} parking — zones, prices, SMS · Kerbo` : 'City not found · Kerbo',
+)
+const ogDesc = computed(() =>
+  city.value?.overview ?? 'Street parking guide — zones, prices and how to pay.',
+)
 useSeoMeta({
-  title: city.value ? `${city.value.name} Parking Guide — Kerb` : 'City not found',
-  description: city.value?.overview ?? 'Street parking guide',
+  title: ogTitle,
+  description: ogDesc,
+  ogTitle,
+  ogDescription: ogDesc,
+  ogUrl: () => `${SITE}/${route.params.id}`,
+  ogImage: `${SITE}/icon-512.png`,
+  ogType: 'website',
+  twitterCard: 'summary',
 })
 </script>
 
@@ -167,6 +219,7 @@ useSeoMeta({
   padding: 13px 0;
   margin-top: 53px;
 }
+.back-bar-inner { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .back-link {
   font-size: 13px;
   color: var(--muted);
@@ -174,6 +227,50 @@ useSeoMeta({
   transition: color 0.15s;
 }
 .back-link:hover { color: var(--text); }
+
+/* Pinned live status chip */
+.live-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 11px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+.live-chip.is-free { background: var(--green-bg); border: 1px solid var(--green-border); color: var(--green); }
+.live-chip.is-paid { background: var(--amber-bg); border: 1px solid var(--amber-border); color: var(--amber); }
+.live-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.live-chip.is-free .live-dot { animation: hours-pulse 2s ease-out infinite; }
+@keyframes hours-pulse {
+  0% { box-shadow: 0 0 0 0 currentColor; opacity: 1; }
+  70% { box-shadow: 0 0 0 5px transparent; opacity: 0.85; }
+  100% { box-shadow: 0 0 0 0 transparent; opacity: 1; }
+}
+@media (max-width: 480px) { .live-detail { display: none; } }
+
+/* Tappable SMS shortcode on each zone card */
+.zone-sms {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+.zone-sms:active { opacity: 0.7; }
+.zone-sms-plate {
+  font-size: 11px;
+  color: var(--text2);
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 1px 6px;
+}
+.sms-receipt { margin-top: 10px; font-size: 12px; color: var(--text2); font-weight: 500; }
 
 /* Loading */
 .loading-wrap { display: flex; align-items: center; justify-content: center; min-height: 60vh; }
@@ -242,6 +339,13 @@ useSeoMeta({
   font-size: 11px;
   color: var(--muted2);
   font-family: var(--font-mono);
+}
+.date-badge.stale {
+  color: var(--amber);
+  background: var(--amber-bg);
+  border: 1px solid var(--amber-border);
+  padding: 3px 8px;
+  border-radius: 20px;
 }
 .city-overview {
   font-size: 15px;

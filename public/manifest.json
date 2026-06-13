@@ -1,7 +1,7 @@
 {
-  "name": "Kerb — Street Parking Guide",
-  "short_name": "Kerb",
-  "description": "Parking rules for any city, organized.",
+  "name": "Kerbo — park · pay · zero fines",
+  "short_name": "Kerbo",
+  "description": "AI-assisted street parking for Serbia. Find your zone, pay by SMS, never learn what a zone is.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#FFFFFF",

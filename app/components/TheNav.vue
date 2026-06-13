@@ -1,7 +1,7 @@
 <template>
   <nav class="nav">
     <div class="nav-inner container-wide">
-      <NuxtLink to="/" class="nav-logo">Kerb</NuxtLink>
+      <NuxtLink to="/" class="nav-logo">Kerbo</NuxtLink>
       <ul class="nav-links">
         <li><NuxtLink to="/cities">Cities</NuxtLink></li>
         <li v-if="user"><NuxtLink to="/sessions">Sessions</NuxtLink></li>
@@ -9,7 +9,6 @@
         <li><NuxtLink to="/contribute">Contribute</NuxtLink></li>
       </ul>
       <div class="nav-right">
-        <NuxtLink to="/contribute" class="nav-btn nav-btn-ghost">Add a city</NuxtLink>
         <template v-if="user">
           <NuxtLink to="/profile" class="nav-avatar" :title="displayName">
             {{ initials }}

@@ -1,23 +1,43 @@
 <template>
   <div class="auth-page">
     <div class="auth-card">
-      <NuxtLink to="/" class="auth-logo">Kerb</NuxtLink>
+      <NuxtLink to="/" class="auth-logo">Kerbo</NuxtLink>
       <p class="auth-sub">{{ isRegister ? 'Create your account' : 'Sign in to your account' }}</p>
+      <p class="auth-value">
+        Save your plate, keep your session history, and get a heads-up before parking
+        runs out — across every device. Free, no card.
+      </p>
 
       <form class="auth-form" @submit.prevent="handleSubmit">
         <div v-if="isRegister" class="form-group">
           <label class="form-label">Display name</label>
-          <input v-model="form.displayName" class="form-input" type="text" placeholder="Your name" />
+          <input v-model="form.displayName" class="form-input" type="text" placeholder="Your name" autocomplete="name" />
         </div>
 
         <div class="form-group">
           <label class="form-label">Email *</label>
-          <input v-model="form.email" class="form-input" type="email" placeholder="you@example.com" required />
+          <input v-model="form.email" class="form-input" type="email" placeholder="you@example.com" required autocomplete="email" />
         </div>
 
         <div class="form-group">
           <label class="form-label">Password *</label>
-          <input v-model="form.password" class="form-input" type="password" placeholder="••••••••" required minlength="6" />
+          <div class="pw-wrap">
+            <input
+              v-model="form.password"
+              class="form-input pw-input"
+              :type="showPw ? 'text' : 'password'"
+              placeholder="••••••••"
+              required
+              minlength="6"
+              :autocomplete="isRegister ? 'new-password' : 'current-password'"
+            />
+            <button
+              type="button"
+              class="pw-toggle"
+              :aria-label="showPw ? 'Hide password' : 'Show password'"
+              @click="showPw = !showPw"
+            >{{ showPw ? 'Hide' : 'Show' }}</button>
+          </div>
         </div>
 
         <div v-if="authError" class="error-banner">{{ authError }}</div>
@@ -48,6 +68,7 @@ const isRegister = ref(false)
 const loading = ref(false)
 const authError = ref('')
 const successMsg = ref('')
+const showPw = ref(false)
 
 const form = reactive({ email: '', password: '', displayName: '' })
 
@@ -77,7 +98,7 @@ const handleSubmit = async () => {
   }
 }
 
-useSeoMeta({ title: 'Sign in — Kerb' })
+useSeoMeta({ title: 'Sign in — Kerbo' })
 </script>
 
 <style scoped>
@@ -109,8 +130,28 @@ useSeoMeta({ title: 'Sign in — Kerb' })
 .auth-sub {
   font-size: 14px;
   color: var(--muted);
-  margin-bottom: 28px;
+  margin-bottom: 10px;
 }
+.auth-value {
+  font-size: 13px;
+  color: var(--text2);
+  line-height: 1.55;
+  margin-bottom: 24px;
+}
+.pw-wrap { position: relative; display: flex; align-items: center; }
+.pw-input { width: 100%; padding-right: 64px; }
+.pw-toggle {
+  position: absolute;
+  right: 8px;
+  background: none;
+  border: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--blue);
+  cursor: pointer;
+  padding: 6px 8px;
+}
+.pw-toggle:hover { text-decoration: underline; }
 .auth-form {
   display: flex;
   flex-direction: column;

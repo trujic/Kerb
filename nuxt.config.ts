@@ -28,16 +28,16 @@ export default defineNuxtConfig({
 
   app: {
     head: {
-      title: 'Kerb — Street Parking Guide',
+      title: 'Kerbo — park · pay · zero fines',
       meta: [
-        { name: 'description', content: 'Parking rules for any city in Europe. Zones, prices, payment methods and local tips.' },
+        { name: 'description', content: 'AI-assisted street parking for Serbia. Find your zone, pay by SMS, never learn what a zone is.' },
         { name: 'theme-color', content: '#2563EB' },
         { name: 'mobile-web-app-capable', content: 'yes' },
         { name: 'apple-mobile-web-app-capable', content: 'yes' },
         { name: 'apple-mobile-web-app-status-bar-style', content: 'default' },
-        { name: 'apple-mobile-web-app-title', content: 'Kerb' },
-        { property: 'og:title', content: 'Kerb — Street Parking Guide' },
-        { property: 'og:description', content: 'Parking rules for any city, organized.' },
+        { name: 'apple-mobile-web-app-title', content: 'Kerbo' },
+        { property: 'og:title', content: 'Kerbo — park · pay · zero fines' },
+        { property: 'og:description', content: 'AI-assisted street parking for Serbia. Find your zone, pay by SMS, never learn what a zone is.' },
         { property: 'og:type', content: 'website' },
       ],
       link: [

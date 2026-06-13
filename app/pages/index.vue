@@ -334,7 +334,7 @@
               v-model="searchQuery"
               class="search-input"
               type="text"
-              placeholder="Search city — Novi Sad, Prague, Vienna..."
+              placeholder="Search city — Novi Sad, Belgrade, Niš..."
               autocomplete="off"
               @focus="searchFocused = true"
               @blur="setTimeout(() => (searchFocused = false), 150)"
@@ -375,7 +375,7 @@
     </section>
 
     <!-- ── CITY STRIP ── -->
-    <div class="city-strip">
+    <div v-if="stripItems.length" class="city-strip">
       <div class="city-strip-track">
         <span
           v-for="(item, i) in stripItems.concat(stripItems)"
@@ -799,21 +799,23 @@ const goToFirstResult = async () => {
 
 const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' })
 
-const stats = [
-  { val: '47', label: 'cities covered' },
-  { val: '18', label: 'countries' },
-  { val: '1.2K', label: 'verifications' },
-]
+// Honest stats only — derived from the cities we actually have, never invented.
+const stats = computed(() => {
+  const list = (cities.value ?? []) as any[]
+  const countries = new Set(list.map((c) => c.country)).size
+  const out = [{ val: String(list.length), label: list.length === 1 ? 'city' : 'cities' }]
+  if (countries) out.push({ val: String(countries), label: countries === 1 ? 'country' : 'countries' })
+  out.push({ val: 'Serbia', label: 'first' })
+  return out
+})
 
-const stripItems = [
-  { city: '🇷🇸 Novi Sad', detail: '4 zones · 80–30 RSD/h · nSpark app' },
-  { city: '🇸🇮 Ljubljana', detail: '3 zones · pay by app' },
-  { city: '🇭🇷 Zagreb', detail: '4 zones · SMS payment' },
-  { city: '🇨🇿 Prague', detail: 'Resident zones · ParkSync' },
-  { city: '🇦🇹 Vienna', detail: 'Kurzparkzone · 2h max' },
-  { city: '🇩🇪 Berlin', detail: 'Parkraum · pay by meter' },
-  { city: '🇳🇱 Amsterdam', detail: 'Paid 24/7 · 4.10 €/h' },
-]
+// Ticker shows only real cities that have a page — no ghost entries.
+const stripItems = computed(() =>
+  ((cities.value ?? []) as any[]).map((c) => ({
+    city: `${c.flag} ${c.name}`,
+    detail: c.country,
+  })),
+)
 
 const steps = [
   {
@@ -853,8 +855,14 @@ onMounted(() => {
 })
 
 useSeoMeta({
-  title: 'Kerb — Street Parking Guide',
-  description: 'Parking rules for any city in Europe. Zones, prices, payment methods and local tips.',
+  title: 'Kerbo — park · pay · zero fines',
+  description: 'AI-assisted street parking for Serbia. Find your zone, pay by SMS, never learn what a zone is.',
+  ogTitle: 'Kerbo — park · pay · zero fines',
+  ogDescription: 'AI-assisted street parking for Serbia. Find your zone, pay by SMS, never learn what a zone is.',
+  ogUrl: 'https://kerbo.netlify.app/',
+  ogImage: 'https://kerbo.netlify.app/icon-512.png',
+  ogType: 'website',
+  twitterCard: 'summary',
 })
 </script>
 
