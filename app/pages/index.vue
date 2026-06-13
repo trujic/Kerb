@@ -215,17 +215,9 @@
               <strong>{{ selectedZone.name }}</strong>.
             </p>
             <div v-if="!user" class="zone-plate">
-              <input
-                v-model="guestPlate"
-                class="zone-plate-input"
-                type="text"
-                autocapitalize="characters"
-                autocomplete="off"
-                placeholder="Your plate — NS123AB"
-                @input="guestPlate = guestPlate.toUpperCase()"
-              />
+              <PlateInput v-model="guestPlate" />
               <span class="zone-plate-hint">
-                Saved on this device · prefilled into the SMS.
+                Saved on this device · prefilled into the SMS · 📷 scan it instead of typing.
                 <NuxtLink to="/login">Create an account</NuxtLink> to sync it.
               </span>
             </div>
