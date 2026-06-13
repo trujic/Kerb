@@ -154,6 +154,16 @@
             <span class="scan-cta-arrow">→</span>
           </button>
 
+          <!-- Ask AI — geometry + registry decide, never a remembered guess -->
+          <button type="button" class="ai-cta" @click="showAi = true">
+            <span class="ai-cta-icon">🧠</span>
+            <span class="ai-cta-text">
+              <span class="ai-cta-title">Ask AI — where am I?</span>
+              <span class="ai-cta-sub">Not sure which zone? Get a verdict with its evidence</span>
+            </span>
+            <span class="ai-cta-arrow">→</span>
+          </button>
+
           <!-- Nearest confirmed sign — lead the user to verified ground truth -->
           <button
             v-if="nearestSign"
@@ -332,6 +342,20 @@
           @close="showScan = false"
           @submitted="onSignSubmitted"
           @pay="onScanPay"
+        />
+      </ClientOnly>
+
+      <!-- Ask AI — candidate-set zone resolver with cited evidence -->
+      <ClientOnly>
+        <AskAi
+          v-if="showAi"
+          :verdict="aiVerdict"
+          :city-name="detectedCity!.name"
+          :source-name="aiSourceName"
+          :confirmed-at="cityDetail?.last_updated"
+          @pick="onAiPick"
+          @scan="onAiScan"
+          @close="showAi = false"
         />
       </ClientOnly>
 
@@ -540,6 +564,7 @@ const userProfile = ref<any>(null)
 const zoneBoundaries = ref<any>(null)
 const mapExpanded = ref(false)
 const showScan = ref(false)              // scan-the-sign modal
+const showAi = ref(false)                // ask-AI resolver panel
 const signReports = ref<any[]>([])       // confirmed sign scans → map pins
 const { loadForCity: loadSignReports } = useSignScan()
 const locateCar = ref(false) // "find my car" — point the map at the saved session
@@ -818,6 +843,19 @@ const onEndSession = () => {
   user.value ? endSession(s.id) : guest.end(s.id)
 }
 const onLocateCar = () => { locateCar.value = true; mapExpanded.value = true }
+
+// ── Ask AI — deterministic candidate-set zone resolver ─────────────────────────
+const { verdict: aiVerdict } = useZoneResolver(coords, zoneBoundaries, signReports)
+const aiSourceName = computed(() => {
+  const u = cityDetail.value?.official_url
+  if (!u) return 'official city registry'
+  try { return new URL(u).hostname.replace(/^www\./, '') } catch { return 'official city registry' }
+})
+const onAiPick = (zoneName: string) => {
+  if (allZones.value.some((z: any) => z.name === zoneName)) selectedZoneName.value = zoneName
+  showAi.value = false
+}
+const onAiScan = () => { showAi.value = false; showScan.value = true }
 
 const pastSessions = computed(() =>
   sessionHistory.value.filter((s: any) => s.id !== activeSession.value?.id).slice(0, 5),
@@ -1513,6 +1551,30 @@ h2 {
 .scan-cta-title { font-size: 14px; font-weight: 700; color: var(--text); letter-spacing: -0.2px; }
 .scan-cta-sub { font-size: 12px; color: var(--muted); line-height: 1.4; }
 .scan-cta-arrow { font-size: 16px; color: var(--blue); flex-shrink: 0; }
+
+/* Ask-AI CTA */
+.ai-cta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  margin-bottom: 12px;
+  padding: 13px 14px;
+  background: var(--bg2);
+  border: 1.5px dashed var(--border2);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 150ms var(--ease-out), transform 150ms var(--ease-out);
+}
+.ai-cta:hover { border-color: var(--blue); }
+.ai-cta:active { transform: scale(0.99); }
+.ai-cta-icon { font-size: 20px; line-height: 1; flex-shrink: 0; }
+.ai-cta-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.ai-cta-title { font-size: 14px; font-weight: 700; color: var(--text); letter-spacing: -0.2px; }
+.ai-cta-sub { font-size: 12px; color: var(--muted); line-height: 1.4; }
+.ai-cta-arrow { font-size: 16px; color: var(--muted2); flex-shrink: 0; }
 
 /* Nearest confirmed sign — lead-me card */
 .nsign {
