@@ -27,6 +27,12 @@
             <span :style="{ color: verdict.zone!.color }">{{ verdict.zone!.name }}</span>.
           </h2>
 
+          <p v-if="verdict.override" class="ai-override">
+            ⚠ Our map shows <strong>{{ verdict.override.mapZone }}</strong> here, but
+            {{ verdict.signCount }} confirmed scan{{ verdict.signCount! > 1 ? 's' : '' }} of the sign
+            say <strong>{{ verdict.zone!.name }}</strong> — trusting the sign, and updating the map.
+          </p>
+
           <ul class="ai-evidence">
             <li v-for="(e, i) in evidence" :key="i"><span class="ai-ev-dot" />{{ e }}</li>
           </ul>
@@ -136,11 +142,13 @@ const age = (iso: string) => {
 const evidence = computed<string[]>(() => {
   const v = props.verdict
   if (!v) return []
-  const lines: string[] = [`GPS fix · ±${Math.round(v.accuracyM)} m in ${props.cityName}`]
+  const lines: string[] = []
+  if (v.signCount) lines.push(`Confirmed sign · ${v.signCount} scan${v.signCount > 1 ? 's' : ''} within ~35 m`)
+  lines.push(`GPS fix · ±${Math.round(v.accuracyM)} m in ${props.cityName}`)
   if (props.sourceName) lines.push(`Registry · ${props.sourceName}${props.confirmedAt ? ` · confirmed ${props.confirmedAt}` : ''}`)
   if (v.boundaryDistM != null) lines.push(`Nearest different zone · ${fmtDist(v.boundaryDistM)} away`)
-  else lines.push('No other zone within range')
-  if (v.sign?.agrees) lines.push(`Verified sign · ${fmtDist(v.sign.distM)} away, confirmed ${age(v.sign.createdAt)}`)
+  else if (!v.signCount) lines.push('No other zone within range')
+  if (v.sign?.agrees && !v.signCount) lines.push(`Verified sign · ${fmtDist(v.sign.distM)} away, confirmed ${age(v.sign.createdAt)}`)
   return lines
 })
 </script>
@@ -182,6 +190,13 @@ const evidence = computed<string[]>(() => {
 .ai-evidence { list-style: none; display: flex; flex-direction: column; gap: 9px; margin-bottom: 16px; }
 .ai-evidence li { display: flex; align-items: flex-start; gap: 9px; font-size: 13px; color: var(--text2); line-height: 1.5; }
 .ai-ev-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); margin-top: 7px; flex-shrink: 0; }
+.ai-override {
+  font-size: 13px; line-height: 1.55; color: var(--amber);
+  padding: 11px 13px; margin-bottom: 16px;
+  background: var(--amber-bg); border: 1px solid var(--amber-border);
+  border-radius: var(--r-md);
+}
+.ai-override strong { font-weight: 700; }
 .ai-price-caveat {
   font-size: 12px; color: var(--muted); line-height: 1.5;
   padding: 10px 12px; background: var(--bg2); border: 1px solid var(--border);

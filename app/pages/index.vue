@@ -12,7 +12,7 @@
               :accuracy="coords!.accuracy"
               :heading="heading"
               :height="260"
-              :zones="zoneBoundaries"
+              :zones="displayZones"
               :highlight="highlightPoint"
               :signs="signReports"
               :compass-prompt="compassPrompt"
@@ -51,7 +51,7 @@
                   :lng="coords!.lng"
                   :accuracy="coords!.accuracy"
                   :heading="heading"
-                  :zones="zoneBoundaries"
+                  :zones="displayZones"
                   :highlight="highlightPoint"
                   :signs="signReports"
                   :compass-prompt="compassPrompt"
@@ -638,6 +638,10 @@ const defaultPlate = computed(() => {
 
 // Geometry-based detection: distance to the nearest paid-parking segment.
 const { nearest } = useNearestParking(coords, zoneBoundaries)
+
+// Self-healing map: confirmed signs recolour segments they disagree with (≥2 scans).
+// The resolver + nearest stay on the raw geometry; only the map display heals.
+const displayZones = computed(() => applySignOverrides(zoneBoundaries.value, signReports.value))
 
 // on  = standing on a paid street · near = just off one · none = no paid parking
 const parkingState = computed<'on' | 'near' | 'none' | null>(() => {

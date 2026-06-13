@@ -33,6 +33,8 @@ export interface ZoneVerdict {
   sign?: ResolverSign | null
   accuracyM: number
   boundaryDistM?: number | null
+  signCount?: number                       // confirmed scans backing this verdict
+  override?: { mapZone: string } | null    // the map said this, the sign overruled it
 }
 
 type Coords = { lat: number; lng: number; accuracy?: number } | null
@@ -81,6 +83,7 @@ function bearingDeg(a: { lat: number; lng: number }, b: { lat: number; lng: numb
 const ASSERT_CLEARANCE = 80 // m to the nearest differing-zone boundary for HIGH CONFIDENCE
 const TRIANGULATE_M = 25    // a verified sign this close that agrees → triangulated
 const SIGN_ROUTE_M = 40     // a verified sign this close on a tie → trust the sign
+const SIGN_PRIMARY_M = 35   // a confirmed sign within this radius is authoritative
 
 export const useZoneResolver = (
   coords: Ref<Coords> | (() => Coords),
@@ -121,6 +124,35 @@ export const useZoneResolver = (
       agrees,
       createdAt: near.s.created_at,
     } : null
+
+    // ── SIGN-FIRST ─────────────────────────────────────────────────────────────
+    // Confirmed signs are ground truth and OUTRANK the map geometry (which we know
+    // carries mismatches). If any are right here, they decide — even against the map.
+    const signsNear = signs.filter((x: any) => x.dist <= SIGN_PRIMARY_M)
+    if (signsNear.length) {
+      const counts: Record<string, number> = {}
+      for (const x of signsNear) counts[x.s.zone_name] = (counts[x.s.zone_name] ?? 0) + 1
+      const ranked = Object.entries(counts).sort((a, b) => b[1] - a[1])
+      const [topZone, topN] = ranked[0]
+      const agree = ranked.length === 1 || topN >= Math.ceil(signsNear.length * 0.6)
+
+      if (agree) {
+        const sZone = signsNear.find((x: any) => x.s.zone_name === topZone)!.s
+        const geomNearest = feats.length ? feats.reduce((a: any, b: any) => (a.dist < b.dist ? a : b)) : null
+        const mapZone = geomNearest && geomNearest.dist <= R ? geomNearest.zone : null
+        return {
+          state: mapZone === topZone ? 'triangulated' : 'assert',
+          zone: { name: topZone, color: sZone.zone_color ?? '#8A93A1' },
+          accuracyM: acc,
+          boundaryDistM: null,
+          signCount: topN,
+          sign: buildSign(true),
+          override: mapZone && mapZone !== topZone ? { mapZone } : null,
+        }
+      }
+      // Nearby signs disagree with each other → trust the one beside the car.
+      return { state: 'route_to_sign', accuracyM: acc, sign: buildSign(false) }
+    }
 
     if (!candidates.length) {
       return { state: 'none', accuracyM: acc, sign: near && near.dist <= 150 ? buildSign(false) : null }
@@ -184,4 +216,49 @@ export const useZoneResolver = (
   })
 
   return { verdict }
+}
+
+// ── SELF-HEALING MAP ──────────────────────────────────────────────────────────
+// Non-destructive: returns a copy of the geometry where any segment that confirmed
+// signs disagree with is recoloured to the sign's zone. The source file is never
+// edited — the sign just wins at render time. Display bar is conservative (≥2 scans)
+// so one stray scan can't recolour the public map; the resolver trusts a single
+// nearby sign for the person actually standing there.
+export function applySignOverrides(
+  geojson: any,
+  signReports: any[],
+  opts: { radiusM?: number; minScans?: number } = {},
+): any {
+  const radiusM = opts.radiusM ?? 25
+  const minScans = opts.minScans ?? 2
+  if (!geojson?.features?.length || !signReports?.length) return geojson
+
+  const out = {
+    ...geojson,
+    features: geojson.features.map((f: any) => ({ ...f, properties: { ...f.properties } })),
+  }
+
+  for (const f of out.features) {
+    const counts: Record<string, { n: number; color: string | null }> = {}
+    for (const s of signReports) {
+      if (s.lat == null || s.lng == null) continue
+      const mLng = mPerDegLng(s.lat)
+      const px = (lng: number) => (lng - s.lng) * mLng
+      const py = (lat: number) => (lat - s.lat) * M_PER_DEG_LAT
+      if (featureMinDist(f.geometry, px, py) > radiusM) continue
+      const z = s.zone_name
+      if (!z) continue
+      ;(counts[z] ??= { n: 0, color: s.zone_color ?? null }).n++
+    }
+    const ranked = Object.entries(counts).sort((a, b) => b[1].n - a[1].n)
+    if (!ranked.length) continue
+    const [topZone, info] = ranked[0]
+    if (info.n >= minScans && topZone !== f.properties?.zone) {
+      f.properties.zone = topZone
+      if (info.color) f.properties.color = info.color
+      f.properties.name = f.properties?.name ? `${f.properties.name} ✓` : '✓ sign-confirmed'
+      f.properties.overridden = true
+    }
+  }
+  return out
 }
