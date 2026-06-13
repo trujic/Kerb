@@ -17,9 +17,12 @@ export interface ZoneDef {
 
 export interface SignRead {
   rawText: string
-  zone: ZoneDef | null   // best match against the city's zones, or null if unsure
+  zone: ZoneDef | null   // best match against the city's zones (from OCR text)
   confidence: number     // 0..1
   fields: SignFields     // per-field read quality (drives amber/red + pre-fill block)
+  color: { zone: ZoneDef | null; confidence: number } | null // dominant-colour match
+  // How the colour read lines up with the text read:
+  corroboration: 'agree' | 'conflict' | 'color-only' | 'none'
 }
 
 // 'read' = trust it · 'low' = show amber, double-check · 'unreadable' = red, can't trust
@@ -92,6 +95,77 @@ const matchZone = (rawText: string, zones: ZoneDef[]): { zone: ZoneDef | null; c
   return { zone: bestScore > 0 ? best : null, confidence }
 }
 
+// ── Colour corroboration ──────────────────────────────────────────────────────
+// The signs are colour-coded, so the dominant saturated colour is an independent
+// check on the OCR text. Strong for Blue/Red/Extra; deliberately inconclusive for
+// the unsaturated White/grey zone (we don't pretend to read a colour that isn't there).
+const hexToRgb = (hex: string): [number, number, number] | null => {
+  const m = hex.replace('#', '').match(/^([0-9a-f]{6})$/i)
+  if (!m) return null
+  const n = parseInt(m[1], 16)
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255]
+}
+const rgbToHsv = (r: number, g: number, b: number) => {
+  r /= 255; g /= 255; b /= 255
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min
+  let h = 0
+  if (d) {
+    if (max === r) h = ((g - b) / d) % 6
+    else if (max === g) h = (b - r) / d + 2
+    else h = (r - g) / d + 4
+    h *= 60; if (h < 0) h += 360
+  }
+  return { h, s: max ? d / max : 0, v: max }
+}
+const hueDist = (a: number, b: number) => { const d = Math.abs(a - b) % 360; return d > 180 ? 360 - d : d }
+
+const detectColor = (image: Blob, zones: ZoneDef[]): Promise<{ zone: ZoneDef | null; confidence: number } | null> =>
+  new Promise((resolve) => {
+    const img = new Image()
+    const url = URL.createObjectURL(image)
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      const S = 50
+      const canvas = document.createElement('canvas')
+      canvas.width = S; canvas.height = S
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return resolve(null)
+      ctx.drawImage(img, 0, 0, S, S)
+      let data: Uint8ClampedArray
+      try { data = ctx.getImageData(0, 0, S, S).data } catch { return resolve(null) }
+
+      // Sample the CENTRE box only — keeps sky/building/asphalt at the edges from
+      // hijacking the colour (a sign shot against blue sky must not read as "Blue").
+      const lo = Math.floor(S * 0.25), hi = Math.ceil(S * 0.75)
+      let sr = 0, sg = 0, sb = 0, n = 0
+      const total = (hi - lo) * (hi - lo)
+      for (let y = lo; y < hi; y++) {
+        for (let x = lo; x < hi; x++) {
+          const i = (y * S + x) * 4
+          const { s, v } = rgbToHsv(data[i], data[i + 1], data[i + 2])
+          if (s > 0.35 && v > 0.2) { sr += data[i]; sg += data[i + 1]; sb += data[i + 2]; n++ }
+        }
+      }
+      if (n / total < 0.08) return resolve(null) // mostly unsaturated → can't tell from colour
+      const dom = rgbToHsv(sr / n, sg / n, sb / n)
+
+      // Nearest zone by hue (only zones that actually have a saturated colour).
+      let best: ZoneDef | null = null, bestD = Infinity
+      for (const z of zones) {
+        const rgb = z.color ? hexToRgb(z.color) : null
+        if (!rgb) continue
+        const zh = rgbToHsv(...rgb)
+        if (zh.s < 0.25) continue // skip white/grey targets
+        const d = hueDist(dom.h, zh.h)
+        if (d < bestD) { bestD = d; best = z }
+      }
+      if (!best || bestD > 45) return resolve(null) // no confident colour match
+      resolve({ zone: best, confidence: Math.max(0, 1 - bestD / 60) })
+    }
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(null) }
+    img.src = url
+  })
+
 // Downscale + re-encode to keep OCR fast and storage small.
 const compressImage = (file: Blob, maxDim = 1280, quality = 0.82): Promise<Blob> =>
   new Promise((resolve, reject) => {
@@ -156,7 +230,23 @@ export const useSignScan = (engine: 'ocr' | 'claude' = 'ocr') => {
     const { data } = await Tesseract.recognize(image, 'eng')
     const rawText = data.text ?? ''
     const { zone, confidence } = matchZone(rawText, zones)
-    return { rawText, zone, confidence, fields: parseFields(rawText, zone, confidence) }
+    const fields = parseFields(rawText, zone, confidence)
+
+    // Independent colour read, then corroborate it against the text read.
+    const color = await detectColor(image, zones)
+    let corroboration: SignRead['corroboration'] = 'none'
+    if (color?.zone && zone) corroboration = color.zone.name === zone.name ? 'agree' : 'conflict'
+    else if (color?.zone && !zone) corroboration = 'color-only'
+
+    if (corroboration === 'agree') {
+      fields.zone.state = 'read' // text + colour agree → trust it
+    } else if (corroboration === 'conflict' && fields.zone.state === 'read') {
+      fields.zone.state = 'low'  // they disagree → don't trust either blindly
+    } else if (corroboration === 'color-only' && fields.zone.state === 'unreadable') {
+      fields.zone = { value: color!.zone!.name, state: 'low' } // colour-derived, double-check
+    }
+
+    return { rawText, zone, confidence, fields, color, corroboration }
   }
 
   // Guests get a couple of free scans; beyond that we nudge to an account (Plus =

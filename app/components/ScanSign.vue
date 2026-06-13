@@ -84,6 +84,18 @@
             </div>
           </div>
 
+          <!-- Colour vs text corroboration -->
+          <p v-if="read?.corroboration === 'agree'" class="scan-corr ok">
+            ✓ Colour and text both read <strong>{{ read.zone?.name }}</strong>.
+          </p>
+          <p v-else-if="read?.corroboration === 'conflict'" class="scan-corr warn">
+            ⚠ The colour looks like <strong>{{ read.color?.zone?.name }}</strong> but the text read
+            <strong>{{ read.zone?.name }}</strong> — look again and pick what the sign actually says.
+          </p>
+          <p v-else-if="read?.corroboration === 'color-only'" class="scan-corr">
+            Colour suggests <strong>{{ read.color?.zone?.name }}</strong> (text was unclear) — confirm below.
+          </p>
+
           <!-- Unsafe read → no pre-fill, the user must pick deliberately -->
           <p v-if="zoneUnsafe" class="scan-unsafe">
             No pre-fill — the zone read wasn't safe enough to trust with your money. Pick the zone printed on the sign.
@@ -248,13 +260,15 @@ const onFile = async (e: Event) => {
     setPhoto(compressed)
     read.value = await readSign(compressed, props.zones)
     // Block pre-fill from an unsafe read: only auto-select when the zone read well.
+    // Colour can stand in for the text when the OCR couldn't.
     selectedName.value = read.value.fields.zone.state === 'unreadable'
       ? null
-      : (read.value.zone?.name ?? props.likelyZoneName ?? null)
+      : (read.value.zone?.name ?? read.value.color?.zone?.name ?? props.likelyZoneName ?? null)
   } catch (err) {
     console.warn('[Kerb] sign read failed:', err)
     read.value = {
       rawText: '', zone: null, confidence: 0,
+      color: null, corroboration: 'none',
       fields: {
         zone: { value: null, state: 'unreadable' },
         price: { value: null, state: 'unreadable' },
@@ -447,6 +461,19 @@ onUnmounted(() => { if (photoUrl.value) URL.revokeObjectURL(photoUrl.value) })
 .scan-field-val.st-low .scan-field-tag { color: var(--amber); }
 .scan-field-val.st-unreadable { color: var(--red); }
 .scan-field-val.st-unreadable .scan-field-tag { color: var(--red); }
+
+.scan-corr {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted);
+  padding: 9px 12px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+}
+.scan-corr strong { font-weight: 700; }
+.scan-corr.ok { color: var(--green); background: var(--green-bg); border-color: var(--green-border); }
+.scan-corr.warn { color: var(--amber); background: var(--amber-bg); border-color: var(--amber-border); }
 
 .scan-unsafe {
   font-size: 13px;
