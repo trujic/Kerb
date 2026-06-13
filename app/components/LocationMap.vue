@@ -34,6 +34,7 @@ const props = defineProps<{
     heading?: number | null; created_at?: string; photo_url?: string | null
   }[] // confirmed sign scans
   compassPrompt?: boolean // show a one-tap "Enable compass" chip (iOS first-time)
+  hideUser?: boolean      // static city-overview map: no user marker, fit to zones
 }>()
 
 const emit = defineEmits<{ compassTap: []; enableCompass: [] }>()
@@ -103,6 +104,24 @@ watchEffect(() => {
 // data is per-street lines (each parking street drawn in its zone color).
 const toLatLngs = (coords: [number, number][]) =>
   coords.map(([lng, lat]) => [lat, lng] as [number, number])
+
+// Bounding box [[minLat,minLng],[maxLat,maxLng]] over all zone geometry, for fit.
+const zoneBounds = (zones: any): [[number, number], [number, number]] | null => {
+  let minLat = 90, minLng = 180, maxLat = -90, maxLng = -180, seen = false
+  const visit = (c: [number, number]) => {
+    seen = true
+    minLng = Math.min(minLng, c[0]); maxLng = Math.max(maxLng, c[0])
+    minLat = Math.min(minLat, c[1]); maxLat = Math.max(maxLat, c[1])
+  }
+  for (const f of zones?.features ?? []) {
+    const g = f.geometry
+    if (!g) continue
+    if (g.type === 'Polygon') g.coordinates[0]?.forEach(visit)
+    else if (g.type === 'LineString') g.coordinates.forEach(visit)
+    else if (g.type === 'MultiLineString') g.coordinates.forEach((l: any) => l.forEach(visit))
+  }
+  return seen ? [[minLat, minLng], [maxLat, maxLng]] : null
+}
 
 watchEffect((onCleanup) => {
   const zones = props.zones
@@ -255,25 +274,32 @@ onMounted(async () => {
     attribution: '&copy; OpenStreetMap &copy; CARTO',
   }).addTo(map)
 
-  if (props.accuracy && props.accuracy < 500) {
-    circleRef.value = L.circle([props.lat, props.lng], {
-      radius: props.accuracy,
-      color: '#2563EB',
-      fillColor: '#2563EB',
-      fillOpacity: 0.08,
-      weight: 1,
-      opacity: 0.3,
-    }).addTo(map)
+  // Static city-overview map: no user, just the zone geometry fitted to view.
+  if (props.hideUser) {
+    follow.value = false
+    const b = zoneBounds(props.zones)
+    if (b) map.fitBounds(b as any, { padding: [26, 26] })
+  } else {
+    if (props.accuracy && props.accuracy < 500) {
+      circleRef.value = L.circle([props.lat, props.lng], {
+        radius: props.accuracy,
+        color: '#2563EB',
+        fillColor: '#2563EB',
+        fillOpacity: 0.08,
+        weight: 1,
+        opacity: 0.3,
+      }).addTo(map)
+    }
+
+    const icon = L.divIcon({
+      className: '',
+      html: `<div class="lm-dot">${CONE_SVG}<div class="lm-pulse"></div><div class="lm-inner"></div></div>`,
+      iconSize: [60, 60],
+      iconAnchor: [30, 30],
+    })
+    markerRef.value = L.marker([props.lat, props.lng], { icon }).addTo(map)
   }
 
-  const icon = L.divIcon({
-    className: '',
-    html: `<div class="lm-dot">${CONE_SVG}<div class="lm-pulse"></div><div class="lm-inner"></div></div>`,
-    iconSize: [60, 60],
-    iconAnchor: [30, 30],
-  })
-
-  markerRef.value = L.marker([props.lat, props.lng], { icon }).addTo(map)
   mapRef.value    = map  // triggers zone watcher if zones already loaded
 
   onUnmounted(() => {

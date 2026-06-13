@@ -68,6 +68,20 @@ export const useCity = () => {
     return data
   }
 
+  // Street → zone lookup (registry tier). Returns matches for a typed street name.
+  const searchStreetZone = async (cityId: string, query: string) => {
+    const q = query.trim()
+    if (q.length < 2) return []
+    const { data, error } = await supabase
+      .from('street_zones')
+      .select('street_name, zone_name')
+      .eq('city_id', cityId)
+      .ilike('street_name', `%${q}%`)
+      .limit(8)
+    if (error) { console.warn('[Kerb] searchStreetZone failed:', error); return [] }
+    return data ?? []
+  }
+
   // Submit a community contribution
   const submitContribution = async (form: {
     city_name: string
@@ -84,5 +98,5 @@ export const useCity = () => {
     return true
   }
 
-  return { getCities, getCity, searchCities, submitContribution }
+  return { getCities, getCity, searchCities, searchStreetZone, submitContribution }
 }

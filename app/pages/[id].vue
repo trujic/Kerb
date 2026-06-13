@@ -68,6 +68,16 @@
         <div class="container city-grid">
           <!-- LEFT -->
           <div class="left-col">
+            <!-- Where the zones are — only as official as the source -->
+            <CityZoneMap
+              :city-id="city.id"
+              :tier="mapTier"
+              :city-name="city.name"
+              :official-url="city.official_url"
+              :last-updated="city.last_updated"
+              :zones="city.zones"
+            />
+
             <!-- Zones -->
             <div class="info-block">
               <p class="section-label">Parking zones</p>
@@ -171,6 +181,9 @@ const { data: city, pending, error } = await useAsyncData(
 
 // Live paid/free status for the pinned chip.
 const { status } = useParkingHours(() => city.value?.id)
+
+// Map tier — how authoritative our spatial data is for this city.
+const { tier: mapTier } = useCityTier(() => city.value?.id)
 
 // Data older than 12 months is shown in amber — rules drift.
 const isStale = computed(() => {
