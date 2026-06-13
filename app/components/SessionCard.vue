@@ -141,7 +141,7 @@ const agoText = computed(() => (props.remainingMs ? fmt(-props.remainingMs) : ''
   transition: background 150ms;
 }
 .se-btn:hover { background: var(--bg); border-color: var(--border2); }
-.se-extend { color: #fff; background: var(--green); border-color: var(--green); }
+.se-extend { color: var(--bg); font-weight: 600; background: var(--green); border-color: var(--green); }
 .se-extend:hover { filter: brightness(0.95); background: var(--green); }
 .se-end { flex: 0 0 auto; min-width: 0; color: var(--muted); }
 </style>

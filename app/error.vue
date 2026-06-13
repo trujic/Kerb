@@ -91,10 +91,12 @@ useSeoMeta({ title: 'Not found — Kerbo' })
 }
 .err-logo {
   display: inline-block;
-  font-size: 18px;
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 400;
   color: var(--blue);
   margin-bottom: 20px;
+  letter-spacing: 0.5px;
 }
 .err-code {
   font-family: var(--font-mono);
@@ -148,7 +150,7 @@ useSeoMeta({ title: 'Not found — Kerbo' })
   width: 100%;
   padding: 13px;
   background: var(--blue);
-  color: #fff;
+  color: var(--on-accent);
   border-radius: var(--r-md);
   font-size: 14px;
   font-weight: 600;

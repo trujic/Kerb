@@ -310,7 +310,7 @@ h1 { font-size: clamp(28px, 5vw, 44px); font-weight: 700; letter-spacing: -0.5px
   padding: 8px 18px;
   font-size: 13px;
   font-weight: 600;
-  color: #fff;
+  color: var(--on-accent);
   background: var(--blue);
   border: none;
   border-radius: var(--r-md);

@@ -964,8 +964,8 @@ h1 {
   border: none;
   padding: 13px 20px;
   font-size: 13px;
-  font-weight: 500;
-  color: #fff;
+  font-weight: 600;
+  color: var(--on-accent);
   white-space: nowrap;
   cursor: pointer;
   transition: background 150ms var(--ease-out), transform 150ms var(--ease-out);
@@ -1175,7 +1175,7 @@ h2 {
   font-size: 12px;
   font-weight: 600;
   color: var(--text2);
-  background: rgba(255, 255, 255, 0.92);
+  background: rgba(31, 34, 40, 0.88);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
   box-shadow: var(--shadow-sm);
@@ -1193,7 +1193,7 @@ h2 {
   z-index: 2000;
   display: flex;
   flex-direction: column;
-  background: #fff;
+  background: var(--bg2);
 }
 .map-fs-bar {
   flex: 0 0 auto;
@@ -1480,7 +1480,7 @@ h2 {
   color: #fff;
   transition: background 150ms, border-color 150ms;
 }
-.zone-pick-radio.on { background: var(--text); border-color: var(--text); }
+.zone-pick-radio.on { background: var(--text); border-color: var(--text); color: var(--bg); }
 
 /* Selected zone — rules + honest pay */
 .zone-act {

@@ -133,7 +133,7 @@ const checkedTime = computed(() =>
   padding: 0 20px;
   font-size: 14px;
   font-weight: 600;
-  color: #fff;
+  color: var(--on-accent);
   background: var(--blue);
   border: none;
   border-radius: var(--r-md);

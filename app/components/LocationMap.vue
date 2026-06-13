@@ -249,7 +249,7 @@ onMounted(async () => {
     requestAnimationFrame(() => map.invalidateSize())
   }
 
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
     subdomains: 'abcd',
     maxZoom: 19,
     attribution: '&copy; OpenStreetMap &copy; CARTO',
@@ -419,8 +419,8 @@ onMounted(async () => {
   justify-content: center;
   font-size: 20px;
   line-height: 1;
-  background: rgba(255, 255, 255, 0.95);
-  color: #2563EB;
+  background: rgba(31, 34, 40, 0.92);
+  color: var(--blue);
   border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 50%;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);

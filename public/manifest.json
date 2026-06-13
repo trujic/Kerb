@@ -4,8 +4,8 @@
   "description": "AI-assisted street parking for Serbia. Find your zone, pay by SMS, never learn what a zone is.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#FFFFFF",
-  "theme_color": "#2563EB",
+  "background_color": "#16181C",
+  "theme_color": "#16181C",
   "orientation": "portrait-primary",
   "icons": [
     {

@@ -354,7 +354,7 @@ onUnmounted(() => { if (photoUrl.value) URL.revokeObjectURL(photoUrl.value) })
   border: 1.5px solid var(--border2); border-radius: 50%;
   font-size: 12px; color: #fff; transition: background 150ms, border-color 150ms;
 }
-.scan-zone-radio.on { background: var(--text); border-color: var(--text); }
+.scan-zone-radio.on { background: var(--text); border-color: var(--text); color: var(--bg); }
 .scan-actions { display: flex; gap: 10px; }
 .scan-btn {
   flex: 1;

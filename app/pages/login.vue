@@ -121,11 +121,12 @@ useSeoMeta({ title: 'Sign in — Kerbo' })
 }
 .auth-logo {
   display: block;
-  font-size: 20px;
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-size: 24px;
+  font-weight: 400;
   color: var(--blue);
   margin-bottom: 6px;
-  letter-spacing: -0.3px;
+  letter-spacing: 0.5px;
 }
 .auth-sub {
   font-size: 14px;

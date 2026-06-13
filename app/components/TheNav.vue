@@ -43,7 +43,7 @@ const initials = computed(() => {
   position: fixed;
   top: 0; left: 0; right: 0;
   z-index: 100;
-  background: rgba(255, 255, 255, 0.92);
+  background: rgba(22, 24, 28, 0.82);
   border-bottom: 1px solid var(--border);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -55,9 +55,10 @@ const initials = computed(() => {
   padding: 14px 24px;
 }
 .nav-logo {
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: -0.3px;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 400;
+  letter-spacing: 0.5px;
   color: var(--blue);
 }
 .nav-links {
@@ -94,8 +95,9 @@ const initials = computed(() => {
 .nav-btn-ghost:hover { background: var(--bg2); border-color: var(--border2); color: var(--text); }
 .nav-btn-primary {
   background: var(--blue);
-  color: #fff;
+  color: var(--on-accent);
   border: none;
+  font-weight: 600;
 }
 .nav-btn-primary:hover { background: var(--blue-hover); }
 .nav-avatar {
@@ -103,7 +105,7 @@ const initials = computed(() => {
   height: 34px;
   border-radius: 50%;
   background: var(--blue);
-  color: #fff;
+  color: var(--on-accent);
   font-size: 12px;
   font-weight: 600;
   display: flex;

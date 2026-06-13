@@ -1,50 +1,53 @@
-/* ── DESIGN TOKENS ─────────────────────────────────────────────────────────── */
+/* ── DESIGN TOKENS — "ROAD PAINT" (dark, road-signage) ───────────────────────── */
 :root {
-  /* Backgrounds */
-  --bg:      #FFFFFF;
-  --bg2:     #F9FAFB;
-  --bg3:     #F3F4F6;
-  --bg4:     #E5E7EB;
+  /* Backgrounds — asphalt → card → patch → edge */
+  --bg:      #16181C;   /* asphalt */
+  --bg2:     #1F2228;   /* card */
+  --bg3:     #282C34;   /* patch */
+  --bg4:     #343943;   /* edge */
 
   /* Text */
-  --text:    #111827;
-  --text2:   #374151;
-  --muted:   #6B7280;
-  --muted2:  #9CA3AF;
+  --text:    #F4F4F0;
+  --text2:   #D6D9DF;
+  --muted:   #9AA1AD;   /* sub */
+  --muted2:  #6E7682;
 
   /* Borders */
-  --border:  #E5E7EB;
-  --border2: #D1D5DB;
+  --border:  #2C313A;
+  --border2: #3C424E;
 
-  /* Brand blue */
-  --blue:        #2563EB;
-  --blue-hover:  #1D4ED8;
-  --blue-bg:     #EFF6FF;
-  --blue-border: #BFDBFE;
+  /* Accent — road-paint yellow. Kept under the --blue token names so the whole
+     existing UI re-skins from here. White never sits on yellow: use --on-accent. */
+  --blue:        #FFD23F;
+  --blue-hover:  #F2C32B;
+  --blue-bg:     rgba(255, 210, 63, 0.12);
+  --blue-border: rgba(255, 210, 63, 0.34);
+  --on-accent:   #161000;   /* ink for text/icons on the yellow accent */
 
-  /* Green */
-  --green:        #16A34A;
-  --green-bg:     #F0FDF4;
-  --green-border: #BBF7D0;
+  /* Green / success */
+  --green:        #3ECF7A;
+  --green-bg:     rgba(62, 207, 122, 0.13);
+  --green-border: rgba(62, 207, 122, 0.36);
 
-  /* Amber */
-  --amber:        #D97706;
-  --amber-bg:     #FFFBEB;
-  --amber-border: #FDE68A;
+  /* Amber / warn */
+  --amber:        #F5A524;
+  --amber-bg:     rgba(245, 165, 36, 0.13);
+  --amber-border: rgba(245, 165, 36, 0.36);
 
   /* Red */
-  --red:        #DC2626;
-  --red-bg:     #FEF2F2;
-  --red-border: #FECACA;
+  --red:        #E25141;
+  --red-bg:     rgba(226, 81, 65, 0.13);
+  --red-border: rgba(226, 81, 65, 0.36);
 
-  /* Zone colors */
-  --zone-extra: #EA580C;
-  --zone-red:   #DC2626;
-  --zone-blue:  #2563EB;
-  --zone-white: #9CA3AF;
+  /* Zone paint chips */
+  --zone-extra: #9B6DF2;
+  --zone-red:   #E25141;
+  --zone-blue:  #4F86F7;
+  --zone-white: #8A93A1;
 
-  /* Typography */
-  --font-body: 'DM Sans', sans-serif;
+  /* Typography — display = sprayed-stencil, body = Saira, mono for plates/codes */
+  --font-display: 'Saira Stencil One', var(--font-body);
+  --font-body: 'Saira', sans-serif;
   --font-mono: 'DM Mono', monospace;
 
   /* Radius */
@@ -53,14 +56,16 @@
   --r-lg: 14px;
   --r-xl: 20px;
 
-  /* Shadows */
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.07), 0 1px 2px rgba(0,0,0,0.04);
-  --shadow-md: 0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
-  --shadow-lg: 0 12px 32px rgba(0,0,0,0.10), 0 4px 8px rgba(0,0,0,0.04);
+  /* Shadows — deeper on dark */
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.40), 0 1px 2px rgba(0,0,0,0.30);
+  --shadow-md: 0 4px 14px rgba(0,0,0,0.45), 0 2px 4px rgba(0,0,0,0.30);
+  --shadow-lg: 0 16px 40px rgba(0,0,0,0.55), 0 4px 10px rgba(0,0,0,0.35);
 
   /* Easing */
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+
+  color-scheme: dark;
 }
 
 /* ── RESET ──────────────────────────────────────────────────────────────────── */
@@ -89,6 +94,7 @@ img { display: block; max-width: 100%; }
 
 /* ── TYPOGRAPHY ─────────────────────────────────────────────────────────────── */
 .mono { font-family: var(--font-mono); }
+h1, .display { font-family: var(--font-display); font-weight: 400; }
 .section-label {
   display: block;
   font-family: var(--font-mono);
@@ -136,20 +142,20 @@ img { display: block; max-width: 100%; }
   background: var(--bg2);
   white-space: nowrap;
 }
-.tag.zone-extra { background: #FFF7ED; border-color: #FED7AA; color: #C2410C; }
-.tag.zone-red   { background: var(--red-bg);   border-color: var(--red-border);   color: var(--red); }
-.tag.zone-blue  { background: var(--blue-bg);  border-color: var(--blue-border);  color: var(--blue); }
+.tag.zone-extra { background: rgba(155,109,242,0.14); border-color: rgba(155,109,242,0.40); color: #B79DF6; }
+.tag.zone-red   { background: var(--red-bg);   border-color: var(--red-border);   color: #ED8076; }
+.tag.zone-blue  { background: rgba(79,134,247,0.14); border-color: rgba(79,134,247,0.40); color: #8FB2FA; }
 .tag.zone-white { background: var(--bg3);      border-color: var(--border2);      color: var(--muted); }
 
 /* ── BUTTONS ─────────────────────────────────────────────────────────────────── */
 .btn-primary {
   background: var(--blue);
-  color: #fff;
+  color: var(--on-accent);
   border: none;
   border-radius: var(--r-md);
   padding: 11px 22px;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 600;
   transition: background 150ms var(--ease-out), transform 150ms var(--ease-out);
   cursor: pointer;
   font-family: var(--font-body);
