@@ -19,6 +19,17 @@ export interface SignRead {
   rawText: string
   zone: ZoneDef | null   // best match against the city's zones, or null if unsure
   confidence: number     // 0..1
+  fields: SignFields     // per-field read quality (drives amber/red + pre-fill block)
+}
+
+// 'read' = trust it · 'low' = show amber, double-check · 'unreadable' = red, can't trust
+export type FieldState = 'read' | 'low' | 'unreadable'
+export interface SignField { value: string | null; state: FieldState }
+export interface SignFields {
+  zone: SignField
+  price: SignField
+  limit: SignField
+  code: SignField
 }
 
 export interface SignReport {
@@ -111,7 +122,31 @@ export const useSignScan = (engine: 'ocr' | 'claude' = 'ocr') => {
   const user = useSupabaseUser()
   const userId = computed(() => (user.value as any)?.id ?? (user.value as any)?.sub ?? null)
 
-  // Read the sign image into a structured zone match. OCR runs fully on-device.
+  // Pull each rule field off the raw OCR with its own read quality.
+  const parseFields = (rawText: string, matched: ZoneDef | null, confidence: number): SignFields => {
+    const text = normalize(rawText)
+    const digits = text.replace(/[^0-9]/g, ' ')
+
+    const priceM = rawText.match(/(\d{2,4})\s*(rsd|din|дин)/i)
+    const price = priceM ? `${priceM[1]} RSD` : (matched?.price ?? null)
+    const limitM = rawText.match(/(\d{2,3})\s*min/i)
+    const codeM = digits.match(/\b(8\d{3})\b/)
+    const code = codeM ? codeM[1] : null
+
+    const zoneState: FieldState = confidence >= 0.6 ? 'read' : confidence > 0 ? 'low' : 'unreadable'
+    const codeState: FieldState = code
+      ? (matched?.sms_shortcode && code === matched.sms_shortcode ? 'read' : 'low')
+      : 'unreadable'
+
+    return {
+      zone:  { value: matched?.name ?? null, state: zoneState },
+      price: { value: price, state: price ? (priceM ? 'read' : 'low') : 'unreadable' },
+      limit: { value: limitM ? `${limitM[1]} min` : null, state: limitM ? 'read' : 'unreadable' },
+      code:  { value: code, state: codeState },
+    }
+  }
+
+  // Read the sign image into a structured per-field read. OCR runs fully on-device.
   const readSign = async (image: Blob, zones: ZoneDef[]): Promise<SignRead> => {
     if (engine === 'claude') {
       // Upgrade slot: POST the image to a serverless Claude-vision read.
@@ -121,8 +156,15 @@ export const useSignScan = (engine: 'ocr' | 'claude' = 'ocr') => {
     const { data } = await Tesseract.recognize(image, 'eng')
     const rawText = data.text ?? ''
     const { zone, confidence } = matchZone(rawText, zones)
-    return { rawText, zone, confidence }
+    return { rawText, zone, confidence, fields: parseFields(rawText, zone, confidence) }
   }
+
+  // Guests get a couple of free scans; beyond that we nudge to an account (Plus =
+  // unlimited, once tiers ship). Counted on-device — best-effort, not a hard wall.
+  const FREE_SCANS = 2
+  const SCAN_KEY = 'kerbo_scans_used'
+  const scansUsed = () => (import.meta.client ? Number(localStorage.getItem(SCAN_KEY) || '0') : 0)
+  const incScan = () => { if (import.meta.client) localStorage.setItem(SCAN_KEY, String(scansUsed() + 1)) }
 
   // Persist the confirmed scan: upload the photo, insert the geotagged report.
   // Returns the stored report (with a public photo URL) so the caller can pin it.
@@ -189,5 +231,5 @@ export const useSignScan = (engine: 'ocr' | 'claude' = 'ocr') => {
     }))
   }
 
-  return { readSign, submit, loadForCity, compressImage }
+  return { readSign, submit, loadForCity, compressImage, FREE_SCANS, scansUsed, incScan }
 }

@@ -10,32 +10,49 @@
       <div class="scan-body">
         <!-- ── 1 · Capture ── -->
         <template v-if="step === 'capture'">
-          <div class="scan-hero">
-            <div class="scan-hero-icon">📸</div>
-            <p class="scan-hero-title">Photograph the parking sign</p>
+          <!-- Guest meter: free scans used up -->
+          <div v-if="metered" class="scan-hero">
+            <div class="scan-hero-icon">🔒</div>
+            <p class="scan-hero-title">That's your {{ FREE_SCANS }} free scans</p>
             <p class="scan-hero-sub">
-              The sign is the source of truth. Snap the colored zone sign next to your car —
-              we read the zone and price off it, you confirm, and it goes on the map for
-              everyone. Then we prefill the right payment.
+              Every scan you add improves the shared sign map — thank you. Create a free
+              account to keep scanning. (Kerbo+ will be unlimited.)
             </p>
+            <NuxtLink to="/login" class="scan-btn scan-meter-cta">Create a free account →</NuxtLink>
+            <button class="scan-btn-ghost wide" type="button" @click="$emit('close')">Maybe later</button>
           </div>
 
-          <label class="scan-shutter">
-            <input
-              ref="fileInput"
-              type="file"
-              accept="image/*"
-              capture="environment"
-              class="scan-file"
-              @change="onFile"
-            />
-            <span class="scan-shutter-ring"><span class="scan-shutter-dot" /></span>
-            <span class="scan-shutter-label">Open camera</span>
-          </label>
+          <template v-else>
+            <div class="scan-hero">
+              <div class="scan-hero-icon">📸</div>
+              <p class="scan-hero-title">Photograph the parking sign</p>
+              <p class="scan-hero-sub">
+                The sign is the source of truth. Snap the colored zone sign next to your car —
+                we read the zone and price off it, you confirm, and it goes on the map for
+                everyone. Then we prefill the right payment.
+              </p>
+            </div>
 
-          <p v-if="!coords" class="scan-warn">
-            ⚠️ Location not available yet — we need your GPS to pin the sign. Allow location and try again.
-          </p>
+            <label class="scan-shutter">
+              <input
+                ref="fileInput"
+                type="file"
+                accept="image/*"
+                capture="environment"
+                class="scan-file"
+                @change="onFile"
+              />
+              <span class="scan-shutter-ring"><span class="scan-shutter-dot" /></span>
+              <span class="scan-shutter-label">Open camera</span>
+            </label>
+
+            <p v-if="!user && used === FREE_SCANS - 1" class="scan-meter-note">
+              Last free scan — create an account to keep going.
+            </p>
+            <p v-if="!coords" class="scan-warn">
+              ⚠️ Location not available yet — we need your GPS to pin the sign. Allow location and try again.
+            </p>
+          </template>
         </template>
 
         <!-- ── 2 · Reading ── -->
@@ -55,17 +72,23 @@
             <img v-if="photoUrl" :src="photoUrl" class="scan-preview" alt="Captured sign" />
           </div>
 
-          <div class="scan-read">
-            <p v-if="read?.zone" class="scan-read-line">
-              The sign reads
-              <strong :style="{ color: read.zone.color }">{{ read.zone.name }}</strong
-              ><span v-if="read.zone.price"> · {{ read.zone.price }}</span>.
-              <span class="scan-read-hint">Tap a zone below if that's wrong.</span>
-            </p>
-            <p v-else class="scan-read-line">
-              Couldn't read the zone clearly — pick the one printed on the sign.
-            </p>
+          <!-- Per-field read: green ✓ / amber double-check / red can't-read -->
+          <div class="scan-fields">
+            <p class="scan-fields-head">What we read off the sign</p>
+            <div v-for="f in fieldRows" :key="f.label" class="scan-field">
+              <span class="scan-field-label">{{ f.label }}</span>
+              <span class="scan-field-val" :class="'st-' + f.state">
+                {{ f.display }}
+                <span class="scan-field-tag">{{ f.state === 'read' ? '✓' : f.state === 'low' ? '~ check' : '✕' }}</span>
+              </span>
+            </div>
           </div>
+
+          <!-- Unsafe read → no pre-fill, the user must pick deliberately -->
+          <p v-if="zoneUnsafe" class="scan-unsafe">
+            No pre-fill — the zone read wasn't safe enough to trust with your money. Pick the zone printed on the sign.
+          </p>
+          <p v-else class="scan-read-hint scan-read-hint--block">Tap a zone below if that's wrong.</p>
 
           <div class="scan-zones">
             <button
@@ -84,6 +107,12 @@
                 <span v-if="z.name === selectedName">✓</span>
               </span>
             </button>
+          </div>
+
+          <!-- GPS cross-check: read vs registry -->
+          <div v-if="crossCheck" class="scan-xcheck" :class="crossCheck">
+            <template v-if="crossCheck === 'match'">✓ Matches the registry for this spot.</template>
+            <template v-else>⚠️ Differs from the registry here — trust the sign in front of you, and make sure you scanned the one next to your car.</template>
           </div>
 
           <p v-if="submitError" class="scan-warn">{{ submitError }}</p>
@@ -110,7 +139,8 @@
             </div>
             <p class="scan-done-title">Pinned · {{ selectedZone.name }}</p>
             <p class="scan-done-sub">
-              Thanks — that confirmed sign is now on the map for everyone here.
+              <strong>+1 sign added to the street map.</strong>
+              Thanks — that confirmed sign now helps everyone here (and powers “Ask AI”).
             </p>
 
             <button
@@ -150,7 +180,13 @@ const emit = defineEmits<{
   pay: [zone: ZoneDef]
 }>()
 
-const { readSign, submit, compressImage } = useSignScan('ocr')
+const { readSign, submit, compressImage, FREE_SCANS, scansUsed, incScan } = useSignScan('ocr')
+const user = useSupabaseUser()
+
+// Guest scan meter (best-effort, on-device). Logged-in users aren't metered yet.
+const used = ref(0)
+onMounted(() => { used.value = scansUsed() })
+const metered = computed(() => !user.value && used.value >= FREE_SCANS)
 
 type Step = 'capture' | 'reading' | 'confirm' | 'submitting' | 'done'
 const step = ref<Step>('capture')
@@ -171,6 +207,27 @@ const selectedZone = computed<ZoneDef | null>(
   () => props.zones.find((z) => z.name === selectedName.value) ?? null,
 )
 
+// Per-field read panel (amber for low, red "can't read" for unreadable).
+const fieldRows = computed(() => {
+  const f = read.value?.fields
+  if (!f) return []
+  const row = (label: string, fld: { value: string | null; state: string }) => ({
+    label,
+    state: fld.state,
+    display: fld.state === 'unreadable' ? "can't read" : (fld.value ?? '—'),
+  })
+  return [row('Zone', f.zone), row('Price', f.price), row('Limit', f.limit), row('SMS code', f.code)]
+})
+
+// The zone read wasn't safe enough to seed payment from — force a manual pick.
+const zoneUnsafe = computed(() => read.value?.fields.zone.state === 'unreadable')
+
+// GPS cross-check: does the picked zone match what the registry expects here?
+const crossCheck = computed<'match' | 'mismatch' | null>(() => {
+  if (!selectedName.value || !props.likelyZoneName) return null
+  return selectedName.value === props.likelyZoneName ? 'match' : 'mismatch'
+})
+
 const setPhoto = (blob: Blob) => {
   if (photoUrl.value) URL.revokeObjectURL(photoUrl.value)
   photoBlob.value = blob
@@ -190,10 +247,21 @@ const onFile = async (e: Event) => {
     const compressed = await compressImage(file)
     setPhoto(compressed)
     read.value = await readSign(compressed, props.zones)
-    selectedName.value = read.value.zone?.name ?? props.likelyZoneName ?? null
+    // Block pre-fill from an unsafe read: only auto-select when the zone read well.
+    selectedName.value = read.value.fields.zone.state === 'unreadable'
+      ? null
+      : (read.value.zone?.name ?? props.likelyZoneName ?? null)
   } catch (err) {
     console.warn('[Kerb] sign read failed:', err)
-    read.value = { rawText: '', zone: null, confidence: 0 }
+    read.value = {
+      rawText: '', zone: null, confidence: 0,
+      fields: {
+        zone: { value: null, state: 'unreadable' },
+        price: { value: null, state: 'unreadable' },
+        limit: { value: null, state: 'unreadable' },
+        code: { value: null, state: 'unreadable' },
+      },
+    }
     selectedName.value = props.likelyZoneName ?? null
   }
   step.value = 'confirm'
@@ -222,6 +290,8 @@ const confirm = async () => {
       photo: photoBlob.value,
     })
     emit('submitted', report)
+    incScan()
+    used.value += 1
     step.value = 'done'
   } catch (err: any) {
     console.warn('[Kerb] sign submit failed:', err)
@@ -336,6 +406,71 @@ onUnmounted(() => { if (photoUrl.value) URL.revokeObjectURL(photoUrl.value) })
 /* Confirm */
 .scan-read-line { font-size: 14px; color: var(--text2); line-height: 1.6; }
 .scan-read-hint { color: var(--muted); }
+.scan-read-hint--block { display: block; font-size: 12px; }
+
+/* Per-field read panel */
+.scan-fields {
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--bg);
+  overflow: hidden;
+}
+.scan-fields-head {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--muted2);
+  padding: 10px 14px 6px;
+}
+.scan-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 14px;
+  border-top: 1px solid var(--border);
+}
+.scan-field-label { font-size: 13px; color: var(--muted); }
+.scan-field-val {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  color: var(--text);
+}
+.scan-field-tag { font-size: 11px; font-weight: 700; }
+.scan-field-val.st-read .scan-field-tag { color: var(--green); }
+.scan-field-val.st-low { color: var(--amber); }
+.scan-field-val.st-low .scan-field-tag { color: var(--amber); }
+.scan-field-val.st-unreadable { color: var(--red); }
+.scan-field-val.st-unreadable .scan-field-tag { color: var(--red); }
+
+.scan-unsafe {
+  font-size: 13px;
+  color: var(--red);
+  line-height: 1.5;
+  padding: 10px 12px;
+  background: var(--red-bg);
+  border: 1px solid var(--red-border);
+  border-radius: var(--r-md);
+}
+
+/* GPS cross-check */
+.scan-xcheck {
+  font-size: 12.5px;
+  line-height: 1.5;
+  padding: 10px 12px;
+  border-radius: var(--r-md);
+}
+.scan-xcheck.match { color: var(--green); background: var(--green-bg); border: 1px solid var(--green-border); }
+.scan-xcheck.mismatch { color: var(--amber); background: var(--amber-bg); border: 1px solid var(--amber-border); }
+
+/* Guest meter */
+.scan-meter-cta { display: inline-block; text-align: center; margin-top: 8px; }
+.scan-meter-note { font-size: 12px; color: var(--amber); text-align: center; }
 .scan-zones { display: flex; flex-direction: column; gap: 6px; }
 .scan-zone {
   display: flex; align-items: center; gap: 12px;
