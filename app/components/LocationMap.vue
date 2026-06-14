@@ -154,7 +154,13 @@ watchEffect((onCleanup) => {
     if (!layer) continue
 
     layer.addTo(map)
-    if (name) layer.bindTooltip(name, { sticky: true, className: 'zone-tooltip' })
+    if (name) {
+      // Interactive (explore) maps get a permanent street/zone label, revealed only
+      // when zoomed in (see lm-labels). The small preview keeps the hover tooltip.
+      layer.bindTooltip(name, props.interactive
+        ? { permanent: true, direction: 'center', className: 'zone-label' }
+        : { sticky: true, className: 'zone-tooltip' })
+    }
     layers.push(layer)
   }
 
@@ -266,6 +272,11 @@ onMounted(async () => {
     // Container is freshly shown (e.g. fullscreen overlay) — ensure Leaflet
     // measures the real size after layout.
     requestAnimationFrame(() => map.invalidateSize())
+
+    // Reveal the permanent street/zone labels only once zoomed in, to avoid clutter.
+    const updateLabels = () => mapEl.value?.classList.toggle('lm-labels', map.getZoom() >= 17)
+    map.on('zoomend', updateLabels)
+    updateLabels()
   }
 
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
@@ -314,6 +325,24 @@ onMounted(async () => {
 </script>
 
 <style>
+/* Permanent street/zone labels — hidden until the map is zoomed in (lm-labels). */
+.leaflet-tooltip.zone-label {
+  background: rgba(22, 24, 28, 0.78);
+  color: #F4F4F0;
+  border: none;
+  box-shadow: none;
+  font-family: var(--font-mono, monospace);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  padding: 1px 6px;
+  border-radius: 5px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.leaflet-tooltip.zone-label::before { display: none; }
+.location-map:not(.lm-labels) .leaflet-tooltip.zone-label { display: none !important; }
+
 .zone-tooltip {
   background: rgba(255,255,255,0.92);
   border: none;
