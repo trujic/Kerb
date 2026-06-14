@@ -25,6 +25,19 @@ const SCHEDULES: Record<string, CitySchedule> = {
       0: null,                             // Sun — free
     },
   },
+  // Niš — Mon–Fri 07–21, Sat 07–14, Sun free (nisparking.rs).
+  'nis': {
+    timezone: 'Europe/Belgrade',
+    days: {
+      1: { start: '07:00', end: '21:00' },
+      2: { start: '07:00', end: '21:00' },
+      3: { start: '07:00', end: '21:00' },
+      4: { start: '07:00', end: '21:00' },
+      5: { start: '07:00', end: '21:00' },
+      6: { start: '07:00', end: '14:00' },
+      0: null,
+    },
+  },
 }
 
 const DAY_ABBR = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']

@@ -50,8 +50,31 @@ function segDist(ax: number, ay: number, bx: number, by: number): number {
   return Math.hypot(ax + t * dx, ay + t * dy)
 }
 
+// Ray-cast: is the query point (the origin, 0,0) inside this projected ring?
+function originInRing(ring: number[][]): boolean {
+  let inside = false
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const yi = ring[i][1], yj = ring[j][1], xi = ring[i][0], xj = ring[j][0]
+    if ((yi > 0) !== (yj > 0) && 0 < ((xj - xi) * (0 - yi)) / (yj - yi) + xi) inside = !inside
+  }
+  return inside
+}
+
+// Distance from the user (origin) to a feature — 0 if standing inside a zone area.
 function featureMinDist(geom: any, px: (n: number) => number, py: (n: number) => number): number {
   if (!geom) return Infinity
+  if (geom.type === 'Polygon') {
+    const ring = (geom.coordinates?.[0] ?? []).map((c: number[]) => [px(c[0]), py(c[1])])
+    if (ring.length < 3) return Infinity
+    if (originInRing(ring)) return 0
+    let min = Infinity
+    for (let i = 0; i < ring.length; i++) {
+      const n = (i + 1) % ring.length
+      const d = segDist(ring[i][0], ring[i][1], ring[n][0], ring[n][1])
+      if (d < min) min = d
+    }
+    return min
+  }
   const lines: number[][][] =
     geom.type === 'LineString' ? [geom.coordinates]
     : geom.type === 'MultiLineString' ? geom.coordinates : []

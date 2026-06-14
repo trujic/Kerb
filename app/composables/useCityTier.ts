@@ -18,6 +18,7 @@ export type MapTier = 'cadastre' | 'street_registry' | 'street_lists' | 'none'
 
 const CITY_TIERS: Record<string, MapTier> = {
   'novi-sad': 'cadastre',       // per-street geometry in /zones/novi-sad.json
+  'nis': 'cadastre',            // official zone-area polygons in /zones/nis.json
   'belgrade': 'street_registry', // official searchable street registry exists
 }
 

@@ -30,6 +30,16 @@ function closestOnSegment(ax: number, ay: number, bx: number, by: number) {
   return { dist: Math.hypot(cx, cy), cx, cy }
 }
 
+// Ray-cast: is the user (origin 0,0) inside this projected ring? (zone-area maps)
+function originInRing(ring: number[][]): boolean {
+  let inside = false
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const yi = ring[i][1], yj = ring[j][1], xi = ring[i][0], xj = ring[j][0]
+    if ((yi > 0) !== (yj > 0) && 0 < ((xj - xi) * (0 - yi)) / (yj - yi) + xi) inside = !inside
+  }
+  return inside
+}
+
 export const useNearestParking = (
   coords: Ref<Coords> | (() => Coords),
   geojson: Ref<any> | (() => any),
@@ -49,13 +59,26 @@ export const useNearestParking = (
     for (const f of g.features) {
       const geom = f.geometry
       if (!geom) continue
+      const zone = f.properties?.zone ?? ''
+      const street = f.properties?.name ?? ''
+
+      // Zone-area polygons (e.g. Niš): inside → distance 0; else nearest edge.
+      if (geom.type === 'Polygon') {
+        const ring = (geom.coordinates?.[0] ?? []).map(([lng, lat]: number[]) => [px(lng), py(lat)])
+        if (ring.length < 3) continue
+        if (originInRing(ring)) { if (!best || best.dist > 0) best = { dist: 0, cx: 0, cy: 0, zone, street }; continue }
+        for (let i = 0; i < ring.length; i++) {
+          const n = (i + 1) % ring.length
+          const r = closestOnSegment(ring[i][0], ring[i][1], ring[n][0], ring[n][1])
+          if (!best || r.dist < best.dist) best = { dist: r.dist, cx: r.cx, cy: r.cy, zone, street }
+        }
+        continue
+      }
+
       const lines: number[][][] =
         geom.type === 'LineString' ? [geom.coordinates]
         : geom.type === 'MultiLineString' ? geom.coordinates
         : []
-      const zone = f.properties?.zone ?? ''
-      const street = f.properties?.name ?? ''
-
       for (const line of lines) {
         for (let i = 0; i + 1 < line.length; i++) {
           const ax = px(line[i][0]), ay = py(line[i][1])
