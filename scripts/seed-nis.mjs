@@ -28,7 +28,7 @@ const city = {
   overview: 'Niš uses a 3-zone street parking system (Extra, Red, Green) run by JKP Parking Servis Niš. Charging applies Mon–Fri 07:00–21:00 and Sat 07:00–14:00 — Sundays are free. Pay by the Parking Servis app, SMS, or a daily ticket. A daily ticket (valid ~24h) is 1,100 RSD across all zones.',
   fine: '1,100 RSD daily ticket if unpaid + towing ("pauk")',
   official_url: 'https://www.nisparking.rs',
-  sms_instructions: 'Send your licence plate (CAPITALS, no spaces) to the zone shortcode. Extra → 9180, Red → 9181, Green → 9182. Daily ticket: Red → 9184, Green → 9185. Keep the confirmation SMS — it is your receipt.',
+  sms_instructions: 'Send your licence plate (CAPITALS, no spaces) to the zone shortcode: Extra → 9180, Red → 9181, Green → 9182. NOTE: Red zone is 70 RSD the first hour, then 210 RSD each hour after. All-day card: Red 700 RSD → 9184, Green 550 RSD → 9185 (a 24h card is 1,100 RSD). Keep the confirmation SMS — it is your receipt.',
 }
 
 // Zone names MATCH public/zones/nis.json so Ask-AI picks and sign scans resolve.
@@ -36,17 +36,17 @@ const zones = [
   {
     name: 'Extra Zone', color: '#E6A700', sms_shortcode: '9180', sort_order: 1,
     price: '100 RSD/h',
-    rules: 'Max 60 min. Strictest zone (centre). Mon–Fri 07:00–21:00, Sat 07:00–14:00, Sun free.',
+    rules: 'Max 60 min — strictest zone (centre). Mon–Fri 07:00–21:00, Sat 07:00–14:00, Sun free.',
   },
   {
     name: 'Red Zone', color: '#E25141', sms_shortcode: '9181', sort_order: 2,
-    price: '70 RSD/h',
-    rules: 'Max 120 min. 70 RSD for the first hour (more thereafter). Daily ticket 1,100 RSD → 9184. Mon–Fri 07:00–21:00, Sat 07:00–14:00, Sun free.',
+    price: '70→210 RSD/h',
+    rules: 'First hour 70 RSD, then 210 RSD for every hour after. Max 120 min. Longer stay? An all-day card is 700 RSD → 9184. Mon–Fri 07:00–21:00, Sat 07:00–14:00, Sun free.',
   },
   {
     name: 'Green Zone', color: '#2FB36B', sms_shortcode: '9182', sort_order: 3,
     price: '55 RSD/h',
-    rules: 'Max 180 min. Daily ticket 1,100 RSD → 9185. Mon–Fri 07:00–21:00, Sat 07:00–14:00, Sun free.',
+    rules: 'Max 180 min. All-day card 550 RSD → 9185. Mon–Fri 07:00–21:00, Sat 07:00–14:00, Sun free.',
   },
 ]
 
@@ -58,7 +58,7 @@ const paymentMethods = [
 
 const tips = [
   { icon: '⏱', text: 'Extra zone is a strict 60-minute zone in the very centre. Red is 120 min, Green 180 min.', sort_order: 1 },
-  { icon: '🎟', text: 'Staying a while? A 1,100 RSD daily ticket (Red → 9184, Green → 9185) beats hourly once you pass a few hours.', sort_order: 2 },
+  { icon: '🎟', text: 'Red zone jumps to 210 RSD/h after the first hour — for a longer stay the 700 RSD all-day card (→ 9184) is cheaper. Green’s all-day card is 550 RSD (→ 9185).', sort_order: 2 },
   { icon: '🚗', text: 'Niš runs a tow truck ("зелени паук"/green pauk). If you do not pay, a daily ticket is charged automatically.', sort_order: 3 },
   { icon: '🗓', text: 'Charging is Mon–Fri 07:00–21:00 and Sat 07:00–14:00. Sundays are free.', sort_order: 4 },
   { icon: '🔤', text: 'For SMS, send your plate in capitals with correct Serbian characters (Č, Š, Ž, Đ, Ć) — wrong characters can block the payment.', sort_order: 5 },
