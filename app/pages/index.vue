@@ -104,6 +104,27 @@
           @locate="onLocateCar"
         />
 
+        <!-- ── TABS — split the stack: do it / figure it out / look it up ── -->
+        <div class="gps-tabs" role="tablist">
+          <button
+            type="button" role="tab" class="gps-tab"
+            :class="{ on: activeTab === 'pay' }"
+            @click="activeTab = 'pay'"
+          >Pay</button>
+          <button
+            type="button" role="tab" class="gps-tab"
+            :class="{ on: activeTab === 'find' }"
+            @click="activeTab = 'find'"
+          >Find zone</button>
+          <button
+            type="button" role="tab" class="gps-tab"
+            :class="{ on: activeTab === 'info' }"
+            @click="activeTab = 'info'"
+          >Info</button>
+        </div>
+
+        <!-- ═══ PAY PANEL — the 10-second job: status → zone → pay ═══ -->
+        <div v-show="activeTab === 'pay'" class="gps-panel">
         <!-- Hours (live free/paid status) -->
         <ParkingHours :city-id="detectedCity!.id" compact class="gps-hours" />
 
@@ -143,50 +164,6 @@
               </template>
             </p>
           </div>
-
-          <!-- Scan the sign — the sign is ground truth: read it, confirm, pin it, pay -->
-          <button type="button" class="scan-cta" @click="showScan = true">
-            <span class="scan-cta-icon">📸</span>
-            <span class="scan-cta-text">
-              <span class="scan-cta-title">Scan the sign</span>
-              <span class="scan-cta-sub">Read the zone off the sign, confirm it on the map, then pay</span>
-            </span>
-            <span class="scan-cta-arrow">→</span>
-          </button>
-
-          <!-- Ask AI — geometry + registry decide, never a remembered guess -->
-          <button type="button" class="ai-cta" @click="showAi = true">
-            <span class="ai-cta-icon">🧠</span>
-            <span class="ai-cta-text">
-              <span class="ai-cta-title">Ask AI — where am I?</span>
-              <span class="ai-cta-sub">Not sure which zone? Get a verdict with its evidence</span>
-            </span>
-            <span class="ai-cta-arrow">→</span>
-          </button>
-
-          <!-- Nearest confirmed sign — lead the user to verified ground truth -->
-          <button
-            v-if="nearestSign"
-            type="button"
-            class="nsign"
-            :style="{ borderColor: (nearestSign.report.zone_color || 'var(--blue)') + '66' }"
-            @click="onLeadToSign"
-          >
-            <span
-              class="nsign-arrow"
-              :style="{ transform: `rotate(${nearestSignArrow - 90}deg)`, color: nearestSign.report.zone_color || 'var(--blue)' }"
-            >➤</span>
-            <span class="nsign-text">
-              <span class="nsign-title">
-                Nearest confirmed sign · {{ formatDist(nearestSign.distanceM) }}
-              </span>
-              <span class="nsign-sub">
-                <span :style="{ color: nearestSign.report.zone_color || 'var(--text2)' }">{{ nearestSign.report.zone_name }}</span>
-                · confirmed {{ relTime(nearestSign.report.created_at) }}
-              </span>
-            </span>
-            <span class="nsign-go">Lead me →</span>
-          </button>
 
           <!-- Selectable zones — likely one floats up, but it's never auto-committed -->
           <div class="zone-pick-list" :class="{ 'zone-pick-list--free': freeNow }">
@@ -291,8 +268,65 @@
               </span>
             </p>
           </div>
-        </div>
 
+          <!-- Escape hatch to the spatial tools when the likely zone isn't enough -->
+          <button type="button" class="zone-unsure" @click="activeTab = 'find'">
+            🪧 Not sure which zone? Scan the sign or ask AI →
+          </button>
+        </div>
+        </div><!-- /pay panel -->
+
+        <!-- ═══ FIND ZONE PANEL — "which zone am I actually in?" ═══ -->
+        <div v-show="activeTab === 'find'" class="gps-panel">
+          <p class="panel-lead">📍 The map up top shows where you are. Use these to pin the exact zone.</p>
+
+          <!-- Scan the sign — the sign is ground truth: read it, confirm, pin it, pay -->
+          <button type="button" class="scan-cta" @click="showScan = true">
+            <span class="scan-cta-icon">📸</span>
+            <span class="scan-cta-text">
+              <span class="scan-cta-title">Scan the sign</span>
+              <span class="scan-cta-sub">Read the zone off the sign, confirm it on the map, then pay</span>
+            </span>
+            <span class="scan-cta-arrow">→</span>
+          </button>
+
+          <!-- Ask AI — geometry + registry decide, never a remembered guess -->
+          <button type="button" class="ai-cta" @click="showAi = true">
+            <span class="ai-cta-icon">🧠</span>
+            <span class="ai-cta-text">
+              <span class="ai-cta-title">Ask AI — where am I?</span>
+              <span class="ai-cta-sub">Not sure which zone? Get a verdict with its evidence</span>
+            </span>
+            <span class="ai-cta-arrow">→</span>
+          </button>
+
+          <!-- Nearest confirmed sign — lead the user to verified ground truth -->
+          <button
+            v-if="nearestSign"
+            type="button"
+            class="nsign"
+            :style="{ borderColor: (nearestSign.report.zone_color || 'var(--blue)') + '66' }"
+            @click="onLeadToSign"
+          >
+            <span
+              class="nsign-arrow"
+              :style="{ transform: `rotate(${nearestSignArrow - 90}deg)`, color: nearestSign.report.zone_color || 'var(--blue)' }"
+            >➤</span>
+            <span class="nsign-text">
+              <span class="nsign-title">
+                Nearest confirmed sign · {{ formatDist(nearestSign.distanceM) }}
+              </span>
+              <span class="nsign-sub">
+                <span :style="{ color: nearestSign.report.zone_color || 'var(--text2)' }">{{ nearestSign.report.zone_name }}</span>
+                · confirmed {{ relTime(nearestSign.report.created_at) }}
+              </span>
+            </span>
+            <span class="nsign-go">Lead me →</span>
+          </button>
+        </div><!-- /find panel -->
+
+        <!-- ═══ INFO PANEL — reference & reassurance, never urgent ═══ -->
+        <div v-show="activeTab === 'info'" class="gps-panel">
         <!-- Guest → account nudge (memory + reminders + fine alerts) -->
         <div v-if="!user" class="guest-upsell">
           <span class="guest-upsell-icon">🔔</span>
@@ -327,6 +361,7 @@
             <span class="hist-when">{{ relTime(s.started_at) }}</span>
           </div>
         </div>
+        </div><!-- /info panel -->
       </div>
 
       <!-- Scan the sign — capture → read → confirm → pin + prefill pay -->
@@ -357,6 +392,36 @@
           @scan="onAiScan"
           @close="showAi = false"
         />
+      </ClientOnly>
+
+      <!-- Open-the-app status moment — only when no payment is needed -->
+      <ClientOnly>
+        <Teleport to="body">
+          <Transition name="status-sheet">
+            <div v-if="showStatusSheet" class="status-scrim" role="dialog" aria-label="Parking status" @click.self="dismissStatus">
+              <div class="status-sheet">
+                <p class="status-kicker">Parking status · {{ detectedCity!.name }}</p>
+                <p class="status-headline">
+                  <template v-if="nextWindow?.dayLabel === 'today'">Free until {{ nextWindow.start }}</template>
+                  <template v-else>Free right now — no payment needed</template>
+                </p>
+                <p class="status-body">
+                  You don't need to pay in {{ detectedCity!.name }} right now.<template v-if="statusCanPrepay">
+                    The next paid window is <strong>{{ nextWindow!.dayLabel }} {{ nextWindow!.start }}–{{ nextWindow!.end }}</strong> — pre-pay it now to be covered the moment it opens.</template><template v-else-if="hoursStatus?.detail"> {{ hoursStatus.detail }}.</template>
+                </p>
+                <div class="status-actions">
+                  <template v-if="statusCanPrepay">
+                    <button type="button" class="status-secondary" @click="dismissStatus">Not now</button>
+                    <button type="button" class="status-primary" @click="statusToPrepay">
+                      Pre-pay {{ nextWindow!.start }}–{{ nextWindow!.end }}
+                    </button>
+                  </template>
+                  <button v-else type="button" class="status-primary" @click="dismissStatus">Got it</button>
+                </div>
+              </div>
+            </div>
+          </Transition>
+        </Teleport>
       </ClientOnly>
 
       <!-- SMS handoff — the web can't verify the send, so we ask -->
@@ -563,6 +628,7 @@ const loadingCityDetail = ref(false)
 const userProfile = ref<any>(null)
 const zoneBoundaries = ref<any>(null)
 const mapExpanded = ref(false)
+const activeTab = ref<'pay' | 'find' | 'info'>('pay') // GPS dashboard: split the stack into panels
 const showScan = ref(false)              // scan-the-sign modal
 const showAi = ref(false)                // ask-AI resolver panel
 const signReports = ref<any[]>([])       // confirmed sign scans → map pins
@@ -581,9 +647,34 @@ watch(user, (u) => {
 }, { immediate: true })
 
 // Time-aware hours — drives free-now desaturation + the night pre-pay path.
-const { paidNow, nextWindow } = useParkingHours(() => detectedCity.value?.id)
+const { paidNow, nextWindow, status: hoursStatus } = useParkingHours(() => detectedCity.value?.id)
 const freeNow = computed(() => paidNow.value === false)
 const nightPrepay = computed(() => freeNow.value && !!nextWindow.value)
+
+// ── Open-the-app status moment ──────────────────────────────────────────────
+// The first question on every open is "do I even need to pay?". When the answer
+// is "no" (Sunday / after hours / before charging), we surface it once as a sheet
+// so the user gets the news and can leave. When parking IS paid we stay silent
+// and let them go straight to paying — no modal on the critical path.
+const STATUS_SEEN_KEY = 'kerb_status_seen'
+const showStatusSheet = ref(false)
+const todayKey = () => new Date().toISOString().slice(0, 10)
+const maybeShowStatus = () => {
+  if (!import.meta.client) return
+  if (!gpsMode.value || !freeNow.value) return
+  if (localStorage.getItem(STATUS_SEEN_KEY) === todayKey()) return
+  showStatusSheet.value = true
+}
+const dismissStatus = () => {
+  if (import.meta.client) localStorage.setItem(STATUS_SEEN_KEY, todayKey())
+  showStatusSheet.value = false
+}
+// Offer pre-pay when the next paid window is near (later today / tomorrow morning),
+// matching the night pre-pay slider on the Pay tab. Further-off windows just inform.
+const statusCanPrepay = computed(() =>
+  freeNow.value && ['today', 'tomorrow'].includes(nextWindow.value?.dayLabel ?? ''),
+)
+const statusToPrepay = () => { activeTab.value = 'pay'; dismissStatus() }
 
 // Guest sessions (no account), persisted on-device. Created only AFTER the user
 // confirms they sent the SMS. Logged-in users keep the Supabase-backed session.
@@ -942,6 +1033,9 @@ watch(gpsMode, (active) => {
     stopOrientation()
   }
 }, { immediate: true })
+
+// Surface the "do I need to pay?" status moment once the dashboard + hours resolve.
+watch([gpsMode, freeNow], () => maybeShowStatus(), { immediate: true })
 
 const { data: cities, pending, error } = await useAsyncData('cities', getCities, { lazy: true })
 
@@ -1417,7 +1511,7 @@ h2 {
 .compass-btn:hover { background: #fff; }
 
 .hero-gps {
-  padding: 80px 0 40px;
+  padding: 62px 0 40px;
   border-bottom: 1px solid var(--border);
 }
 .gps-hero-map {
@@ -1474,6 +1568,69 @@ h2 {
   transition: color 150ms var(--ease-out);
 }
 .gps-full-link:hover { color: var(--blue-hover); }
+
+/* ── Dashboard tabs — split the stack into do-it / find-it / look-it-up ── */
+.gps-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 20px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  position: sticky;
+  top: 53px;
+  z-index: 40;
+}
+.gps-tab {
+  flex: 1;
+  padding: 9px 10px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  background: transparent;
+  border: none;
+  border-radius: var(--r-md);
+  cursor: pointer;
+  transition: color 150ms var(--ease-out), background 150ms var(--ease-out);
+}
+.gps-tab:hover { color: var(--text2); }
+.gps-tab.on {
+  color: var(--text);
+  background: var(--bg);
+  box-shadow: var(--shadow-sm);
+}
+.gps-panel { animation: panel-in 180ms var(--ease-out); }
+@keyframes panel-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+.panel-lead {
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
+  margin-bottom: 14px;
+}
+
+/* "Not sure?" escape hatch from Pay → Find */
+.zone-unsure {
+  display: block;
+  width: 100%;
+  margin-top: 14px;
+  padding: 11px 14px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text2);
+  text-align: center;
+  background: var(--bg2);
+  border: 1px dashed var(--border2);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  transition: border-color 150ms var(--ease-out), color 150ms var(--ease-out);
+}
+.zone-unsure:hover { border-color: var(--blue); color: var(--blue); }
 
 /* Zone pay cards */
 .gps-hours { margin-bottom: 20px; }
@@ -1673,6 +1830,84 @@ h2 {
   cursor: pointer;
 }
 .armed-cancel:hover { color: var(--text); }
+
+/* ── Open-the-app status sheet ── */
+.status-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 3400;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  padding: 16px;
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+}
+.status-sheet {
+  width: 100%;
+  max-width: 440px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--green);
+  border-radius: var(--r-xl);
+  padding: 22px 20px;
+  box-shadow: var(--shadow-lg);
+}
+.status-kicker {
+  font-size: 11px;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+.status-headline {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  line-height: 1.2;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+.status-body {
+  font-size: 14px;
+  color: var(--muted);
+  line-height: 1.6;
+  margin-bottom: 20px;
+}
+.status-body strong { color: var(--text); font-weight: 700; }
+.status-actions { display: flex; gap: 10px; }
+.status-secondary {
+  flex: 1;
+  padding: 13px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text2);
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  cursor: pointer;
+}
+.status-primary {
+  flex: 1;
+  padding: 13px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--on-accent);
+  background: var(--blue);
+  border: none;
+  border-radius: var(--r-md);
+  cursor: pointer;
+}
+.status-primary:active, .status-secondary:active { transform: scale(0.98); }
+.status-sheet-enter-active, .status-sheet-leave-active { transition: opacity 200ms var(--ease-out); }
+.status-sheet-enter-active .status-sheet, .status-sheet-leave-active .status-sheet {
+  transition: transform 240ms var(--ease-out);
+}
+.status-sheet-enter-from, .status-sheet-leave-to { opacity: 0; }
+.status-sheet-enter-from .status-sheet, .status-sheet-leave-to .status-sheet { transform: translateY(100%); }
 
 /* SMS handoff sheet */
 .sent {
