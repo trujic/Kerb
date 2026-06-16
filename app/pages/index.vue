@@ -104,6 +104,27 @@
           @locate="onLocateCar"
         />
 
+        <!-- ═══ FREE-NOW SURFACE — when no payment is needed, the screen IS the answer ═══ -->
+        <div v-if="freeSurface" class="free-surface">
+          <span class="free-now-tag"><span class="free-now-dot" />Free now</span>
+          <h2 class="free-now-title">No need to pay right now</h2>
+          <p class="free-now-sub">
+            Parking is free in {{ detectedCity!.name }}.<template v-if="nextWindow">
+              Charging resumes <strong>{{ nextWindow.dayLabel }} {{ nextWindow.start }}</strong>.</template><template v-else-if="hoursStatus?.detail"> {{ hoursStatus.detail }}.</template>
+          </p>
+          <div class="free-now-actions">
+            <button
+              v-if="statusCanPrepay"
+              type="button"
+              class="free-prepay-btn"
+              @click="statusToPrepay"
+            >Pre-pay {{ nextWindow!.start }}–{{ nextWindow!.end }} →</button>
+            <button type="button" class="free-browse-btn" @click="browseAnyway">Browse zones</button>
+          </div>
+        </div>
+
+        <!-- ═══ FULL DASHBOARD — paid now, or browsing while free ═══ -->
+        <template v-else>
         <!-- ── TABS — split the stack: do it / figure it out / look it up ── -->
         <div class="gps-tabs" role="tablist">
           <button
@@ -115,7 +136,7 @@
             type="button" role="tab" class="gps-tab"
             :class="{ on: activeTab === 'find' }"
             @click="activeTab = 'find'"
-          >Find zone</button>
+          >Find</button>
           <button
             type="button" role="tab" class="gps-tab"
             :class="{ on: activeTab === 'info' }"
@@ -125,8 +146,8 @@
 
         <!-- ═══ PAY PANEL — the 10-second job: status → zone → pay ═══ -->
         <div v-show="activeTab === 'pay'" class="gps-panel">
-        <!-- Hours (live free/paid status) -->
-        <ParkingHours :city-id="detectedCity!.id" compact class="gps-hours" />
+        <!-- Live free/paid status only — the full weekly schedule lives in Info -->
+        <ParkingHours :city-id="detectedCity!.id" compact status-only class="gps-hours" />
 
         <!-- No paid parking at the user's spot -->
         <div v-if="parkingState === 'none' && nearest" class="gps-noparking">
@@ -162,6 +183,9 @@
               <template v-else>
                 🪧 Tap the zone printed on the sign next to your car — that's the one that counts.
               </template>
+            </p>
+            <p v-if="mapApprox" class="zone-pick-approx">
+              ⚠️ {{ detectedCity!.name }}'s zone areas are approximate (no official map) — use this to narrow it down, then trust the sign.
             </p>
           </div>
 
@@ -327,6 +351,9 @@
 
         <!-- ═══ INFO PANEL — reference & reassurance, never urgent ═══ -->
         <div v-show="activeTab === 'info'" class="gps-panel">
+        <!-- Full weekly charging schedule (reference) -->
+        <ParkingHours :city-id="detectedCity!.id" class="gps-hours" />
+
         <!-- Guest → account nudge (memory + reminders + fine alerts) -->
         <div v-if="!user" class="guest-upsell">
           <span class="guest-upsell-icon">🔔</span>
@@ -362,6 +389,7 @@
           </div>
         </div>
         </div><!-- /info panel -->
+        </template><!-- /full dashboard -->
       </div>
 
       <!-- Scan the sign — capture → read → confirm → pin + prefill pay -->
@@ -400,7 +428,7 @@
           <Transition name="status-sheet">
             <div v-if="showStatusSheet" class="status-scrim" role="dialog" aria-label="Parking status" @click.self="dismissStatus">
               <div class="status-sheet">
-                <p class="status-kicker">Parking status · {{ detectedCity!.name }}</p>
+                <p class="status-kicker"><span class="status-free-dot" />Parking status · {{ detectedCity!.name }}</p>
                 <p class="status-headline">
                   <template v-if="nextWindow?.dayLabel === 'today'">Free until {{ nextWindow.start }}</template>
                   <template v-else>Free right now — no payment needed</template>
@@ -674,7 +702,17 @@ const dismissStatus = () => {
 const statusCanPrepay = computed(() =>
   freeNow.value && ['today', 'tomorrow'].includes(nextWindow.value?.dayLabel ?? ''),
 )
-const statusToPrepay = () => { activeTab.value = 'pay'; dismissStatus() }
+
+// ── Free-now main surface ────────────────────────────────────────────────────
+// When no payment is needed, the whole dashboard collapses to one calm answer
+// instead of the full Pay/Find/Info stack. The user can still open the dashboard
+// (to pre-pay or browse zones) — that flips forceBrowse and reveals the tabs.
+const forceBrowse = ref(false)
+const freeSurface = computed(() =>
+  freeNow.value && !forceBrowse.value && !displaySession.value,
+)
+const browseAnyway = () => { forceBrowse.value = true }
+const statusToPrepay = () => { forceBrowse.value = true; activeTab.value = 'pay'; dismissStatus() }
 
 // Guest sessions (no account), persisted on-device. Created only AFTER the user
 // confirms they sent the SMS. Logged-in users keep the Supabase-backed session.
@@ -729,6 +767,11 @@ const defaultPlate = computed(() => {
 
 // Geometry-based detection: distance to the nearest paid-parking segment.
 const { nearest } = useNearestParking(coords, zoneBoundaries)
+
+// When a city's zone geometry is only coarsely traced (no official vector cadastre),
+// the dashboard flags it: GPS proximity here is a hint, never a claim.
+const { tier: dashTier } = useCityTier(() => detectedCity.value?.id)
+const mapApprox = computed(() => dashTier.value === 'cadastre_approx')
 
 // Self-healing map: confirmed signs recolour segments they disagree with (≥2 scans).
 // The resolver + nearest stay on the raw geometry; only the map display heals.
@@ -1026,6 +1069,7 @@ const gpsMode = computed(() => !!(detectedCity.value && cityDetail.value))
 // Start live GPS tracking + compass when GPS mode activates
 watch(gpsMode, (active) => {
   if (active) {
+    forceBrowse.value = false   // a fresh open lands on the calm free surface
     startTracking()
     startOrientation()
   } else {
@@ -1613,6 +1657,85 @@ h2 {
   margin-bottom: 14px;
 }
 
+/* ── Free-now surface — the calm "no payment needed" main screen ── */
+.free-surface {
+  padding: 30px 22px;
+  background: var(--green-bg);
+  border: 1px solid var(--green-border);
+  border-radius: var(--r-xl);
+  text-align: center;
+}
+.free-now-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--green);
+  margin-bottom: 14px;
+}
+.free-now-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+  animation: free-pulse 2s ease-out infinite;
+}
+@keyframes free-pulse {
+  0%   { box-shadow: 0 0 0 0 currentColor; opacity: 1; }
+  70%  { box-shadow: 0 0 0 6px transparent; opacity: 0.8; }
+  100% { box-shadow: 0 0 0 0 transparent; opacity: 1; }
+}
+.free-now-title {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  line-height: 1.2;
+  color: var(--text);
+  margin-bottom: 10px;
+}
+.free-now-sub {
+  font-size: 14px;
+  color: var(--text2);
+  line-height: 1.6;
+  max-width: 380px;
+  margin: 0 auto 22px;
+}
+.free-now-sub strong { color: var(--text); font-weight: 700; }
+.free-now-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 320px;
+  margin: 0 auto;
+}
+.free-prepay-btn {
+  padding: 13px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--on-accent);
+  background: var(--blue);
+  border: none;
+  border-radius: var(--r-md);
+  cursor: pointer;
+}
+.free-browse-btn {
+  padding: 12px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text2);
+  background: transparent;
+  border: 1px solid var(--green-border);
+  border-radius: var(--r-md);
+  cursor: pointer;
+}
+.free-prepay-btn:active, .free-browse-btn:active { transform: scale(0.98); }
+
 /* "Not sure?" escape hatch from Pay → Find */
 .zone-unsure {
   display: block;
@@ -1659,9 +1782,8 @@ h2 {
   gap: 14px;
   padding: 14px 16px;
   margin-bottom: 20px;
-  background: var(--bg2);
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--green);
+  background: var(--green-bg);
+  border: 1px solid var(--green-border);
   border-radius: var(--r-md);
 }
 .np-icon {
@@ -1687,6 +1809,16 @@ h2 {
   font-size: 13px;
   color: var(--muted);
   line-height: 1.5;
+}
+.zone-pick-approx {
+  margin-top: 8px;
+  padding: 8px 11px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--amber);
+  background: var(--amber-bg);
+  border: 1px solid var(--amber-border);
+  border-radius: var(--r-md);
 }
 /* Scan-the-sign CTA */
 .scan-cta {
@@ -1794,9 +1926,8 @@ h2 {
   line-height: 1.55;
   margin-bottom: 12px;
   padding: 10px 12px;
-  background: var(--bg2);
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--amber);
+  background: var(--amber-bg);
+  border: 1px solid var(--amber-border);
   border-radius: var(--r-md);
 }
 .prepay-note strong { color: var(--text); font-weight: 700; }
@@ -1809,9 +1940,8 @@ h2 {
   justify-content: space-between;
   margin-bottom: 20px;
   padding: 14px 16px;
-  background: var(--bg2);
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--amber);
+  background: var(--amber-bg);
+  border: 1px solid var(--amber-border);
   border-radius: var(--r-lg);
 }
 .armed-main { display: flex; align-items: flex-start; gap: 12px; min-width: 0; }
@@ -1848,18 +1978,27 @@ h2 {
   max-width: 440px;
   background: var(--bg2);
   border: 1px solid var(--border);
-  border-left: 3px solid var(--green);
   border-radius: var(--r-xl);
   padding: 22px 20px;
   box-shadow: var(--shadow-lg);
 }
 .status-kicker {
+  display: flex;
+  align-items: center;
+  gap: 7px;
   font-size: 11px;
   font-family: var(--font-mono);
   text-transform: uppercase;
   letter-spacing: 1px;
   color: var(--muted);
   margin-bottom: 10px;
+}
+.status-free-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--green);
+  flex-shrink: 0;
 }
 .status-headline {
   font-size: 22px;

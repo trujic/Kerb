@@ -1,5 +1,5 @@
 <template>
-  <div v-if="schedule" class="hours" :class="{ 'hours--compact': compact }">
+  <div v-if="schedule" class="hours" :class="{ 'hours--compact': compact, 'hours--status': statusOnly }">
     <div class="hours-head">
       <span class="hours-title">Parking hours</span>
       <span v-if="status" class="hours-pill" :class="status.paid ? 'is-paid' : 'is-free'">
@@ -10,7 +10,7 @@
 
     <p v-if="status" class="hours-detail">{{ status.detail }}</p>
 
-    <dl class="hours-rows">
+    <dl v-if="!statusOnly" class="hours-rows">
       <div v-for="row in summary" :key="row.label" class="hours-row">
         <dt>{{ row.label }}</dt>
         <dd :class="{ 'is-free-day': row.value === 'Free' }">{{ row.value }}</dd>
@@ -23,6 +23,7 @@
 const props = defineProps<{
   cityId: string | null | undefined
   compact?: boolean
+  statusOnly?: boolean   // live status line only — hide the weekly schedule table
 }>()
 
 const { schedule, status, summary } = useParkingHours(() => props.cityId)
@@ -36,6 +37,7 @@ const { schedule, status, summary } = useParkingHours(() => props.cityId)
   padding: 18px;
 }
 .hours--compact { padding: 14px; border-radius: var(--r-md); }
+.hours--status .hours-detail { margin-bottom: 0; }
 
 .hours-head {
   display: flex;
