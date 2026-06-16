@@ -11,7 +11,7 @@
               :lng="coords!.lng"
               :accuracy="coords!.accuracy"
               :heading="heading"
-              :height="260"
+              :height="190"
               :zones="displayZones"
               :highlight="highlightPoint"
               :signs="signReports"
@@ -64,17 +64,14 @@
           </Teleport>
         </ClientOnly>
 
-        <!-- City badge -->
-        <div class="gps-city-bar">
-          <div class="gps-city-info">
-            <span class="gps-city-flag">{{ detectedCity!.flag }}</span>
-            <div>
-              <div class="gps-city-name">{{ detectedCity!.name }}</div>
-              <div class="gps-city-country">{{ detectedCity!.country }}</div>
-            </div>
-            <span v-if="cityDetail.verified" class="gps-verified">✓ Verified</span>
-          </div>
-          <NuxtLink :to="`/${detectedCity!.id}`" class="gps-full-link">Full guide →</NuxtLink>
+        <!-- Detected-location line — minimal: where you are, not a city banner -->
+        <div class="gps-detected">
+          <span class="gps-detected-where">
+            <span class="gps-detected-pin">📍</span>
+            <template v-if="detectedStreet"><strong>{{ detectedStreet }}</strong> · </template>{{ detectedCity!.name }}
+            <span class="gps-detected-tag">detected</span>
+          </span>
+          <NuxtLink :to="`/${detectedCity!.id}`" class="gps-detected-guide">Full guide →</NuxtLink>
         </div>
 
         <!-- Armed night pre-pay — scheduled for the next paid window, not live yet -->
@@ -635,7 +632,7 @@
 <script setup lang="ts">
 const { getCities, searchCities, getCity } = useCity()
 const { user, getProfile } = useAuth()
-const { detectCity, detectedCity, coords, detecting, gpsError, suggestedZoneName, startTracking, stopTracking } = useGPS()
+const { detectCity, detectedCity, detectedStreet, coords, detecting, gpsError, suggestedZoneName, startTracking, stopTracking } = useGPS()
 const {
   heading, attached: compassAttached, previouslyEnabled: compassWasEnabled,
   needsPermission: compassNeedsPerm, start: startOrientation, stop: stopOrientation, onMapTap,
@@ -1566,52 +1563,42 @@ h2 {
   margin-bottom: 0;
 }
 /* City bar below map */
-.gps-city-bar {
+.gps-detected {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 14px 0 20px;
+  padding: 10px 0 14px;
   border-bottom: 1px solid var(--border);
-  margin-bottom: 28px;
+  margin-bottom: 20px;
 }
-.gps-city-info {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.gps-city-flag { font-size: 28px; line-height: 1; }
-.gps-city-name {
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: -0.2px;
-  color: var(--text);
-}
-.gps-city-country {
-  font-size: 11px;
+.gps-detected-where {
+  min-width: 0;
+  font-size: 13px;
   color: var(--muted);
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.gps-detected-where strong { color: var(--text); font-weight: 600; }
+.gps-detected-pin { margin-right: 4px; }
+.gps-detected-tag {
+  font-size: 10px;
   font-family: var(--font-mono);
   text-transform: uppercase;
-  letter-spacing: 1px;
+  letter-spacing: 0.5px;
+  color: var(--muted2);
 }
-.gps-verified {
-  font-size: 11px;
-  font-family: var(--font-mono);
-  color: var(--green);
-  background: var(--green-bg);
-  border: 1px solid var(--green-border);
-  padding: 3px 8px;
-  border-radius: 20px;
-}
-.gps-full-link {
-  font-size: 13px;
+.gps-detected-guide {
+  font-size: 12px;
   font-weight: 500;
   color: var(--blue);
   white-space: nowrap;
   flex-shrink: 0;
   transition: color 150ms var(--ease-out);
 }
-.gps-full-link:hover { color: var(--blue-hover); }
+.gps-detected-guide:hover { color: var(--blue-hover); }
 
 /* ── Dashboard tabs — split the stack into do-it / find-it / look-it-up ── */
 .gps-tabs {

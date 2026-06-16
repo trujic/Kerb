@@ -20,6 +20,19 @@ const normalizeStreet = (name: string): string => {
     .trim()
 }
 
+// Cyrillic → Serbian Latin for display (preserves case; digraphs Lj/Nj/Dž).
+// Nominatim returns Serbian road names in Cyrillic even with accept-language=en.
+const CYR_LAT: Record<string, string> = {
+  'А':'A','Б':'B','В':'V','Г':'G','Д':'D','Ђ':'Đ','Е':'E','Ж':'Ž','З':'Z','И':'I',
+  'Ј':'J','К':'K','Л':'L','Љ':'Lj','М':'M','Н':'N','Њ':'Nj','О':'O','П':'P','Р':'R',
+  'С':'S','Т':'T','Ћ':'Ć','У':'U','Ф':'F','Х':'H','Ц':'C','Ч':'Č','Џ':'Dž','Ш':'Š',
+  'а':'a','б':'b','в':'v','г':'g','д':'d','ђ':'đ','е':'e','ж':'ž','з':'z','и':'i',
+  'ј':'j','к':'k','л':'l','љ':'lj','м':'m','н':'n','њ':'nj','о':'o','п':'p','р':'r',
+  'с':'s','т':'t','ћ':'ć','у':'u','ф':'f','х':'h','ц':'c','ч':'č','џ':'dž','ш':'š',
+}
+const transliterate = (s: string): string =>
+  s.split('').map((c) => CYR_LAT[c] ?? c).join('')
+
 export const useGPS = () => {
   const supabase = useSupabaseClient()
 
@@ -28,6 +41,7 @@ export const useGPS = () => {
   const detecting = ref(false)
   const gpsError = ref<string | null>(null)
   const suggestedZoneName = ref<string | null>(null)
+  const detectedStreet = ref<string | null>(null) // reverse-geocoded street at detection
 
   const detectCity = async () => {
     if (!import.meta.client) return null
@@ -60,6 +74,7 @@ export const useGPS = () => {
       const geo = await res.json()
       const rawCity = geo.address?.city || geo.address?.town || geo.address?.village || null
       const rawStreet = geo.address?.road || geo.address?.pedestrian || geo.address?.footway || null
+      detectedStreet.value = rawStreet ? transliterate(rawStreet) : null
 
       if (!rawCity) {
         gpsError.value = 'Could not determine your city.'
@@ -143,5 +158,5 @@ export const useGPS = () => {
     }
   }
 
-  return { detectCity, detectedCity, coords, detecting, gpsError, suggestedZoneName, startTracking, stopTracking }
+  return { detectCity, detectedCity, detectedStreet, coords, detecting, gpsError, suggestedZoneName, startTracking, stopTracking }
 }
