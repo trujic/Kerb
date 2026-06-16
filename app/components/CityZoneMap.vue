@@ -5,8 +5,14 @@
       <span class="czm-tier" :class="`t-${tier}`">{{ tierLabel }}</span>
     </div>
 
-    <!-- ── cadastre: interactive reference map ── -->
-    <template v-if="tier === 'cadastre'">
+    <!-- ── cadastre / cadastre_approx: interactive reference map ── -->
+    <template v-if="tier === 'cadastre' || tier === 'cadastre_approx'">
+      <div v-if="tier === 'cadastre_approx'" class="czm-warn">
+        ⚠️ {{ cityName }} publishes no official vector map — these zone areas are
+        <strong>approximate</strong>, coarsely traced from the official zone image. Treat them as a
+        rough guide and confirm on the sign before you pay.
+      </div>
+
       <ClientOnly>
         <div v-if="center" class="czm-map">
           <LocationMap
@@ -28,8 +34,14 @@
       </div>
 
       <p class="czm-prov">
-        Reference overlay digitised from the official source{{ provenance }}. It narrows it down —
-        <strong>the sign always wins</strong>.
+        <template v-if="tier === 'cadastre_approx'">
+          Approximate overlay traced from the official zone map{{ provenance }} — not an exact cadastre.
+          It narrows it down — <strong>the sign always wins</strong>.
+        </template>
+        <template v-else>
+          Reference overlay digitised from the official source{{ provenance }}. It narrows it down —
+          <strong>the sign always wins</strong>.
+        </template>
       </p>
     </template>
 
@@ -94,6 +106,7 @@ const { searchStreetZone } = useCity()
 
 const tierLabel = computed(() => ({
   cadastre: 'Mapped',
+  cadastre_approx: 'Approximate',
   street_registry: 'Registry',
   street_lists: 'Approximate',
   none: 'Sign-only',
@@ -112,7 +125,7 @@ const provenance = computed(() => {
 const geo = ref<any>(null)
 const center = ref<{ lat: number; lng: number } | null>(null)
 onMounted(async () => {
-  if (props.tier !== 'cadastre' || !import.meta.client) return
+  if ((props.tier !== 'cadastre' && props.tier !== 'cadastre_approx') || !import.meta.client) return
   try {
     const res = await fetch(`/zones/${props.cityId}.json`)
     if (!res.ok) return
@@ -160,7 +173,7 @@ const onSearch = () => {
 }
 .czm-tier.t-cadastre { color: var(--green); background: var(--green-bg); border: 1px solid var(--green-border); }
 .czm-tier.t-street_registry { color: var(--blue); background: var(--blue-bg); border: 1px solid var(--blue-border); }
-.czm-tier.t-street_lists, .czm-tier.t-none { color: var(--amber); background: var(--amber-bg); border: 1px solid var(--amber-border); }
+.czm-tier.t-cadastre_approx, .czm-tier.t-street_lists, .czm-tier.t-none { color: var(--amber); background: var(--amber-bg); border: 1px solid var(--amber-border); }
 
 .czm-map { border-radius: var(--r-lg); overflow: hidden; border: 1px solid var(--border); }
 .czm-loading { padding: 40px; text-align: center; color: var(--muted); background: var(--bg2); border-radius: var(--r-lg); }
