@@ -70,29 +70,39 @@ const normalize = (s: string) =>
 
 // Score each zone by the strongest signals on a parking sign:
 //   shortcode digits (3) > colour word (2) > price number (1).
+// Only the shortcode and colour word *identify* a zone; the price digit merely
+// corroborates one — zones share price numbers, and stray digits (time limits,
+// phone numbers) coincide too. So we track the identifying signals separately and
+// refuse to assert a zone from a price match alone.
 const matchZone = (rawText: string, zones: ZoneDef[]): { zone: ZoneDef | null; confidence: number } => {
   const text = normalize(rawText)
   const digits = text.replace(/[^0-9]/g, ' ')
   let best: ZoneDef | null = null
   let bestScore = 0
+  let bestIdScore = 0 // identifying signal only (shortcode + colour word)
 
   for (const z of zones) {
-    let score = 0
-    if (z.sms_shortcode && new RegExp(`\\b${z.sms_shortcode}\\b`).test(digits)) score += 3
+    let idScore = 0
+    if (z.sms_shortcode && new RegExp(`\\b${z.sms_shortcode}\\b`).test(digits)) idScore += 3
 
     const colorKey = z.name.toLowerCase().split(/\s+/)[0]
     const words = ZONE_SYNONYMS[colorKey] ?? [colorKey]
-    if (words.some((w) => new RegExp(`\\b${w}\\b`).test(text))) score += 2
+    if (words.some((w) => new RegExp(`\\b${w}\\b`).test(text))) idScore += 2
 
     const priceNum = z.price?.match(/\d+/)?.[0]
-    if (priceNum && new RegExp(`\\b${priceNum}\\b`).test(digits)) score += 1
+    const priceHit = priceNum ? new RegExp(`\\b${priceNum}\\b`).test(digits) ? 1 : 0 : 0
 
-    if (score > bestScore) { bestScore = score; best = z }
+    const score = idScore + priceHit
+    if (score > bestScore) { bestScore = score; bestIdScore = idScore; best = z }
   }
+
+  // Require an identifying signal (colour word or shortcode) — never assert a zone
+  // off a coincidental price digit, which would pre-fill the wrong payment.
+  if (bestIdScore < 2) return { zone: null, confidence: 0 }
 
   // 3 = a single decisive signal (shortcode); ≥5 = corroborated. Cap at 1.
   const confidence = Math.min(1, bestScore / 5)
-  return { zone: bestScore > 0 ? best : null, confidence }
+  return { zone: best, confidence }
 }
 
 // ── Colour corroboration ──────────────────────────────────────────────────────
