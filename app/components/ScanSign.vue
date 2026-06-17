@@ -7,7 +7,7 @@
         <button class="scan-close" type="button" aria-label="Close" @click="$emit('close')">✕</button>
       </div>
 
-      <div class="scan-body">
+      <div class="scan-body" :class="{ 'scan-body--cam': step === 'capture' && cameraOn }">
         <!-- ── 1 · Capture ── -->
         <template v-if="step === 'capture'">
           <!-- Guest meter: free scans used up -->
@@ -22,6 +22,40 @@
             <button class="scan-btn-ghost wide" type="button" @click="$emit('close')">Maybe later</button>
           </div>
 
+          <!-- Live in-app camera: 2/3 viewfinder, slide-to-pay underneath -->
+          <template v-else-if="cameraOn">
+            <div class="cam">
+              <video ref="videoEl" class="cam-video" autoplay playsinline muted />
+              <div class="cam-guide">
+                <span class="cam-guide-hint">Point at the colored zone sign</span>
+              </div>
+              <button type="button" class="cam-shutter" aria-label="Capture the sign" @click="capturePhoto">
+                <span class="cam-shutter-ring"><span class="cam-shutter-dot" /></span>
+              </button>
+            </div>
+
+            <div class="cam-pay">
+              <template v-if="liveZone">
+                <div class="cam-pay-zone">
+                  <span class="cam-pay-stripe" :style="{ background: liveZone.color }" />
+                  <span class="cam-pay-name">{{ liveZone.name }}</span>
+                  <span class="cam-pay-price" :style="{ color: liveZone.color }">{{ liveZone.price }}</span>
+                </div>
+                <SlideToConfirm
+                  v-if="liveZone.sms_shortcode"
+                  :key="liveZone.name"
+                  :label="`Slide to pay ${liveZone.name}`"
+                  :done-label="`Opening ${liveZone.sms_shortcode}…`"
+                  :color="liveZone.color || 'var(--blue)'"
+                  @confirm="payNow(liveZone)"
+                />
+                <p class="cam-pay-hint">Tap the shutter to read &amp; pin the sign — or just slide to pay the detected zone.</p>
+              </template>
+              <p v-else class="cam-pay-hint">Tap the shutter to read the zone off the sign, then pay.</p>
+            </div>
+          </template>
+
+          <!-- Fallback: live camera denied/unsupported → native capture -->
           <template v-else>
             <div class="scan-hero">
               <div class="scan-hero-icon">📸</div>
@@ -204,6 +238,9 @@ type Step = 'capture' | 'reading' | 'confirm' | 'submitting' | 'done'
 const step = ref<Step>('capture')
 
 const fileInput = ref<HTMLInputElement | null>(null)
+const videoEl = ref<HTMLVideoElement | null>(null)
+const stream = ref<MediaStream | null>(null)
+const cameraOn = ref(false) // true once a live viewfinder stream is attached
 const photoBlob = ref<Blob | null>(null)
 const photoUrl = ref<string | null>(null)
 const read = ref<Awaited<ReturnType<typeof readSign>> | null>(null)
@@ -218,6 +255,14 @@ const shotHeading = ref<number | null>(null)
 const selectedZone = computed<ZoneDef | null>(
   () => props.zones.find((z) => z.name === selectedName.value) ?? null,
 )
+
+// The zone the slide-to-pay under the live viewfinder pays for: the scan result
+// once we have one, otherwise the GPS-detected likely zone so the user can pay
+// immediately without waiting on a read.
+const liveZone = computed<ZoneDef | null>(() => {
+  const name = selectedName.value ?? props.likelyZoneName
+  return props.zones.find((z) => z.name === name) ?? null
+})
 
 // Per-field read panel (amber for low, red "can't read" for unreadable).
 const fieldRows = computed(() => {
@@ -246,9 +291,58 @@ const setPhoto = (blob: Blob) => {
   photoUrl.value = URL.createObjectURL(blob)
 }
 
-const onFile = async (e: Event) => {
+// ── Live in-app camera ────────────────────────────────────────────────────────
+// Open the device camera straight into a viewfinder (no OS picker round-trip). If
+// the browser blocks it or has no camera, we fall back to the native file capture.
+const startCamera = async () => {
+  if (metered.value || cameraOn.value) return
+  if (!import.meta.client || !navigator.mediaDevices?.getUserMedia) { cameraOn.value = false; return }
+  try {
+    stream.value = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' } },
+      audio: false,
+    })
+    cameraOn.value = true
+    await nextTick()
+    if (videoEl.value) {
+      videoEl.value.srcObject = stream.value
+      await videoEl.value.play().catch(() => {})
+    }
+  } catch (err) {
+    console.warn('[Kerb] live camera unavailable, falling back to file capture:', err)
+    cameraOn.value = false
+  }
+}
+
+const stopCamera = () => {
+  stream.value?.getTracks().forEach((t) => t.stop())
+  stream.value = null
+  if (videoEl.value) videoEl.value.srcObject = null
+  cameraOn.value = false
+}
+
+// Grab the current viewfinder frame and read it like any captured photo.
+const capturePhoto = async () => {
+  const v = videoEl.value
+  if (!v || !v.videoWidth) return
+  const canvas = document.createElement('canvas')
+  canvas.width = v.videoWidth
+  canvas.height = v.videoHeight
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+  ctx.drawImage(v, 0, 0, canvas.width, canvas.height)
+  const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, 'image/jpeg', 0.92))
+  if (!blob) return
+  stopCamera()
+  await handleBlob(blob)
+}
+
+const onFile = (e: Event) => {
   const file = (e.target as HTMLInputElement).files?.[0]
-  if (!file) return
+  if (file) handleBlob(file)
+}
+
+const handleBlob = async (file: Blob) => {
   submitError.value = ''
   // Snapshot location at the instant the photo is taken.
   shotCoords.value = props.coords ? { ...props.coords } : null
@@ -315,7 +409,10 @@ const confirm = async () => {
   }
 }
 
-const payNow = () => { if (selectedZone.value) emit('pay', selectedZone.value) }
+const payNow = (zone?: ZoneDef | null) => {
+  const z = zone ?? selectedZone.value
+  if (z) emit('pay', z)
+}
 
 const reset = () => {
   if (photoUrl.value) URL.revokeObjectURL(photoUrl.value)
@@ -326,9 +423,14 @@ const reset = () => {
   submitError.value = ''
   step.value = 'capture'
   if (fileInput.value) fileInput.value.value = ''
+  startCamera() // reopen the viewfinder for the next scan
 }
 
-onUnmounted(() => { if (photoUrl.value) URL.revokeObjectURL(photoUrl.value) })
+onMounted(() => { startCamera() })
+onUnmounted(() => {
+  stopCamera()
+  if (photoUrl.value) URL.revokeObjectURL(photoUrl.value)
+})
 </script>
 
 <style scoped>
@@ -401,6 +503,91 @@ onUnmounted(() => { if (photoUrl.value) URL.revokeObjectURL(photoUrl.value) })
   background: var(--amber-bg, #fffbeb); border: 1px solid var(--amber-border, #fde68a);
   border-radius: var(--r-md); padding: 10px 12px; text-align: center;
 }
+
+/* Live camera capture — full-bleed: 2/3 viewfinder, 1/3 slide-to-pay */
+.scan-body--cam {
+  padding: 0;
+  gap: 0;
+  max-width: none;
+  overflow: hidden;
+}
+.cam {
+  position: relative;
+  flex: 2 1 0;
+  min-height: 0;
+  background: #000;
+  overflow: hidden;
+}
+.cam-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.cam-guide {
+  position: absolute;
+  inset: 10% 8% 22%;
+  border: 2px dashed rgba(255, 255, 255, 0.55);
+  border-radius: var(--r-lg);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  pointer-events: none;
+}
+.cam-guide-hint {
+  margin-top: -30px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 5px 12px;
+  border-radius: 999px;
+}
+.cam-shutter {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 68px;
+  height: 68px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+.cam-shutter-ring {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.15);
+  transition: transform 120ms var(--ease-out);
+}
+.cam-shutter:active .cam-shutter-ring { transform: scale(0.92); }
+.cam-shutter-dot { width: 50px; height: 50px; border-radius: 50%; background: #fff; }
+.cam-pay {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px 20px;
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+  background: var(--bg);
+}
+.cam-pay-zone {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.cam-pay-stripe { width: 5px; height: 20px; border-radius: 999px; flex-shrink: 0; }
+.cam-pay-name { font-size: 15px; font-weight: 700; color: var(--text); }
+.cam-pay-price { margin-left: auto; font-size: 15px; font-weight: 700; font-family: var(--font-mono); }
+.cam-pay-hint { font-size: 12px; color: var(--muted); line-height: 1.5; text-align: center; }
 
 /* Preview + reading */
 .scan-preview-wrap {
