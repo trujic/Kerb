@@ -294,14 +294,45 @@ const setPhoto = (blob: Blob) => {
 // ── Live in-app camera ────────────────────────────────────────────────────────
 // Open the device camera straight into a viewfinder (no OS picker round-trip). If
 // the browser blocks it or has no camera, we fall back to the native file capture.
+//
+// The browser owns the actual permission: on HTTPS, once the user picks "Allow"
+// (not "Allow once") the grant persists for the origin and getUserMedia no longer
+// prompts. We read that saved state via the Permissions API so we can go straight
+// to the camera when it's already granted, and skip getUserMedia entirely when it
+// was blocked — no pointless re-prompt, no fallback flicker. A localStorage hint
+// covers browsers (older Safari) whose Permissions API can't report camera state.
+const CAM_PREF_KEY = 'kerb.camera'
+const camHint = () => (import.meta.client ? localStorage.getItem(CAM_PREF_KEY) : null)
+const setCamHint = (v: 'granted' | 'denied') => { if (import.meta.client) localStorage.setItem(CAM_PREF_KEY, v) }
+
+const cameraBlocked = async (): Promise<boolean> => {
+  try {
+    const status = await (navigator as any).permissions?.query({ name: 'camera' as PermissionName })
+    if (status) {
+      // Re-evaluate the moment the user changes the site's camera permission.
+      status.onchange = () => {
+        setCamHint(status.state === 'denied' ? 'denied' : 'granted')
+        if (status.state === 'granted' && step.value === 'capture' && !cameraOn.value) startCamera()
+        else if (status.state === 'denied') stopCamera()
+      }
+      if (status.state === 'denied') return true
+      if (status.state === 'granted') return false
+    }
+  } catch { /* Permissions API can't report camera (older Safari) — use our hint */ }
+  return camHint() === 'denied'
+}
+
 const startCamera = async () => {
   if (metered.value || cameraOn.value) return
   if (!import.meta.client || !navigator.mediaDevices?.getUserMedia) { cameraOn.value = false; return }
+  // Skip the request when the saved permission says it's blocked.
+  if (await cameraBlocked()) { cameraOn.value = false; return }
   try {
     stream.value = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: { ideal: 'environment' } },
       audio: false,
     })
+    setCamHint('granted')
     cameraOn.value = true
     await nextTick()
     if (videoEl.value) {
@@ -309,6 +340,7 @@ const startCamera = async () => {
       await videoEl.value.play().catch(() => {})
     }
   } catch (err) {
+    if ((err as any)?.name === 'NotAllowedError') setCamHint('denied')
     console.warn('[Kerb] live camera unavailable, falling back to file capture:', err)
     cameraOn.value = false
   }
