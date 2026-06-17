@@ -23,6 +23,7 @@ export interface SignRead {
   color: { zone: ZoneDef | null; confidence: number } | null // dominant-colour match
   // How the colour read lines up with the text read:
   corroboration: 'agree' | 'conflict' | 'color-only' | 'none'
+  notSign: boolean       // the frame carries no parking-tariff content (likely another sign)
 }
 
 // 'read' = trust it · 'low' = show amber, double-check · 'unreadable' = red, can't trust
@@ -103,6 +104,26 @@ const matchZone = (rawText: string, zones: ZoneDef[]): { zone: ZoneDef | null; c
   // 3 = a single decisive signal (shortcode); ≥5 = corroborated. Cap at 1.
   const confidence = Math.min(1, bestScore / 5)
   return { zone: best, confidence }
+}
+
+// Is this actually a parking-tariff sign — not just any sign that happens to share
+// the zone colours (a blue mandatory sign, a red stop sign, a green motorway sign)?
+// Decided by CONTENT, never colour: a parking sign carries a price, an hours range,
+// an SMS pay-number, or parking words. Colour alone can't tell them apart, so we
+// require this textual evidence before we trust a read or pre-fill any payment.
+const PARKING_WORDS = [
+  'parking', 'parkiranje', 'naplata', 'zona', 'zone', 'sms', 'sat', 'cas', 'min',
+  ...Object.values(ZONE_SYNONYMS).flat(), // zone colour words double as evidence
+]
+const looksLikeParkingSign = (rawText: string): boolean => {
+  const text = normalize(rawText)
+  const digits = text.replace(/[^0-9]/g, ' ')
+  if (/\d{2,4}\s*(din|rsd)/.test(text)) return true                              // a price
+  if (/\b[89]\d{3}\b/.test(digits)) return true                                  // an SMS shortcode
+  if (/\b([01]?\d|2[0-4])\s*[-–]\s*([01]?\d|2[0-4])\b/.test(text)) return true    // an hours range
+  let hits = 0
+  for (const w of PARKING_WORDS) if (new RegExp(`\\b${w}`).test(text)) hits++     // ≥2 parking words
+  return hits >= 2
 }
 
 // ── Colour corroboration ──────────────────────────────────────────────────────
@@ -239,10 +260,23 @@ export const useSignScan = (engine: 'ocr' | 'claude' = 'ocr') => {
     const Tesseract = (await import('tesseract.js')).default
     const { data } = await Tesseract.recognize(image, 'eng')
     const rawText = data.text ?? ''
+
+    // Gate on content first: if the frame carries no parking-tariff text, it's some
+    // other sign that merely shares a colour. Refuse to read a zone off colour alone —
+    // that's exactly how a blue road sign would masquerade as the Blue zone.
+    if (!looksLikeParkingSign(rawText)) {
+      const unreadable: SignField = { value: null, state: 'unreadable' }
+      return {
+        rawText, zone: null, confidence: 0, color: null, corroboration: 'none', notSign: true,
+        fields: { zone: { ...unreadable }, price: { ...unreadable }, limit: { ...unreadable }, code: { ...unreadable } },
+      }
+    }
+
     const { zone, confidence } = matchZone(rawText, zones)
     const fields = parseFields(rawText, zone, confidence)
 
-    // Independent colour read, then corroborate it against the text read.
+    // Independent colour read, then corroborate it against the text read. Colour only
+    // ranks WHICH zone now that the text has confirmed this is a parking sign.
     const color = await detectColor(image, zones)
     let corroboration: SignRead['corroboration'] = 'none'
     if (color?.zone && zone) corroboration = color.zone.name === zone.name ? 'agree' : 'conflict'
@@ -256,7 +290,7 @@ export const useSignScan = (engine: 'ocr' | 'claude' = 'ocr') => {
       fields.zone = { value: color!.zone!.name, state: 'low' } // colour-derived, double-check
     }
 
-    return { rawText, zone, confidence, fields, color, corroboration }
+    return { rawText, zone, confidence, fields, color, corroboration, notSign: false }
   }
 
   // Guests get a couple of free scans; beyond that we nudge to an account (Plus =

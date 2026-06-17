@@ -83,7 +83,7 @@ const onFile = async (e: Event) => {
       emit('update:modelValue', res.plate)
       confidence.value = res.confidence
     } else {
-      scanError.value = "Couldn't read a plate — type it in, or try a straighter, closer shot."
+      scanError.value = "Couldn't read a plate. Fill the frame with it, straight on and level, then retake — or just type it in."
     }
   } catch {
     scanError.value = 'Plate read failed. Type it in instead.'

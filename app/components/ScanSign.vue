@@ -118,8 +118,14 @@
             </div>
           </div>
 
+          <!-- Not a parking sign — refuse to guess a zone off colour alone -->
+          <p v-if="read?.notSign" class="scan-unsafe">
+            That doesn't look like a parking sign — we found no price, hours or SMS number on it.
+            Point at the coloured zone sign next to your car (the one with the price and the SMS code) and retake.
+          </p>
+
           <!-- Colour vs text corroboration -->
-          <p v-if="read?.corroboration === 'agree'" class="scan-corr ok">
+          <p v-else-if="read?.corroboration === 'agree'" class="scan-corr ok">
             ✓ Colour and text both read <strong>{{ read.zone?.name }}</strong>.
           </p>
           <p v-else-if="read?.corroboration === 'conflict'" class="scan-corr warn">
@@ -131,10 +137,10 @@
           </p>
 
           <!-- Unsafe read → no pre-fill, the user must pick deliberately -->
-          <p v-if="zoneUnsafe" class="scan-unsafe">
+          <p v-if="zoneUnsafe && !read?.notSign" class="scan-unsafe">
             No pre-fill — the zone read wasn't safe enough to trust with your money. Pick the zone printed on the sign.
           </p>
-          <p v-else class="scan-read-hint scan-read-hint--block">Tap a zone below if that's wrong.</p>
+          <p v-else-if="!zoneUnsafe" class="scan-read-hint scan-read-hint--block">Tap a zone below if that's wrong.</p>
 
           <div class="scan-zones">
             <button
@@ -385,16 +391,16 @@ const handleBlob = async (file: Blob) => {
     const compressed = await compressImage(file)
     setPhoto(compressed)
     read.value = await readSign(compressed, props.zones)
-    // Block pre-fill from an unsafe read: only auto-select when the zone read well.
-    // Colour can stand in for the text when the OCR couldn't.
-    selectedName.value = read.value.fields.zone.state === 'unreadable'
+    // No pre-fill when it isn't a parking sign or the zone read unsafe — only
+    // auto-select when the zone read well (colour can stand in for unclear text).
+    selectedName.value = read.value.notSign || read.value.fields.zone.state === 'unreadable'
       ? null
       : (read.value.zone?.name ?? read.value.color?.zone?.name ?? props.likelyZoneName ?? null)
   } catch (err) {
     console.warn('[Kerb] sign read failed:', err)
     read.value = {
       rawText: '', zone: null, confidence: 0,
-      color: null, corroboration: 'none',
+      color: null, corroboration: 'none', notSign: false,
       fields: {
         zone: { value: null, state: 'unreadable' },
         price: { value: null, state: 'unreadable' },
