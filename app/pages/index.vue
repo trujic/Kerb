@@ -165,21 +165,14 @@
           <!-- ── Honest framing: GPS narrows it down, the sign decides ── -->
           <div class="zone-pick-head">
             <p class="zone-pick-title">
-              <span v-if="freeNow" class="free-badge">FREE NOW</span>
-              <template v-if="freeNow">Parking is free right now</template>
-              <template v-else-if="parkingState === 'on'">You're in a paid parking area</template>
-              <template v-else-if="parkingState === 'near' && nearest">
+              <template v-if="!freeNow && parkingState === 'on'">You're in a paid parking area</template>
+              <template v-else-if="!freeNow && parkingState === 'near' && nearest">
                 Paid parking ~{{ formatDist(nearest.distanceM) }} away
               </template>
               <template v-else>Parking zones in {{ detectedCity!.name }}</template>
             </p>
             <p class="zone-pick-hint">
-              <template v-if="freeNow && nextWindow">
-                🌙 No need to pay until <strong>{{ nextWindow.dayLabel }} {{ nextWindow.start }}</strong>. You can pre-pay the first hour now.
-              </template>
-              <template v-else>
-                🪧 Tap the zone printed on the sign next to your car — that's the one that counts.
-              </template>
+              🪧 Tap the zone printed on the sign next to your car — that's the one that counts.
             </p>
             <p v-if="mapApprox" class="zone-pick-approx">
               ⚠️ {{ detectedCity!.name }}'s zone areas are approximate (no official map) — use this to narrow it down, then trust the sign.
@@ -1919,20 +1912,6 @@ h2 {
 /* Free-now: calm the cards but keep them tappable */
 .zone-pick-list--free { opacity: 0.62; filter: saturate(0.65); transition: opacity 150ms var(--ease-out); }
 .zone-pick-list--free:hover { opacity: 1; filter: none; }
-.free-badge {
-  display: inline-block;
-  margin-right: 8px;
-  font-size: 10px;
-  font-weight: 700;
-  font-family: var(--font-mono);
-  letter-spacing: 0.5px;
-  color: var(--green);
-  background: var(--green-bg);
-  border: 1px solid var(--green-border);
-  padding: 2px 7px;
-  border-radius: 20px;
-  vertical-align: middle;
-}
 
 /* Night pre-pay */
 .prepay-note {
