@@ -186,131 +186,114 @@
             </p>
           </div>
 
-          <!-- Selectable zones — likely one floats up, but it's never auto-committed -->
+          <!-- Selectable zones — likely floats up; the chosen one expands in place to pay -->
           <div class="zone-pick-list" :class="{ 'zone-pick-list--free': freeNow }">
-            <button
+            <div
               v-for="zone in orderedZones"
               :key="zone.id"
-              type="button"
               class="zone-pick"
               :class="{ 'zone-pick--active': zone.name === selectedZoneName }"
-              :style="zone.name === selectedZoneName
-                ? { borderColor: zone.color, background: zone.color + '0d' }
-                : null"
-              @click="selectedZoneName = zone.name"
+              :style="zone.name === selectedZoneName ? { borderColor: zone.color } : null"
             >
-              <span class="zone-pick-stripe" :style="{ background: zone.color }" />
-              <span class="zone-pick-info">
-                <span class="zone-pick-name">{{ zone.name }}</span>
-                <span v-if="zone.name === likelyZoneName" class="zone-pick-tag">📍 likely yours</span>
-                <span v-if="pickLimit(zone.rules)" class="zone-pick-limit">{{ pickLimit(zone.rules) }}</span>
-              </span>
-              <span class="zone-pick-price" :style="{ color: zone.color }">{{ zone.price }}</span>
-              <span class="zone-pick-radio" :class="{ on: zone.name === selectedZoneName }">
-                <span v-if="zone.name === selectedZoneName">✓</span>
-              </span>
-            </button>
-          </div>
-
-          <!-- Selected zone — one card: zone · price · limit · slide-to-pay -->
-          <div
-            v-if="selectedZone"
-            class="zone-act"
-            :style="{ borderColor: selectedZone.color }"
-          >
-            <!-- Pay card header — which zone, what it costs, all in one place -->
-            <div class="zone-act-head">
-              <span class="zone-act-stripe" :style="{ background: selectedZone.color }" />
-              <span class="zone-act-name">{{ selectedZone.name }}</span>
-              <span v-if="selectedZone.name === likelyZoneName" class="zone-act-likely">📍 likely yours</span>
-              <span class="zone-act-price" :style="{ color: selectedZone.color }">{{ selectedZone.price }}</span>
-            </div>
-
-            <!-- The hard limit, made unmissable — it's what gets people fined -->
-            <div
-              v-if="selectedLimit"
-              class="zone-limit"
-              :class="selectedLimit.cap ? 'zone-limit--cap' : 'zone-limit--free'"
-            >
-              <span
-                class="zone-limit-badge"
-                :style="selectedLimit.cap ? { background: selectedZone.color, borderColor: selectedZone.color } : null"
+              <!-- Identity row — zone · likely · limit · price, all on one line -->
+              <button
+                type="button"
+                class="zone-pick-row"
+                :style="zone.name === selectedZoneName ? { background: zone.color + '0d' } : null"
+                @click="selectedZoneName = zone.name"
               >
-                <span class="zone-limit-icon">{{ selectedLimit.cap ? '⏱' : '∞' }}</span>
-                {{ selectedLimit.label }}
-              </span>
-              <span v-if="selectedLimit.note" class="zone-limit-note">{{ selectedLimit.note }}</span>
-            </div>
-            <p v-if="parkingState === 'near'" class="zone-act-caution">
-              ⚠️ GPS puts you near a boundary — only pay this zone if the sign says
-              <strong>{{ selectedZone.name }}</strong>.
-            </p>
-            <div v-if="!user" class="zone-plate">
-              <PlateInput v-model="guestPlate" />
-              <span class="zone-plate-hint">
-                Saved on this device · prefilled into the SMS · 📷 scan it instead of typing.
-                <NuxtLink to="/login">Create an account</NuxtLink> to sync it.
-              </span>
-            </div>
-            <template v-if="selectedZone.sms_shortcode">
-              <!-- ── Night pre-pay: free now, the SMS carries over to the next window ── -->
-              <div v-if="nightPrepay" class="prepay">
-                <p class="prepay-note">
-                  🌙 Free until <strong>{{ nextWindow!.start }}</strong>. Per the official carry-over rule,
-                  an SMS you send now applies to <strong>{{ nextWindow!.dayLabel }} {{ nextWindow!.start }}–{{ nextWindow!.end }}</strong> —
-                  not the moment you send it.
+                <span class="zone-pick-stripe" :style="{ background: zone.color }" />
+                <span class="zone-pick-info">
+                  <span class="zone-pick-name">{{ zone.name }}</span>
+                  <span v-if="zone.name === likelyZoneName" class="zone-pick-tag">📍 likely yours</span>
+                  <span
+                    v-if="zoneLimits[zone.name]"
+                    class="zone-pick-limit"
+                    :class="{ 'zone-pick-limit--cap': zoneLimits[zone.name]!.cap }"
+                    :style="zoneLimits[zone.name]!.cap ? { color: zone.color, borderColor: zone.color } : null"
+                  >{{ zoneLimits[zone.name]!.cap ? zoneLimits[zone.name]!.label : 'No limit' }}</span>
+                </span>
+                <span class="zone-pick-price" :style="{ color: zone.color }">{{ zone.price }}</span>
+                <span class="zone-pick-radio" :class="{ on: zone.name === selectedZoneName }">
+                  <span v-if="zone.name === selectedZoneName">✓</span>
+                </span>
+              </button>
+
+              <!-- Chosen → the same card expands to pay. No second header. -->
+              <div v-if="zone.name === selectedZoneName" class="zone-pay">
+                <p v-if="zoneLimits[zone.name]?.note" class="zone-pay-note">{{ zoneLimits[zone.name]!.note }}</p>
+                <p v-if="parkingState === 'near'" class="zone-act-caution">
+                  ⚠️ GPS puts you near a boundary — only pay this zone if the sign says
+                  <strong>{{ zone.name }}</strong>.
                 </p>
-                <SlideToConfirm
-                  :key="'pp-' + selectedZone.name"
-                  :label="`I checked the sign — slide to pre-pay ${nextWindow!.start}–${nextWindow!.end}`"
-                  done-label="Opening SMS…"
-                  :color="selectedZone.color"
-                  @confirm="pay(selectedZone, { armed: true })"
-                />
+                <div v-if="!user" class="zone-plate">
+                  <PlateInput v-model="guestPlate" />
+                  <span class="zone-plate-hint">
+                    Saved on this device · prefilled into the SMS · 📷 scan it instead of typing.
+                    <NuxtLink to="/login">Create an account</NuxtLink> to sync it.
+                  </span>
+                </div>
+                <template v-if="zone.sms_shortcode">
+                  <!-- ── Night pre-pay: free now, the SMS carries over to the next window ── -->
+                  <div v-if="nightPrepay" class="prepay">
+                    <p class="prepay-note">
+                      🌙 Free until <strong>{{ nextWindow!.start }}</strong>. Per the official carry-over rule,
+                      an SMS you send now applies to <strong>{{ nextWindow!.dayLabel }} {{ nextWindow!.start }}–{{ nextWindow!.end }}</strong> —
+                      not the moment you send it.
+                    </p>
+                    <SlideToConfirm
+                      :key="'pp-' + zone.name"
+                      :label="`I checked the sign — slide to pre-pay ${nextWindow!.start}–${nextWindow!.end}`"
+                      done-label="Opening SMS…"
+                      :color="zone.color"
+                      @confirm="pay(zone, { armed: true })"
+                    />
+                  </div>
+
+                  <!-- ── Paid hours: the slide IS the sign-confirmation ── -->
+                  <template v-else>
+                    <SlideToConfirm
+                      v-if="!skipConfirm"
+                      :key="zone.name"
+                      :label="`I checked the sign — slide to pay ${zone.name}`"
+                      done-label="Opening SMS…"
+                      :color="zone.color"
+                      @confirm="pay(zone)"
+                    />
+                    <!-- Responsibility mode: fast tap, no per-pay confirm -->
+                    <button
+                      v-else
+                      type="button"
+                      class="zone-act-btn"
+                      :style="{ background: zone.color }"
+                      @click="pay(zone)"
+                    >
+                      <span v-if="defaultPlate">Pay {{ zone.name }} · {{ defaultPlate }}</span>
+                      <span v-else>Pay {{ zone.name }}</span>
+                      <span class="zone-act-arrow">→ {{ zone.sms_shortcode }}</span>
+                    </button>
+
+                    <!-- Persisted opt-out: take responsibility, skip the per-pay slide -->
+                    <label class="zone-resp" :class="{ 'zone-resp--on': skipConfirm }">
+                      <input v-model="skipConfirm" type="checkbox" class="zone-resp-box" />
+                      <span v-if="!skipConfirm">Don't ask each time — I'll check the sign myself and take responsibility</span>
+                      <span v-else>Sign-check off — you choose the zone and are responsible. Tap to turn confirmation back on.</span>
+                    </label>
+                  </template>
+                </template>
+
+                <p class="zone-act-foot">
+                  <NuxtLink
+                    v-if="user && zone.sms_shortcode && !defaultPlate"
+                    to="/profile"
+                    class="zone-act-link"
+                  >Add a plate for one-tap SMS</NuxtLink>
+                  <span class="zone-act-src">
+                    Your phone sends the SMS to the parking operator.
+                  </span>
+                </p>
               </div>
-
-              <!-- ── Paid hours: the slide IS the sign-confirmation ── -->
-              <template v-else>
-                <SlideToConfirm
-                  v-if="!skipConfirm"
-                  :key="selectedZone.name"
-                  :label="`I checked the sign — slide to pay ${selectedZone.name}`"
-                  done-label="Opening SMS…"
-                  :color="selectedZone.color"
-                  @confirm="pay(selectedZone)"
-                />
-                <!-- Responsibility mode: fast tap, no per-pay confirm -->
-                <button
-                  v-else
-                  type="button"
-                  class="zone-act-btn"
-                  :style="{ background: selectedZone.color }"
-                  @click="pay(selectedZone)"
-                >
-                  <span v-if="defaultPlate">Pay {{ selectedZone.name }} · {{ defaultPlate }}</span>
-                  <span v-else>Pay {{ selectedZone.name }}</span>
-                  <span class="zone-act-arrow">→ {{ selectedZone.sms_shortcode }}</span>
-                </button>
-
-                <!-- Persisted opt-out: take responsibility, skip the per-pay slide -->
-                <label class="zone-resp" :class="{ 'zone-resp--on': skipConfirm }">
-                  <input v-model="skipConfirm" type="checkbox" class="zone-resp-box" />
-                  <span v-if="!skipConfirm">Don't ask each time — I'll check the sign myself and take responsibility</span>
-                  <span v-else>Sign-check off — you choose the zone and are responsible. Tap to turn confirmation back on.</span>
-                </label>
-              </template>
-            </template>
-
-            <p class="zone-act-foot">
-              <NuxtLink
-                v-if="user && selectedZone.sms_shortcode && !defaultPlate"
-                to="/profile"
-                class="zone-act-link"
-              >Add a plate for one-tap SMS</NuxtLink>
-              <span class="zone-act-src">
-                Your phone sends the SMS to the parking operator.
-              </span>
-            </p>
+            </div>
           </div>
 
           <!-- Escape hatch to the spatial tools when the likely zone isn't enough -->
@@ -845,11 +828,12 @@ const limitOf = (rules?: string | null) => {
   if (free) return { cap: false, label: 'No time limit', note: rules.slice(free[0].length).trim() }
   return { cap: false, label: '', note: rules }
 }
-// Short version for the zone chips while choosing.
-const pickLimit = (rules?: string | null) => {
-  const l = limitOf(rules)
-  return l ? (l.cap ? l.label : 'No limit') : ''
-}
+// Parsed limit per zone, keyed by name — drives the inline chip + the fine print.
+const zoneLimits = computed<Record<string, ReturnType<typeof limitOf>>>(() => {
+  const m: Record<string, ReturnType<typeof limitOf>> = {}
+  for (const z of allZones.value) m[z.name] = limitOf(z.rules)
+  return m
+})
 
 // Likely zone floats to the top; the rest keep their original order.
 const orderedZones = computed(() => {
@@ -865,7 +849,6 @@ const selectedZoneName = ref<string | null>(null)
 const selectedZone = computed(
   () => allZones.value.find((z: any) => z.name === selectedZoneName.value) ?? null,
 )
-const selectedLimit = computed(() => limitOf(selectedZone.value?.rules))
 
 // Seed/repair the selection without ever overriding an explicit, still-valid choice.
 watch([likelyZoneName, allZones], () => {
@@ -2130,22 +2113,30 @@ h2 {
 .sent-yes:active, .sent-no:active { transform: scale(0.98); }
 .zone-pick {
   display: flex;
+  flex-direction: column;
+  width: 100%;
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  transition: border-color 150ms var(--ease-out), box-shadow 150ms var(--ease-out);
+}
+.zone-pick:hover { border-color: var(--border2); }
+.zone-pick--active { box-shadow: var(--shadow-sm); }
+.zone-pick-row {
+  display: flex;
   align-items: center;
   gap: 12px;
   width: 100%;
   text-align: left;
   padding: 0;
-  background: var(--bg);
-  border: 1.5px solid var(--border);
-  border-radius: var(--r-md);
-  overflow: hidden;
+  background: none;
+  border: none;
   cursor: pointer;
   font-family: inherit;
-  transition: border-color 150ms var(--ease-out), background 150ms var(--ease-out);
+  transition: background 150ms var(--ease-out);
 }
-.zone-pick:hover { border-color: var(--border2); }
-.zone-pick--active { box-shadow: var(--shadow-sm); }
-.zone-pick-stripe { width: 5px; align-self: stretch; flex-shrink: 0; }
+.zone-pick-stripe { width: 5px; align-self: stretch; flex-shrink: 0; min-height: 48px; }
 .zone-pick-info {
   flex: 1;
   min-width: 0;
@@ -2168,11 +2159,17 @@ h2 {
   border-radius: 20px;
 }
 .zone-pick-limit {
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   font-family: var(--font-mono);
-  letter-spacing: 0.3px;
-  color: var(--text2);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+}
+.zone-pick-limit--cap {
+  padding: 2px 7px;
+  border: 1px solid;
+  border-radius: 20px;
 }
 .zone-pick-price {
   font-size: 16px;
@@ -2197,87 +2194,22 @@ h2 {
 }
 .zone-pick-radio.on { background: var(--text); border-color: var(--text); color: var(--bg); }
 
-/* Selected zone — rules + honest pay */
-.zone-act {
-  margin-top: 12px;
-  padding: 16px;
-  border: 1.5px solid;
-  border-radius: var(--r-lg);
-  box-shadow: var(--shadow-sm);
+/* Chosen zone expands the same card to pay — no duplicate header */
+.zone-pay {
+  padding: 13px 14px 14px;
+  border-top: 1px solid var(--border);
 }
-/* Pay card header — restates the chosen zone so the card stands on its own */
-.zone-act-head {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  margin-bottom: 12px;
-}
-.zone-act-stripe { width: 5px; height: 20px; border-radius: 3px; flex-shrink: 0; }
-.zone-act-name { font-size: 16px; font-weight: 700; color: var(--text); letter-spacing: -0.2px; }
-.zone-act-likely {
-  font-size: 10px;
-  font-family: var(--font-mono);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+.zone-pay-note {
+  font-size: 12.5px;
   color: var(--text2);
-  background: var(--bg3);
-  border: 1px solid var(--border);
-  padding: 2px 7px;
-  border-radius: 20px;
-}
-.zone-act-price {
-  margin-left: auto;
-  font-size: 16px;
-  font-weight: 700;
-  font-family: var(--font-mono);
-  letter-spacing: -0.5px;
-  flex-shrink: 0;
-}
-
-/* The hard time cap, loud — replaces the buried prose sentence */
-.zone-limit {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  padding: 11px 13px;
-  margin-bottom: 14px;
-  border-radius: var(--r-md);
-  background: var(--bg2);
-  border: 1px solid var(--border);
-}
-.zone-limit-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-  padding: 7px 12px;
-  border-radius: var(--r-md);
-  font-size: 15px;
-  font-weight: 800;
-  letter-spacing: 0.4px;
-  font-family: var(--font-mono);
-  border: 1.5px solid var(--border2);
-  color: #fff;
-}
-.zone-limit-icon { font-size: 13px; }
-.zone-limit--free .zone-limit-badge {
-  color: var(--green);
-  border-color: var(--green-border);
-  background: var(--green-bg);
-}
-.zone-limit-note {
-  flex: 1;
-  min-width: 0;
-  font-size: 12px;
-  color: var(--text2);
-  line-height: 1.45;
+  line-height: 1.5;
+  margin-bottom: 13px;
 }
 .zone-act-caution {
   font-size: 12px;
   color: var(--amber);
   line-height: 1.45;
-  margin: -6px 0 14px;
+  margin: 0 0 13px;
 }
 .zone-act-caution strong { font-weight: 700; }
 .zone-act-btn {
