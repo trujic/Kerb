@@ -3,9 +3,9 @@
     <!-- ── GPS DASHBOARD (logged-in + city detected) ── -->
     <section v-if="gpsMode" class="hero-gps">
       <div class="container">
-        <!-- Map -->
+        <!-- Map — hidden while free: the "no need to pay" answer is the whole screen -->
         <ClientOnly>
-          <div class="gps-map-wrap">
+          <div v-if="!freeSurface" class="gps-map-wrap">
             <LocationMap
               :lat="coords!.lat"
               :lng="coords!.lng"
@@ -143,8 +143,8 @@
 
         <!-- ═══ PAY PANEL — the 10-second job: status → zone → pay ═══ -->
         <div v-show="activeTab === 'pay'" class="gps-panel">
-        <!-- Live free/paid status only — the full weekly schedule lives in Info -->
-        <ParkingHours :city-id="detectedCity!.id" compact status-only class="gps-hours" />
+        <!-- Live paid status — when free, the zone header already says so (no double text) -->
+        <ParkingHours v-if="!freeNow" :city-id="detectedCity!.id" compact status-only class="gps-hours" />
 
         <!-- No paid parking at the user's spot -->
         <div v-if="parkingState === 'none' && nearest" class="gps-noparking">
