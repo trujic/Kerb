@@ -1,111 +1,100 @@
 <template>
   <Teleport to="body">
-    <div class="ai" role="dialog" aria-label="Ask AI for help">
+    <div class="ai" role="dialog" aria-label="How parking works here">
       <div class="ai-bar">
-        <span class="ai-title">🧠 Ask AI — where am I?</span>
+        <span class="ai-title">🧠 Parking in {{ cityName }}, simply</span>
         <button class="ai-close" type="button" aria-label="Close" @click="$emit('close')">✕</button>
       </div>
 
       <div class="ai-body">
-        <div v-if="!verdict || verdict.state === 'none'" class="ai-block">
-          <p class="ai-verdict-label" style="color: var(--green)">LIKELY FREE</p>
-          <h2 class="ai-headline">No paid zone where you're standing.</h2>
-          <p class="ai-sub">
-            Nothing chargeable is within your GPS error circle (±{{ Math.round(verdict?.accuracyM ?? 0) }} m).
-            Parking here is most likely free — but the sign is the final word.
-          </p>
-          <button class="ai-btn-ghost" type="button" @click="$emit('scan')">📸 Scan the sign to be sure</button>
+        <!-- ── THE BASICS · plain enough for anyone ───────────────────────── -->
+
+        <!-- 1. Do I pay right now? -->
+        <div class="g-now" :class="status?.paid ? 'is-paid' : 'is-free'">
+          <span class="g-now-dot" />
+          <div class="g-now-text">
+            <p class="g-now-label">{{ status?.paid ? 'You pay right now' : 'It’s free right now 🎉' }}</p>
+            <p class="g-now-detail">{{ nowDetail }}</p>
+          </div>
         </div>
 
-        <!-- ASSERT / TRIANGULATED -->
-        <div v-else-if="verdict.state === 'assert' || verdict.state === 'triangulated'" class="ai-block">
-          <p class="ai-verdict-label" :class="verdict.state === 'triangulated' ? 'is-tri' : 'is-high'">
-            {{ verdict.state === 'triangulated' ? 'TRIANGULATED ✓' : 'HIGH CONFIDENCE' }}
-          </p>
-          <h2 class="ai-headline">
-            You're in
-            <span :style="{ color: verdict.zone!.color }">{{ verdict.zone!.name }}</span>.
-          </h2>
-
-          <p v-if="verdict.override" class="ai-override">
-            ⚠ Our map shows <strong>{{ verdict.override.mapZone }}</strong> here, but
-            {{ verdict.signCount }} confirmed scan{{ verdict.signCount! > 1 ? 's' : '' }} of the sign
-            say <strong>{{ verdict.zone!.name }}</strong> — trusting the sign, and updating the map.
-          </p>
-
-          <ul class="ai-evidence">
-            <li v-for="(e, i) in evidence" :key="i"><span class="ai-ev-dot" />{{ e }}</li>
-          </ul>
-
-          <p class="ai-price-caveat">
-            Zone comes from the official registry. Prices change faster than zones — confirm the rate on the sign or app.
-          </p>
-
-          <button
-            class="ai-btn"
-            type="button"
-            :style="{ background: verdict.zone!.color }"
-            @click="$emit('pick', verdict.zone!.name)"
-          >
-            Use {{ verdict.zone!.name }} — I'll confirm the sign
-          </button>
-          <button class="ai-btn-ghost" type="button" @click="$emit('scan')">Scan the sign instead</button>
-        </div>
-
-        <!-- DISAMBIGUATE -->
-        <div v-else-if="verdict.state === 'disambiguate'" class="ai-block">
-          <p class="ai-verdict-label is-amber">WHICH STREET?</p>
-          <h2 class="ai-headline">GPS can't split these — which street is your car on?</h2>
-          <p class="ai-sub">±{{ Math.round(verdict.accuracyM) }} m puts you between more than one zone.</p>
-
-          <div class="ai-options">
+        <!-- 2. How to pay — three tiny steps + the numbers -->
+        <section v-if="status?.paid && payableZones.length" class="g-sec">
+          <p class="g-sec-title">Pay in 3 steps</p>
+          <ol class="g-steps">
+            <li>Look at the coloured sign next to your car.</li>
+            <li>Send your plate in a text to that colour’s number.</li>
+            <li>Done. Keep the text — that’s your ticket.</li>
+          </ol>
+          <div class="g-codes">
             <button
-              v-for="(o, i) in verdict.candidates"
-              :key="i"
-              class="ai-option"
+              v-for="z in payableZones"
+              :key="z.name"
               type="button"
-              :style="{ borderColor: o.color }"
-              @click="$emit('pick', o.zone)"
+              class="g-code"
+              :style="{ borderColor: (z.color || 'var(--border2)') }"
+              @click="$emit('pick', z.name)"
             >
-              <span class="ai-opt-stripe" :style="{ background: o.color }" />
-              <span class="ai-opt-text">
-                <span class="ai-opt-street">{{ o.street || 'This street' }}</span>
-                <span class="ai-opt-zone" :style="{ color: o.color }">{{ o.zone }}</span>
-                <span v-if="o.segmented" class="ai-opt-seg">⚠ this street changes zone near here — match the sign</span>
-              </span>
-              <span class="ai-opt-go">→</span>
+              <span class="g-code-chip" :style="{ background: z.color || 'var(--muted2)' }" />
+              <span class="g-code-zone">{{ shortZone(z.name) }}</span>
+              <span class="g-code-num">{{ z.sms_shortcode }}</span>
             </button>
           </div>
-          <button class="ai-btn-ghost" type="button" @click="$emit('scan')">Not sure? Scan the sign</button>
-        </div>
+          <p class="g-note">Tap your colour and we’ll fill in your plate for you.</p>
+        </section>
 
-        <!-- ROUTE TO SIGN -->
-        <div v-else class="ai-block">
-          <p class="ai-verdict-label is-amber">TOO CLOSE TO CALL</p>
-          <h2 class="ai-headline">A zone boundary runs right through here.</h2>
-          <p class="ai-sub">
-            GPS (±{{ Math.round(verdict.accuracyM) }} m) can't safely pick a side. Don't trust a guess with your money — read the sign.
-          </p>
+        <!-- When it's free, the basics are: you don't need to do anything -->
+        <section v-else class="g-sec">
+          <p class="g-free-line">Nothing to do — just park. 🚗</p>
+          <p class="g-note">When paying starts again, come back here and we’ll show you how.</p>
+        </section>
 
-          <div v-if="verdict.sign" class="ai-signhint">
-            <span class="ai-sign-arrow">📍</span>
-            <span>
-              Nearest verified sign <strong>{{ fmtDist(verdict.sign.distM) }} {{ compass(verdict.sign.bearing) }}</strong>
-              — <span :style="{ color: verdict.sign.color || 'var(--text2)' }">{{ verdict.sign.zoneName }}</span>,
-              confirmed {{ age(verdict.sign.createdAt) }}.
-            </span>
+        <!-- The single sure thing -->
+        <button class="ai-btn" type="button" @click="$emit('scan')">📸 Scan the sign by your car</button>
+
+        <!-- ── MORE, IF YOU WANT IT · tucked away ─────────────────────────── -->
+
+        <details class="g-more">
+          <summary>🗓️ When do you have to pay?</summary>
+          <div class="g-more-body">
+            <dl class="g-days">
+              <div v-for="r in dayRows" :key="r.label" class="g-day" :class="{ 'is-free': r.free }">
+                <dt>{{ r.label }}</dt>
+                <dd>{{ r.value }}</dd>
+              </div>
+            </dl>
+            <p class="g-note">Any other time, parking is free — no ticket needed.</p>
           </div>
+        </details>
 
-          <button class="ai-btn" type="button" @click="$emit('scan')">📸 Scan the sign next to your car</button>
-          <button
-            v-if="verdict.zone"
-            class="ai-btn-ghost"
-            type="button"
-            @click="$emit('pick', verdict.zone.name)"
-          >
-            Sign says {{ verdict.zone.name }}? Use it (you confirm)
-          </button>
-        </div>
+        <details class="g-more">
+          <summary>🎨 What are the colours?</summary>
+          <div class="g-more-body">
+            <div class="g-zones">
+              <span
+                v-for="z in zones"
+                :key="z.name"
+                class="g-zone"
+                :style="{ borderColor: (z.color || 'var(--border2)') }"
+              >
+                <span class="g-zone-chip" :style="{ background: z.color || 'var(--muted2)' }" />
+                <span class="g-zone-name">{{ shortZone(z.name) }}</span>
+                <span v-if="z.price" class="g-zone-price">{{ z.price }}</span>
+              </span>
+            </div>
+            <p class="g-note">Each colour is a zone. Nearer the centre usually costs more. The sign by your car shows your colour.</p>
+          </div>
+        </details>
+
+        <details v-if="whereLine" class="g-more">
+          <summary>📍 Where am I standing?</summary>
+          <div class="g-more-body">
+            <p class="g-where-text">{{ whereLine }}</p>
+            <p class="g-note">Not sure? The sign next to your car is always right.</p>
+          </div>
+        </details>
+
+        <p v-if="sourceName" class="g-source">Straight from {{ sourceName }}{{ confirmedAt ? ` · checked ${confirmedAt}` : '' }}.</p>
       </div>
     </div>
   </Teleport>
@@ -114,42 +103,61 @@
 <script setup lang="ts">
 import type { ZoneVerdict } from '~/composables/useZoneResolver'
 
+interface ZoneLite { name: string; color?: string; price?: string; sms_shortcode?: string }
+
 const props = defineProps<{
-  verdict: ZoneVerdict | null
+  cityId: string
   cityName: string
+  zones: ZoneLite[]
+  verdict?: ZoneVerdict | null
   sourceName?: string | null
   confirmedAt?: string | null
 }>()
 
 defineEmits<{ pick: [zone: string]; scan: []; close: [] }>()
 
-const fmtDist = (m: number) => (m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${Math.max(5, Math.round(m / 5) * 5)} m`)
+// Hours + live status come straight from our registry — no model, no guessing.
+const { summary, status } = useParkingHours(() => props.cityId)
 
-const compass = (deg: number) => {
-  const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']
-  return dirs[Math.round(deg / 45) % 8]
-}
+// "Blue Zone" → "Blue", "Extra Zone" → "Extra"; leave anything else intact.
+const shortZone = (name: string) => name.replace(/\s*zone\s*/i, ' ').trim() || name
 
-const age = (iso: string) => {
-  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000)
-  if (days <= 0) return 'today'
-  if (days === 1) return 'yesterday'
-  if (days < 30) return `${days} days ago`
-  return `${Math.floor(days / 30)} mo ago`
-}
+// Friendly weekly rows: "Mon–Fri · 07–21", "Sat · 07–14", "Sun · Free".
+const dayRows = computed(() =>
+  summary.value.map((r) => ({
+    label: r.label,
+    free: r.value === 'Free',
+    value: r.value === 'Free' ? 'Free' : r.value.replace(/:00/g, ''),
+  })),
+)
 
-// Cited evidence for the assert/triangulated verdict — every claim shows its source.
-const evidence = computed<string[]>(() => {
+// Only zones you can actually pay by SMS get a number chip.
+const payableZones = computed(() => props.zones.filter((z) => z.sms_shortcode))
+
+// One plain line under the headline — friendlier than the raw schedule wording.
+const nowDetail = computed(() =>
+  status.value?.paid
+    ? (status.value.detail ? `Free again at ${status.value.detail.replace(/^Free at\s*/i, '')}.` : 'You need a ticket right now.')
+    : 'No ticket needed. Just park.',
+)
+
+// One plain line from the GPS verdict — context, never the whole story.
+const whereLine = computed<string | null>(() => {
   const v = props.verdict
-  if (!v) return []
-  const lines: string[] = []
-  if (v.signCount) lines.push(`Confirmed sign · ${v.signCount} scan${v.signCount > 1 ? 's' : ''} within ~35 m`)
-  lines.push(`GPS fix · ±${Math.round(v.accuracyM)} m in ${props.cityName}`)
-  if (props.sourceName) lines.push(`Registry · ${props.sourceName}${props.confirmedAt ? ` · confirmed ${props.confirmedAt}` : ''}`)
-  if (v.boundaryDistM != null) lines.push(`Nearest different zone · ${fmtDist(v.boundaryDistM)} away`)
-  else if (!v.signCount) lines.push('No other zone within range')
-  if (v.sign?.agrees && !v.signCount) lines.push(`Verified sign · ${fmtDist(v.sign.distM)} away, confirmed ${age(v.sign.createdAt)}`)
-  return lines
+  if (!v) return null
+  switch (v.state) {
+    case 'assert':
+    case 'triangulated':
+      return v.zone ? `You’re most likely in the ${shortZone(v.zone.name)} zone.` : null
+    case 'disambiguate':
+      return 'You’re between two zones — let the sign decide.'
+    case 'route_to_sign':
+      return 'A zone border runs through here — read the sign by your car.'
+    case 'none':
+      return 'No paid zone right where you’re standing.'
+    default:
+      return null
+  }
 })
 </script>
 
@@ -169,73 +177,114 @@ const evidence = computed<string[]>(() => {
 .ai-close {
   width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
   font-size: 16px; color: var(--text2); background: var(--bg2); border: 1px solid var(--border);
-  border-radius: 50%; cursor: pointer;
+  border-radius: 50%; cursor: pointer; flex-shrink: 0;
 }
-.ai-body { flex: 1 1 auto; overflow-y: auto; padding: 24px 20px 40px; max-width: 560px; width: 100%; margin: 0 auto; }
-.ai-block { display: flex; flex-direction: column; }
+.ai-body {
+  flex: 1 1 auto; overflow-y: auto;
+  padding: 20px 20px 40px; padding-bottom: max(40px, env(safe-area-inset-bottom));
+  max-width: 560px; width: 100%; margin: 0 auto;
+  display: flex; flex-direction: column; gap: 18px;
+}
 
-.ai-verdict-label {
-  font-family: var(--font-mono); font-size: 12px; font-weight: 700;
-  letter-spacing: 1.5px; margin-bottom: 10px;
+/* Right-now status — the headline answer */
+.g-now {
+  display: flex; align-items: center; gap: 12px;
+  padding: 16px; border-radius: var(--r-lg); border: 1px solid;
 }
-.ai-verdict-label.is-high { color: var(--green); }
-.ai-verdict-label.is-tri { color: var(--green); }
-.ai-verdict-label.is-amber { color: var(--amber); }
-.ai-headline {
-  font-family: var(--font-display); font-weight: 400;
-  font-size: 26px; line-height: 1.15; color: var(--text); margin-bottom: 14px;
+.g-now.is-free { background: var(--green-bg); border-color: var(--green-border); }
+.g-now.is-paid { background: var(--amber-bg); border-color: var(--amber-border); }
+.g-now-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+.g-now.is-free .g-now-dot { background: var(--green); animation: g-pulse 2s ease-out infinite; }
+.g-now.is-paid .g-now-dot { background: var(--amber); }
+@keyframes g-pulse {
+  0% { box-shadow: 0 0 0 0 var(--green); }
+  70% { box-shadow: 0 0 0 6px transparent; }
+  100% { box-shadow: 0 0 0 0 transparent; }
 }
-.ai-sub { font-size: 14px; color: var(--muted); line-height: 1.6; margin-bottom: 18px; }
+.g-now-text { min-width: 0; }
+.g-now-label { font-size: 17px; font-weight: 700; letter-spacing: -0.2px; }
+.g-now.is-free .g-now-label { color: var(--green); }
+.g-now.is-paid .g-now-label { color: var(--amber); }
+.g-now-detail { font-size: 13px; color: var(--text2); margin-top: 2px; }
 
-.ai-evidence { list-style: none; display: flex; flex-direction: column; gap: 9px; margin-bottom: 16px; }
-.ai-evidence li { display: flex; align-items: flex-start; gap: 9px; font-size: 13px; color: var(--text2); line-height: 1.5; }
-.ai-ev-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); margin-top: 7px; flex-shrink: 0; }
-.ai-override {
-  font-size: 13px; line-height: 1.55; color: var(--amber);
-  padding: 11px 13px; margin-bottom: 16px;
-  background: var(--amber-bg); border: 1px solid var(--amber-border);
-  border-radius: var(--r-md);
+/* Free state — nothing to do */
+.g-free-line { font-size: 18px; font-weight: 700; color: var(--text); letter-spacing: -0.2px; }
+.g-where-text { font-size: 14px; color: var(--text); line-height: 1.5; }
+
+/* Collapsible "more, if you want it" */
+.g-more {
+  border: 1px solid var(--border); border-radius: var(--r-md);
+  background: var(--bg); overflow: hidden;
 }
-.ai-override strong { font-weight: 700; }
-.ai-price-caveat {
-  font-size: 12px; color: var(--muted); line-height: 1.5;
-  padding: 10px 12px; background: var(--bg2); border: 1px solid var(--border);
-  border-left: 3px solid var(--amber); border-radius: var(--r-md); margin-bottom: 18px;
+.g-more > summary {
+  list-style: none; cursor: pointer; user-select: none;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px; font-size: 14px; font-weight: 600; color: var(--text);
 }
+.g-more > summary::-webkit-details-marker { display: none; }
+.g-more > summary::after {
+  content: '⌄'; font-size: 16px; color: var(--muted2);
+  transition: transform 180ms var(--ease-out);
+}
+.g-more[open] > summary::after { transform: rotate(180deg); }
+.g-more[open] > summary { border-bottom: 1px solid var(--border); }
+.g-more-body { padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+
+/* Sections */
+.g-sec { display: flex; flex-direction: column; gap: 10px; }
+.g-sec-title {
+  font-size: 11px; font-family: var(--font-mono); text-transform: uppercase;
+  letter-spacing: 1.2px; color: var(--muted2);
+}
+.g-note { font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+
+/* When you pay */
+.g-days { display: flex; flex-direction: column; }
+.g-day {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 16px;
+  padding: 9px 0; border-bottom: 1px solid var(--border);
+}
+.g-day:last-child { border-bottom: none; }
+.g-day dt { font-size: 14px; font-weight: 600; color: var(--text); }
+.g-day dd { font-size: 15px; font-family: var(--font-mono); color: var(--text2); }
+.g-day.is-free dd { color: var(--green); font-weight: 700; }
+
+/* Zones */
+.g-zones { display: flex; flex-wrap: wrap; gap: 8px; }
+.g-zone {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 12px; border: 1.5px solid; border-radius: 999px; background: var(--bg);
+}
+.g-zone-chip { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+.g-zone-name { font-size: 14px; font-weight: 700; color: var(--text); }
+.g-zone-price { font-size: 13px; font-family: var(--font-mono); color: var(--muted); }
+
+/* How to pay */
+.g-steps {
+  margin: 0; padding-left: 20px;
+  display: flex; flex-direction: column; gap: 6px;
+  font-size: 14px; color: var(--text2); line-height: 1.5;
+}
+.g-steps li { padding-left: 4px; }
+.g-codes { display: flex; flex-wrap: wrap; gap: 8px; }
+.g-code {
+  display: inline-flex; align-items: center; gap: 10px;
+  padding: 10px 14px; border: 1.5px solid; border-radius: var(--r-md);
+  background: var(--bg); cursor: pointer; font-family: inherit;
+  transition: filter 150ms var(--ease-out);
+}
+.g-code:hover { filter: brightness(0.97); }
+.g-code-chip { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+.g-code-zone { font-size: 13px; font-weight: 700; color: var(--text); }
+.g-code-num { font-size: 16px; font-weight: 700; font-family: var(--font-mono); color: var(--text); }
 
 .ai-btn {
   display: flex; align-items: center; justify-content: center; gap: 8px;
   padding: 15px; border: none; border-radius: var(--r-md);
   font-size: 15px; font-weight: 700; color: #fff; font-family: inherit;
-  cursor: pointer; margin-bottom: 10px; transition: filter 150ms var(--ease-out);
+  background: var(--text); cursor: pointer; transition: filter 150ms var(--ease-out);
+  margin-top: 4px;
 }
-.ai-btn:hover { filter: brightness(0.93); }
-.ai-btn-ghost {
-  padding: 14px; border-radius: var(--r-md);
-  font-size: 14px; font-weight: 600; color: var(--text2);
-  background: var(--bg2); border: 1px solid var(--border); cursor: pointer; font-family: inherit;
-}
-.ai-btn-ghost:hover { color: var(--text); }
-
-.ai-options { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
-.ai-option {
-  display: flex; align-items: center; gap: 12px; width: 100%; padding: 0; overflow: hidden;
-  background: var(--bg2); border: 1.5px solid; border-radius: var(--r-md);
-  cursor: pointer; font-family: inherit; text-align: left;
-}
-.ai-opt-stripe { width: 6px; align-self: stretch; flex-shrink: 0; }
-.ai-opt-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; padding: 14px 0; }
-.ai-opt-street { font-size: 15px; font-weight: 700; color: var(--text); }
-.ai-opt-zone { font-size: 13px; font-weight: 600; }
-.ai-opt-seg { font-size: 11px; color: var(--amber); line-height: 1.4; margin-top: 2px; }
-.ai-opt-go { font-size: 18px; color: var(--muted2); margin-right: 14px; flex-shrink: 0; }
-
-.ai-signhint {
-  display: flex; gap: 10px; align-items: flex-start;
-  font-size: 13px; color: var(--text2); line-height: 1.5;
-  padding: 12px 14px; background: var(--bg2); border: 1px solid var(--border);
-  border-radius: var(--r-md); margin-bottom: 18px;
-}
-.ai-sign-arrow { flex-shrink: 0; }
-.ai-signhint strong { color: var(--text); }
+.ai-btn:hover { filter: brightness(1.15); }
+.g-source { font-size: 11.5px; color: var(--muted2); text-align: center; line-height: 1.5; }
 </style>

@@ -203,6 +203,7 @@
               <span class="zone-pick-info">
                 <span class="zone-pick-name">{{ zone.name }}</span>
                 <span v-if="zone.name === likelyZoneName" class="zone-pick-tag">📍 likely yours</span>
+                <span v-if="pickLimit(zone.rules)" class="zone-pick-limit">{{ pickLimit(zone.rules) }}</span>
               </span>
               <span class="zone-pick-price" :style="{ color: zone.color }">{{ zone.price }}</span>
               <span class="zone-pick-radio" :class="{ on: zone.name === selectedZoneName }">
@@ -211,13 +212,35 @@
             </button>
           </div>
 
-          <!-- Selected zone — rules + honest pay action -->
+          <!-- Selected zone — one card: zone · price · limit · slide-to-pay -->
           <div
             v-if="selectedZone"
             class="zone-act"
             :style="{ borderColor: selectedZone.color }"
           >
-            <p class="zone-act-rules">{{ selectedZone.rules }}</p>
+            <!-- Pay card header — which zone, what it costs, all in one place -->
+            <div class="zone-act-head">
+              <span class="zone-act-stripe" :style="{ background: selectedZone.color }" />
+              <span class="zone-act-name">{{ selectedZone.name }}</span>
+              <span v-if="selectedZone.name === likelyZoneName" class="zone-act-likely">📍 likely yours</span>
+              <span class="zone-act-price" :style="{ color: selectedZone.color }">{{ selectedZone.price }}</span>
+            </div>
+
+            <!-- The hard limit, made unmissable — it's what gets people fined -->
+            <div
+              v-if="selectedLimit"
+              class="zone-limit"
+              :class="selectedLimit.cap ? 'zone-limit--cap' : 'zone-limit--free'"
+            >
+              <span
+                class="zone-limit-badge"
+                :style="selectedLimit.cap ? { background: selectedZone.color, borderColor: selectedZone.color } : null"
+              >
+                <span class="zone-limit-icon">{{ selectedLimit.cap ? '⏱' : '∞' }}</span>
+                {{ selectedLimit.label }}
+              </span>
+              <span v-if="selectedLimit.note" class="zone-limit-note">{{ selectedLimit.note }}</span>
+            </div>
             <p v-if="parkingState === 'near'" class="zone-act-caution">
               ⚠️ GPS puts you near a boundary — only pay this zone if the sign says
               <strong>{{ selectedZone.name }}</strong>.
@@ -315,8 +338,8 @@
           <button type="button" class="ai-cta" @click="showAi = true">
             <span class="ai-cta-icon">🧠</span>
             <span class="ai-cta-text">
-              <span class="ai-cta-title">Ask AI — where am I?</span>
-              <span class="ai-cta-sub">Not sure which zone? Get a verdict with its evidence</span>
+              <span class="ai-cta-title">New here? How parking works</span>
+              <span class="ai-cta-sub">When you pay, the zones, and how — in plain language</span>
             </span>
             <span class="ai-cta-arrow">→</span>
           </button>
@@ -409,8 +432,10 @@
       <ClientOnly>
         <AskAi
           v-if="showAi"
-          :verdict="aiVerdict"
+          :city-id="detectedCity!.id"
           :city-name="detectedCity!.name"
+          :zones="allZones"
+          :verdict="aiVerdict"
           :source-name="aiSourceName"
           :confirmed-at="cityDetail?.last_updated"
           @pick="onAiPick"
@@ -809,6 +834,23 @@ const activeSuggestedName = computed<string | null>(() => {
 const likelyZoneName = computed(() => activeSuggestedName.value)
 const allZones = computed<any[]>(() => cityDetail.value?.zones ?? [])
 
+// The one rule that actually gets people fined: the hard time cap. Pull it out of
+// the prose so we can show "MAX 60 MIN" loud, and keep the fine print as a quiet
+// second line instead of a wall of sentence.
+const limitOf = (rules?: string | null) => {
+  if (!rules) return null
+  const cap = /^\s*max\s*(\d+)\s*min\.?\s*/i.exec(rules)
+  if (cap) return { cap: true, label: `MAX ${cap[1]} MIN`, note: rules.slice(cap[0].length).trim() }
+  const free = /^\s*no time limit\.?\s*/i.exec(rules)
+  if (free) return { cap: false, label: 'No time limit', note: rules.slice(free[0].length).trim() }
+  return { cap: false, label: '', note: rules }
+}
+// Short version for the zone chips while choosing.
+const pickLimit = (rules?: string | null) => {
+  const l = limitOf(rules)
+  return l ? (l.cap ? l.label : 'No limit') : ''
+}
+
 // Likely zone floats to the top; the rest keep their original order.
 const orderedZones = computed(() => {
   const likely = likelyZoneName.value
@@ -823,6 +865,7 @@ const selectedZoneName = ref<string | null>(null)
 const selectedZone = computed(
   () => allZones.value.find((z: any) => z.name === selectedZoneName.value) ?? null,
 )
+const selectedLimit = computed(() => limitOf(selectedZone.value?.rules))
 
 // Seed/repair the selection without ever overriding an explicit, still-valid choice.
 watch([likelyZoneName, allZones], () => {
@@ -991,6 +1034,8 @@ const aiSourceName = computed(() => {
 const onAiPick = (zoneName: string) => {
   if (allZones.value.some((z: any) => z.name === zoneName)) selectedZoneName.value = zoneName
   showAi.value = false
+  forceBrowse.value = true   // reveal the tabs…
+  activeTab.value = 'pay'     // …and land on the zone, ready to pay
 }
 const onAiScan = () => { showAi.value = false; showScan.value = true }
 
@@ -2122,6 +2167,13 @@ h2 {
   padding: 2px 7px;
   border-radius: 20px;
 }
+.zone-pick-limit {
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  letter-spacing: 0.3px;
+  color: var(--text2);
+}
 .zone-pick-price {
   font-size: 16px;
   font-weight: 700;
@@ -2153,11 +2205,73 @@ h2 {
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-sm);
 }
-.zone-act-rules {
-  font-size: 13px;
+/* Pay card header — restates the chosen zone so the card stands on its own */
+.zone-act-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 12px;
+}
+.zone-act-stripe { width: 5px; height: 20px; border-radius: 3px; flex-shrink: 0; }
+.zone-act-name { font-size: 16px; font-weight: 700; color: var(--text); letter-spacing: -0.2px; }
+.zone-act-likely {
+  font-size: 10px;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
   color: var(--text2);
-  line-height: 1.55;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  padding: 2px 7px;
+  border-radius: 20px;
+}
+.zone-act-price {
+  margin-left: auto;
+  font-size: 16px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  letter-spacing: -0.5px;
+  flex-shrink: 0;
+}
+
+/* The hard time cap, loud — replaces the buried prose sentence */
+.zone-limit {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 11px 13px;
   margin-bottom: 14px;
+  border-radius: var(--r-md);
+  background: var(--bg2);
+  border: 1px solid var(--border);
+}
+.zone-limit-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: 7px 12px;
+  border-radius: var(--r-md);
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  font-family: var(--font-mono);
+  border: 1.5px solid var(--border2);
+  color: #fff;
+}
+.zone-limit-icon { font-size: 13px; }
+.zone-limit--free .zone-limit-badge {
+  color: var(--green);
+  border-color: var(--green-border);
+  background: var(--green-bg);
+}
+.zone-limit-note {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--text2);
+  line-height: 1.45;
 }
 .zone-act-caution {
   font-size: 12px;
