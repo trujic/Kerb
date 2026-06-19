@@ -1,7 +1,7 @@
 <template>
   <div class="err">
     <div class="err-card">
-      <NuxtLink to="/" class="err-logo" @click="reset">Kerbo</NuxtLink>
+      <NuxtLink to="/" class="err-logo" @click="reset">Kerb</NuxtLink>
 
       <p class="err-code">{{ is404 ? '404' : (error?.statusCode || 'Error') }}</p>
       <h1 class="err-title">
@@ -67,7 +67,7 @@ const reset = () => clearError()
 const go = (id: string) => clearError({ redirect: `/${id}` })
 const goFirst = () => { if (results.value.length) go(results.value[0].id) }
 
-useSeoMeta({ title: 'Not found — Kerbo' })
+useSeoMeta({ title: 'Not found — Kerb' })
 </script>
 
 <style scoped>

@@ -1,7 +1,7 @@
 <template>
   <nav class="nav">
     <div class="nav-inner container-wide">
-      <NuxtLink to="/" class="nav-logo">Kerbo</NuxtLink>
+      <NuxtLink to="/" class="nav-logo">Kerb</NuxtLink>
       <ul class="nav-links">
         <li><NuxtLink to="/cities">Cities</NuxtLink></li>
         <li v-if="user"><NuxtLink to="/sessions">Sessions</NuxtLink></li>

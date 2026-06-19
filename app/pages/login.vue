@@ -1,7 +1,7 @@
 <template>
   <div class="auth-page">
     <div class="auth-card">
-      <NuxtLink to="/" class="auth-logo">Kerbo</NuxtLink>
+      <NuxtLink to="/" class="auth-logo">Kerb</NuxtLink>
       <p class="auth-sub">{{ isRegister ? 'Create your account' : 'Sign in to your account' }}</p>
       <p class="auth-value">
         Save your plate, keep your session history, and get a heads-up before parking
@@ -98,7 +98,7 @@ const handleSubmit = async () => {
   }
 }
 
-useSeoMeta({ title: 'Sign in — Kerbo' })
+useSeoMeta({ title: 'Sign in — Kerb' })
 </script>
 
 <style scoped>

@@ -11,11 +11,12 @@
               :lng="coords!.lng"
               :accuracy="coords!.accuracy"
               :heading="heading"
-              :height="190"
+              :height="152"
               :zones="displayZones"
               :highlight="highlightPoint"
               :signs="signReports"
               :compass-prompt="compassPrompt"
+              labels
               @compass-tap="onMapTap"
               @enable-compass="onMapTap"
             />
@@ -1179,9 +1180,9 @@ onMounted(() => {
 })
 
 useSeoMeta({
-  title: 'Kerbo — park · pay · zero fines',
+  title: 'Kerb — park · pay · zero fines',
   description: 'AI-assisted street parking for Serbia. Find your zone, pay by SMS, never learn what a zone is.',
-  ogTitle: 'Kerbo — park · pay · zero fines',
+  ogTitle: 'Kerb — park · pay · zero fines',
   ogDescription: 'AI-assisted street parking for Serbia. Find your zone, pay by SMS, never learn what a zone is.',
   ogUrl: 'https://kerbo.netlify.app/',
   ogImage: 'https://kerbo.netlify.app/icon-512.png',
@@ -1573,7 +1574,7 @@ h2 {
 .compass-btn:hover { background: #fff; }
 
 .hero-gps {
-  padding: 62px 0 40px;
+  padding: 44px 0 40px;
   border-bottom: 1px solid var(--border);
 }
 .gps-hero-map {
@@ -1589,9 +1590,9 @@ h2 {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 10px 0 14px;
+  padding: 7px 0 10px;
   border-bottom: 1px solid var(--border);
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 .gps-detected-where {
   min-width: 0;

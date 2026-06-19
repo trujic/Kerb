@@ -16,7 +16,7 @@
             <p class="scan-hero-title">That's your {{ FREE_SCANS }} free scans</p>
             <p class="scan-hero-sub">
               Every scan you add improves the shared sign map — thank you. Create a free
-              account to keep scanning. (Kerbo+ will be unlimited.)
+              account to keep scanning. (Kerb+ will be unlimited.)
             </p>
             <NuxtLink to="/login" class="scan-btn scan-meter-cta">Create a free account →</NuxtLink>
             <button class="scan-btn-ghost wide" type="button" @click="$emit('close')">Maybe later</button>

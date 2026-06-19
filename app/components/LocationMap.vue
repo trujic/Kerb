@@ -35,6 +35,7 @@ const props = defineProps<{
   }[] // confirmed sign scans
   compassPrompt?: boolean // show a one-tap "Enable compass" chip (iOS first-time)
   hideUser?: boolean      // static city-overview map: no user marker, fit to zones
+  labels?: boolean        // show permanent street/zone labels (e.g. on the locked preview)
 }>()
 
 const emit = defineEmits<{ compassTap: []; enableCompass: [] }>()
@@ -155,9 +156,9 @@ watchEffect((onCleanup) => {
 
     layer.addTo(map)
     if (name) {
-      // Interactive (explore) maps get a permanent street/zone label, revealed only
-      // when zoomed in (see lm-labels). The small preview keeps the hover tooltip.
-      layer.bindTooltip(name, props.interactive
+      // Permanent street/zone labels on explore maps (revealed when zoomed in, see
+      // lm-labels) and on the labelled preview. Plain previews keep the hover tooltip.
+      layer.bindTooltip(name, (props.interactive || props.labels)
         ? { permanent: true, direction: 'center', className: 'zone-label' }
         : { sticky: true, className: 'zone-tooltip' })
     }
@@ -277,6 +278,9 @@ onMounted(async () => {
     const updateLabels = () => mapEl.value?.classList.toggle('lm-labels', map.getZoom() >= 17)
     map.on('zoomend', updateLabels)
     updateLabels()
+  } else if (props.labels) {
+    // Locked preview: it opens at street zoom, so show the labels right away.
+    mapEl.value?.classList.add('lm-labels')
   }
 
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {

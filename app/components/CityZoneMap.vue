@@ -82,7 +82,7 @@
       <div class="czm-none">
         <p class="czm-none-title">No map we can stand behind — yet.</p>
         <p class="czm-none-sub">
-          Kerbo doesn't draw maps it can't back with a source. Here the sign — and your scans — are the map.
+          Kerb doesn't draw maps it can't back with a source. Here the sign — and your scans — are the map.
         </p>
         <NuxtLink to="/" class="czm-scan">📸 Scan a sign to start the map →</NuxtLink>
       </div>

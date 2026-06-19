@@ -208,7 +208,7 @@ const smsHref = (zone: any) => {
 
 const SITE = 'https://kerbo.netlify.app'
 const ogTitle = computed(() =>
-  city.value ? `${city.value.name} parking — zones, prices, SMS · Kerbo` : 'City not found · Kerbo',
+  city.value ? `${city.value.name} parking — zones, prices, SMS · Kerb` : 'City not found · Kerb',
 )
 const ogDesc = computed(() =>
   city.value?.overview ?? 'Street parking guide — zones, prices and how to pay.',
