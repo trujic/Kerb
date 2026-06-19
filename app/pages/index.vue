@@ -194,7 +194,7 @@
                 type="button"
                 class="zone-pick-row"
                 :style="zone.name === selectedZoneName ? { background: zone.color + '0d' } : null"
-                @click="selectedZoneName = zone.name"
+                @click="selectZone(zone.name)"
               >
                 <span class="zone-pick-stripe" :style="{ background: zone.color }" />
                 <span class="zone-pick-info">
@@ -843,11 +843,19 @@ const selectedZoneName = ref<string | null>(null)
 const selectedZone = computed(
   () => allZones.value.find((z: any) => z.name === selectedZoneName.value) ?? null,
 )
+// Once the user explicitly taps/scans/AI-picks a zone, stop auto-following the
+// likely guess. Before that, the selection must track likelyZoneName — otherwise
+// the early fallback (first zone, while GPS is still resolving) sticks and the
+// open card disagrees with the "likely yours" tag.
+const userPickedZone = ref(false)
+const selectZone = (name: string) => { selectedZoneName.value = name; userPickedZone.value = true }
 
-// Seed/repair the selection without ever overriding an explicit, still-valid choice.
+// Follow the likely zone until the user picks; afterwards only repair invalid picks.
 watch([likelyZoneName, allZones], () => {
   const valid = allZones.value.some((z: any) => z.name === selectedZoneName.value)
-  if (!valid) selectedZoneName.value = likelyZoneName.value ?? allZones.value[0]?.name ?? null
+  if (!userPickedZone.value || !valid) {
+    selectedZoneName.value = likelyZoneName.value ?? allZones.value[0]?.name ?? null
+  }
 }, { immediate: true })
 
 // ── Nearest confirmed sign — lead the user to verified ground truth ────────────
@@ -1009,7 +1017,7 @@ const aiSourceName = computed(() => {
   try { return new URL(u).hostname.replace(/^www\./, '') } catch { return 'official city registry' }
 })
 const onAiPick = (zoneName: string) => {
-  if (allZones.value.some((z: any) => z.name === zoneName)) selectedZoneName.value = zoneName
+  if (allZones.value.some((z: any) => z.name === zoneName)) selectZone(zoneName)
   showAi.value = false
   forceBrowse.value = true   // reveal the tabs…
   activeTab.value = 'pay'     // …and land on the zone, ready to pay
@@ -1061,7 +1069,7 @@ watch(detectedCity, async (city) => {
 const onSignSubmitted = (report: any) => {
   signReports.value = [report, ...signReports.value]
   if (allZones.value.some((z: any) => z.name === report.zone_name)) {
-    selectedZoneName.value = report.zone_name
+    selectZone(report.zone_name)
   }
 }
 
