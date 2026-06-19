@@ -23,7 +23,8 @@ const props = withDefaults(defineProps<{
   label: string
   doneLabel?: string
   color?: string
-}>(), { doneLabel: 'Confirmed', color: 'var(--blue)' })
+  confirmRatio?: number // fraction of the track you must cross to confirm (rest of the way snaps for you)
+}>(), { doneLabel: 'Confirmed', color: 'var(--blue)', confirmRatio: 0.55 })
 
 const emit = defineEmits<{ confirm: [] }>()
 
@@ -38,6 +39,8 @@ const thumbLeft = ref(PAD)
 const maxLeft = ref(PAD)
 
 const fillWidth = computed(() => thumbLeft.value + THUMB)
+// Confirm once you've crossed this point — no need to drag all the way across.
+const confirmAt = computed(() => PAD + (maxLeft.value - PAD) * props.confirmRatio)
 
 const measure = () => {
   const w = track.value?.clientWidth ?? 0
@@ -59,8 +62,8 @@ const onUp = () => {
   dragging.value = false
   window.removeEventListener('pointermove', onMove)
   window.removeEventListener('pointerup', onUp)
-  if (thumbLeft.value >= maxLeft.value - 4) {
-    thumbLeft.value = maxLeft.value
+  if (thumbLeft.value >= confirmAt.value) {
+    thumbLeft.value = maxLeft.value // snap the rest of the way home
     done.value = true
     emit('confirm')
     resetTimer = setTimeout(reset, 2200) // become slidable again (e.g. to extend)
