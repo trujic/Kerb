@@ -27,8 +27,8 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{ confirm: [] }>()
 
-const PAD = 4
-const THUMB = 48
+const PAD = 3
+const THUMB = 50
 
 const track = ref<HTMLElement | null>(null)
 const thumb = ref<HTMLElement | null>(null)
@@ -92,10 +92,11 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* Apple-style slide: a pill track, a round thumb, and a terse shimmering label. */
 .s2c {
   position: relative;
   height: 56px;
-  border-radius: var(--r-md);
+  border-radius: 999px;
   background: var(--bg2);
   border: 1.5px solid var(--border);
   overflow: hidden;
@@ -116,27 +117,43 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 60px;
-  font-size: 13px;
+  padding: 0 64px;
+  font-size: 14px;
   font-weight: 600;
-  color: var(--text2);
+  letter-spacing: 0.1px;
+  color: var(--muted);
   text-align: center;
   pointer-events: none;
 }
+/* The classic slide-to-unlock sheen sweeping in the drag direction. */
+@media (prefers-reduced-motion: no-preference) {
+  .s2c:not(.s2c--drag):not(.s2c--done) .s2c-label {
+    background: linear-gradient(
+      100deg,
+      var(--muted) 36%, var(--text) 50%, var(--muted) 64%
+    );
+    background-size: 220% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: s2c-sheen 2.4s linear infinite;
+  }
+}
+@keyframes s2c-sheen { from { background-position: 120% 0; } to { background-position: -120% 0; } }
 .s2c--done .s2c-label { color: var(--s2c-color); }
 .s2c-thumb {
   position: absolute;
-  top: 4px;
-  width: 48px;
-  height: 48px;
+  top: 3px;
+  width: 50px;
+  height: 50px;
   display: flex;
   align-items: center;
   justify-content: center;
   border: none;
-  border-radius: var(--r-sm);
+  border-radius: 50%;
   background: var(--s2c-color);
   color: #fff;
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 700;
   line-height: 1;
   cursor: grab;

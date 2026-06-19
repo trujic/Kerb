@@ -237,23 +237,26 @@
                     </p>
                     <SlideToConfirm
                       :key="'pp-' + zone.name"
-                      :label="`I checked the sign — slide to pre-pay ${nextWindow!.start}–${nextWindow!.end}`"
+                      label="slide to pre-pay"
                       done-label="Opening SMS…"
                       :color="zone.color"
                       @confirm="pay(zone, { armed: true })"
                     />
+                    <p class="pay-note">🪧 Sliding confirms you've checked the sign.</p>
                   </div>
 
                   <!-- ── Paid hours: the slide IS the sign-confirmation ── -->
                   <template v-else>
-                    <SlideToConfirm
-                      v-if="!skipConfirm"
-                      :key="zone.name"
-                      :label="`I checked the sign — slide to pay ${zone.name}`"
-                      done-label="Opening SMS…"
-                      :color="zone.color"
-                      @confirm="pay(zone)"
-                    />
+                    <template v-if="!skipConfirm">
+                      <SlideToConfirm
+                        :key="zone.name"
+                        label="slide to pay"
+                        done-label="Opening SMS…"
+                        :color="zone.color"
+                        @confirm="pay(zone)"
+                      />
+                      <p class="pay-note">🪧 Sliding confirms you've checked the sign.</p>
+                    </template>
                     <!-- Responsibility mode: fast tap, no per-pay confirm -->
                     <button
                       v-else
@@ -270,8 +273,8 @@
                     <!-- Persisted opt-out: take responsibility, skip the per-pay slide -->
                     <label class="zone-resp" :class="{ 'zone-resp--on': skipConfirm }">
                       <input v-model="skipConfirm" type="checkbox" class="zone-resp-box" />
-                      <span v-if="!skipConfirm">Don't ask each time — I'll check the sign myself and take responsibility</span>
-                      <span v-else>Sign-check off — you choose the zone and are responsible. Tap to turn confirmation back on.</span>
+                      <span v-if="!skipConfirm">Don't ask each time — I'll check the sign myself</span>
+                      <span v-else>Confirmation off — tap to turn it back on</span>
                     </label>
                   </template>
                 </template>
@@ -2192,6 +2195,14 @@ h2 {
   color: var(--text2);
   line-height: 1.5;
   margin-bottom: 13px;
+}
+/* Tiny sign-check reassurance under the slide — keeps the track itself terse */
+.pay-note {
+  margin-top: 8px;
+  font-size: 11.5px;
+  color: var(--muted2);
+  text-align: center;
+  line-height: 1.4;
 }
 .zone-act-caution {
   font-size: 12px;
