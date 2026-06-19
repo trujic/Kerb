@@ -29,7 +29,7 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{ confirm: [] }>()
 
 const PAD = 3
-const THUMB = 50
+const THUMB = 40
 
 const track = ref<HTMLElement | null>(null)
 const thumb = ref<HTMLElement | null>(null)
@@ -98,10 +98,10 @@ onUnmounted(() => {
 /* Apple-style slide: a pill track, a round thumb, and a terse shimmering label. */
 .s2c {
   position: relative;
-  height: 56px;
+  height: 46px;
   border-radius: 999px;
   background: var(--bg2);
-  border: 1.5px solid var(--border);
+  border: 1px solid var(--border);
   overflow: hidden;
   user-select: none;
   touch-action: pan-y;
@@ -120,8 +120,8 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 64px;
-  font-size: 14px;
+  padding: 0 52px;
+  font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.1px;
   color: var(--muted);
@@ -147,8 +147,8 @@ onUnmounted(() => {
 .s2c-thumb {
   position: absolute;
   top: 3px;
-  width: 50px;
-  height: 50px;
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -156,7 +156,7 @@ onUnmounted(() => {
   border-radius: 50%;
   background: var(--s2c-color);
   color: #fff;
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 700;
   line-height: 1;
   cursor: grab;
