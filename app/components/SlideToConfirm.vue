@@ -6,7 +6,7 @@
     :style="{ '--s2c-color': color }"
   >
     <div class="s2c-fill" :style="{ width: fillWidth + 'px' }" />
-    <span class="s2c-label">{{ done ? doneLabel : label }}</span>
+    <span v-if="!done" class="s2c-arrows" aria-hidden="true">›››</span>
     <button
       ref="thumb"
       type="button"
@@ -14,7 +14,11 @@
       :style="{ left: thumbLeft + 'px' }"
       :aria-label="label"
       @pointerdown="onDown"
-    >{{ done ? '✓' : '›' }}</button>
+    >
+      <span class="s2c-thumb-chev">{{ done ? '✓' : '⠿' }}</span>
+      <span class="s2c-thumb-tx">{{ done ? doneLabel : label }}</span>
+      <span class="s2c-thumb-go" aria-hidden="true">{{ done ? '' : '›' }}</span>
+    </button>
   </div>
 </template>
 
@@ -28,8 +32,7 @@ const props = withDefaults(defineProps<{
 
 const emit = defineEmits<{ confirm: [] }>()
 
-const PAD = 3
-const THUMB = 40
+const PAD = 4
 
 const track = ref<HTMLElement | null>(null)
 const thumb = ref<HTMLElement | null>(null)
@@ -37,14 +40,17 @@ const dragging = ref(false)
 const done = ref(false)
 const thumbLeft = ref(PAD)
 const maxLeft = ref(PAD)
+const thumbW = ref(0)
 
-const fillWidth = computed(() => thumbLeft.value + THUMB)
+const fillWidth = computed(() => thumbLeft.value + thumbW.value)
 // Confirm once you've crossed this point — no need to drag all the way across.
 const confirmAt = computed(() => PAD + (maxLeft.value - PAD) * props.confirmRatio)
 
+// The whole labelled pill is the thumb, so its width varies with the text.
 const measure = () => {
   const w = track.value?.clientWidth ?? 0
-  maxLeft.value = Math.max(PAD, w - THUMB - PAD)
+  thumbW.value = thumb.value?.offsetWidth ?? 0
+  maxLeft.value = Math.max(PAD, w - thumbW.value - PAD)
 }
 
 let startX = 0
@@ -95,10 +101,10 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-/* Apple-style slide: a pill track, a round thumb, and a terse shimmering label. */
+/* Swipe button: the labelled pill IS the thumb — grab it and drag right. */
 .s2c {
   position: relative;
-  height: 46px;
+  height: 52px;
   border-radius: 999px;
   background: var(--bg2);
   border: 1px solid var(--border);
@@ -114,50 +120,37 @@ onUnmounted(() => {
   pointer-events: none;
 }
 .s2c--drag .s2c-fill { transition: none; }
-.s2c-label {
+
+/* Faint "keep going →" arrows the thumb slides toward */
+.s2c-arrows {
   position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 52px;
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.1px;
-  color: var(--muted);
-  text-align: center;
+  right: 20px; top: 0; bottom: 0;
+  display: flex; align-items: center;
+  font-size: 18px; font-weight: 700; letter-spacing: 2px;
+  color: var(--muted2);
   pointer-events: none;
 }
-/* The classic slide-to-unlock sheen sweeping in the drag direction. */
 @media (prefers-reduced-motion: no-preference) {
-  .s2c:not(.s2c--drag):not(.s2c--done) .s2c-label {
-    background: linear-gradient(
-      100deg,
-      var(--muted) 36%, var(--text) 50%, var(--muted) 64%
-    );
-    background-size: 220% 100%;
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-    animation: s2c-sheen 2.4s linear infinite;
-  }
+  .s2c:not(.s2c--drag) .s2c-arrows { animation: s2c-arrows 1.6s ease-in-out infinite; }
 }
-@keyframes s2c-sheen { from { background-position: 120% 0; } to { background-position: -120% 0; } }
-.s2c--done .s2c-label { color: var(--s2c-color); }
+@keyframes s2c-arrows { 0%, 100% { opacity: 0.3; } 50% { opacity: 0.7; } }
+
 .s2c-thumb {
   position: absolute;
-  top: 3px;
-  width: 40px;
-  height: 40px;
-  display: flex;
+  top: 4px;
+  height: 44px;
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
+  gap: 8px;
+  padding: 0 14px 0 14px;
   border: none;
-  border-radius: 50%;
+  border-radius: 999px;
   background: var(--s2c-color);
   color: #fff;
-  font-size: 20px;
+  font-family: inherit;
+  font-size: 14px;
   font-weight: 700;
+  white-space: nowrap;
   line-height: 1;
   cursor: grab;
   box-shadow: var(--shadow-sm);
@@ -166,4 +159,7 @@ onUnmounted(() => {
 }
 .s2c--drag .s2c-thumb { transition: none; cursor: grabbing; }
 .s2c--done .s2c-thumb { cursor: default; }
+.s2c-thumb-chev { font-size: 16px; opacity: 0.85; }
+.s2c-thumb-tx { letter-spacing: 0.2px; }
+.s2c-thumb-go { font-size: 18px; opacity: 0.85; margin-left: 2px; }
 </style>

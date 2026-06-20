@@ -237,7 +237,7 @@
                     </p>
                     <SlideToConfirm
                       :key="'pp-' + zone.name"
-                      :label="`pre-pay · send SMS → ${zone.sms_shortcode}`"
+                      :label="`Send SMS → ${zone.sms_shortcode}`"
                       done-label="Opening SMS…"
                       :color="zone.color"
                       @confirm="pay(zone, { armed: true })"
@@ -250,7 +250,7 @@
                     <template v-if="!skipConfirm">
                       <SlideToConfirm
                         :key="zone.name"
-                        :label="`send SMS → ${zone.sms_shortcode}`"
+                        :label="`Send SMS → ${zone.sms_shortcode}`"
                         done-label="Opening SMS…"
                         :color="zone.color"
                         @confirm="pay(zone)"
