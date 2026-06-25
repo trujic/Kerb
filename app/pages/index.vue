@@ -980,7 +980,7 @@ const pay = (zone: any, opts: { armed?: boolean } = {}) => {
     pendingPay.value = { zone, armed: !!opts.armed } // guest: confirm the send first
     armSentPrompt()
   }
-  if (import.meta.client && zone.sms_shortcode) window.location.href = smsLink(zone)
+  if (import.meta.client && zone.sms_shortcode) openSms(smsLink(zone))
 }
 
 const onSentYes = () => {
@@ -997,7 +997,7 @@ const onExtend = () => {
   if (!z) return
   if (user.value) {
     startOrExtend(sessionPayload(z))
-    if (import.meta.client && z.sms_shortcode) window.location.href = smsLink(z)
+    if (import.meta.client && z.sms_shortcode) openSms(smsLink(z))
   } else {
     pay(z) // guest: re-open the SMS, confirm, log a fresh hour
   }
@@ -1046,10 +1046,25 @@ const clockOf = (iso: string | null) =>
   iso ? new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : ''
 
 const smsLink = (zone: any) => {
-  const body = defaultPlate.value
-    ? `?body=${encodeURIComponent(defaultPlate.value)}`
-    : ''
-  return `sms:${zone.sms_shortcode}${body}`
+  if (!defaultPlate.value) return `sms:${zone.sms_shortcode}`
+  // Body-prefill separator differs by platform: iOS wants '&body=', Android
+  // (and most others) want '?body='. Getting this wrong silently drops the plate.
+  const ua = import.meta.client ? navigator.userAgent : ''
+  const sep = /iP(hone|ad|od)/i.test(ua) ? '&' : '?'
+  return `sms:${zone.sms_shortcode}${sep}body=${encodeURIComponent(defaultPlate.value)}`
+}
+
+// Open the SMS composer via a synthesized anchor click rather than location.href.
+// In an installed PWA on Android, navigating the window to an sms: scheme can
+// drop the ?body query; a real link click hands the intent over intact.
+const openSms = (url: string) => {
+  if (!import.meta.client) return
+  const a = document.createElement('a')
+  a.href = url
+  a.style.display = 'none'
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
 }
 
 watch(detectedCity, async (city) => {
