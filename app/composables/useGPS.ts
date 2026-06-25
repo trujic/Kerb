@@ -42,6 +42,7 @@ export const useGPS = () => {
   const gpsError = ref<string | null>(null)
   const suggestedZoneName = ref<string | null>(null)
   const detectedStreet = ref<string | null>(null) // reverse-geocoded street at detection
+  const unsupportedCity = ref<string | null>(null) // detected a city we have no data for (→ AI help)
 
   const detectCity = async () => {
     if (!import.meta.client) return null
@@ -53,6 +54,7 @@ export const useGPS = () => {
     detecting.value = true
     gpsError.value = null
     suggestedZoneName.value = null
+    unsupportedCity.value = null
 
     try {
       const position = await new Promise<GeolocationPosition>((resolve, reject) => {
@@ -122,6 +124,7 @@ export const useGPS = () => {
       }
 
       gpsError.value = `You appear to be in ${rawCity}, but we don't have parking data for it yet.`
+      unsupportedCity.value = transliterate(rawCity)
       return null
     } catch (e: any) {
       if (e?.code === 1) gpsError.value = 'Location access denied. Enable it in browser settings.'
@@ -158,5 +161,5 @@ export const useGPS = () => {
     }
   }
 
-  return { detectCity, detectedCity, detectedStreet, coords, detecting, gpsError, suggestedZoneName, startTracking, stopTracking }
+  return { detectCity, detectedCity, detectedStreet, coords, detecting, gpsError, suggestedZoneName, unsupportedCity, startTracking, stopTracking }
 }

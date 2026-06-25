@@ -492,7 +492,26 @@
           <span class="gps-icon">📍</span>
           <span>Detecting your location…</span>
         </div>
-        <div v-else-if="gpsError" class="gps-error fade-up-3">{{ gpsError }}</div>
+        <div v-else-if="gpsError" class="gps-error fade-up-3">
+          <p class="gps-error-text">{{ gpsError }}</p>
+          <!-- Unsupported city → AI orientation so the app is still useful here -->
+          <button
+            v-if="unsupportedCity"
+            type="button"
+            class="gps-ai-help"
+            @click="showCityHelp = true"
+          >🧠 Ask AI how parking works in {{ unsupportedCity }} →</button>
+        </div>
+
+        <ClientOnly>
+          <CityHelp
+            v-if="showCityHelp && unsupportedCity"
+            :city="unsupportedCity"
+            :lat="coords?.lat ?? null"
+            :lng="coords?.lng ?? null"
+            @close="showCityHelp = false"
+          />
+        </ClientOnly>
 
         <!-- Search -->
         <div class="search-outer fade-up-3">
@@ -637,7 +656,8 @@
 <script setup lang="ts">
 const { getCities, searchCities, getCity } = useCity()
 const { user, getProfile } = useAuth()
-const { detectCity, detectedCity, detectedStreet, coords, detecting, gpsError, suggestedZoneName, startTracking, stopTracking } = useGPS()
+const { detectCity, detectedCity, detectedStreet, coords, detecting, gpsError, suggestedZoneName, unsupportedCity, startTracking, stopTracking } = useGPS()
+const showCityHelp = ref(false) // AI orientation panel for cities we don't cover yet
 const {
   heading, attached: compassAttached, previouslyEnabled: compassWasEnabled,
   needsPermission: compassNeedsPerm, start: startOrientation, stop: stopOrientation, onMapTap,
@@ -1269,9 +1289,26 @@ h1 {
 .gps-error {
   font-size: 13px;
   color: var(--muted);
-  margin-bottom: 10px;
+  margin-bottom: 16px;
   max-width: 560px;
 }
+.gps-error-text { margin-bottom: 10px; }
+.gps-ai-help {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 11px 16px;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  transition: border-color 150ms var(--ease-out), background 150ms var(--ease-out);
+}
+.gps-ai-help:hover { border-color: var(--blue); color: var(--blue); }
 
 /* Search */
 .search-outer {
