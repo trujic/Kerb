@@ -2,14 +2,14 @@
   <Teleport to="body">
     <div class="ch" role="dialog" aria-label="AI parking help">
       <div class="ch-bar">
-        <span class="ch-title">🧠 Parking in {{ city }}</span>
-        <button class="ch-close" type="button" aria-label="Close" @click="$emit('close')">✕</button>
+        <span class="ch-title"><Icon name="ai" :size="15" /> Parking in {{ city }}</span>
+        <button ref="closeEl" class="ch-close" type="button" aria-label="Close" @click="$emit('close')">✕</button>
       </div>
 
       <div class="ch-body">
         <!-- Honesty banner — this is never Kerb-verified data -->
         <div class="ch-unverified">
-          <span class="ch-unverified-icon">⚠️</span>
+          <span class="ch-unverified-icon"><Icon name="alert" :size="14" /></span>
           <p>
             Kerb doesn't cover {{ city }} yet, so this is <strong>AI orientation</strong> —
             helpful to get your bearings, but always confirm at the meter or on the sign.
@@ -127,7 +127,11 @@ interface CityHelp {
 }
 
 const props = defineProps<{ city: string; lat?: number | null; lng?: number | null }>()
-defineEmits<{ close: [] }>()
+const emit = defineEmits<{ close: [] }>()
+
+// Escape closes; focus lands on the close button and returns to the opener.
+const closeEl = ref<HTMLElement | null>(null)
+useDialogBehavior(() => emit('close'), () => closeEl.value)
 
 const loading = ref(true)
 const error = ref(false)

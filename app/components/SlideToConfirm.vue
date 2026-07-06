@@ -5,15 +5,17 @@
     :class="{ 's2c--drag': dragging, 's2c--done': done }"
     :style="{ '--s2c-color': color }"
   >
-    <div class="s2c-fill" :style="{ width: fillWidth + 'px' }" />
+    <div class="s2c-fill" :style="{ transform: `scaleX(${fillRatio})` }" />
     <span v-if="!done" class="s2c-arrows" aria-hidden="true">›››</span>
     <button
       ref="thumb"
       type="button"
       class="s2c-thumb"
-      :style="{ left: thumbLeft + 'px' }"
-      :aria-label="label"
+      :style="{ left: thumbLeft + 'px', color: ink }"
+      :aria-label="done ? doneLabel : `${label}. Slide right or press Enter to confirm.`"
       @pointerdown="onDown"
+      @keydown.enter.prevent="onKeyConfirm"
+      @keydown.space.prevent="onKeyConfirm"
     >
       <span class="s2c-thumb-chev">{{ done ? '✓' : '⠿' }}</span>
       <span class="s2c-thumb-tx">{{ done ? doneLabel : label }}</span>
@@ -42,15 +44,23 @@ const thumbLeft = ref(PAD)
 const maxLeft = ref(PAD)
 const thumbW = ref(0)
 
-const fillWidth = computed(() => thumbLeft.value + thumbW.value)
+// Fill is a full-width layer scaled from the left — scaleX animates on the
+// compositor; a width transition re-runs layout every frame.
+const trackW = ref(0)
+const fillRatio = computed(() =>
+  trackW.value ? Math.min(1, (thumbLeft.value + thumbW.value) / trackW.value) : 0,
+)
 // Confirm once you've crossed this point — no need to drag all the way across.
 const confirmAt = computed(() => PAD + (maxLeft.value - PAD) * props.confirmRatio)
 
+// Readable ink for the thumb — zone fills are too light for white text.
+const ink = computed(() => inkOn(props.color))
+
 // The whole labelled pill is the thumb, so its width varies with the text.
 const measure = () => {
-  const w = track.value?.clientWidth ?? 0
+  trackW.value = track.value?.clientWidth ?? 0
   thumbW.value = thumb.value?.offsetWidth ?? 0
-  maxLeft.value = Math.max(PAD, w - thumbW.value - PAD)
+  maxLeft.value = Math.max(PAD, trackW.value - thumbW.value - PAD)
 }
 
 let startX = 0
@@ -76,6 +86,17 @@ const onUp = () => {
   } else {
     thumbLeft.value = PAD // snap back
   }
+}
+
+// Keyboard path: pressing Enter/Space on the focused thumb is as deliberate as
+// the drag — switch and screen-reader users get the same confirm.
+const onKeyConfirm = () => {
+  if (done.value || dragging.value) return
+  measure()
+  thumbLeft.value = maxLeft.value
+  done.value = true
+  emit('confirm')
+  resetTimer = setTimeout(reset, 2200)
 }
 
 const onDown = (e: PointerEvent) => {
@@ -114,12 +135,16 @@ onUnmounted(() => {
 }
 .s2c-fill {
   position: absolute;
-  top: 0; left: 0; bottom: 0;
+  inset: 0;
   background: color-mix(in srgb, var(--s2c-color) 16%, transparent);
-  transition: width 0.18s var(--ease-out);
+  transform-origin: left center;
+  transition: transform 0.18s var(--ease-out);
   pointer-events: none;
 }
 .s2c--drag .s2c-fill { transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  .s2c-fill, .s2c-thumb { transition: none; }
+}
 
 /* Faint "keep going →" arrows the thumb slides toward */
 .s2c-arrows {
@@ -146,7 +171,6 @@ onUnmounted(() => {
   border: none;
   border-radius: 999px;
   background: var(--s2c-color);
-  color: #fff;
   font-family: inherit;
   font-size: 14px;
   font-weight: 700;
@@ -158,6 +182,7 @@ onUnmounted(() => {
   transition: left 0.18s var(--ease-out);
 }
 .s2c--drag .s2c-thumb { transition: none; cursor: grabbing; }
+.s2c-thumb:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
 .s2c--done .s2c-thumb { cursor: default; }
 .s2c-thumb-chev { font-size: 16px; opacity: 0.85; }
 .s2c-thumb-tx { letter-spacing: 0.2px; }

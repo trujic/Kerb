@@ -1,7 +1,7 @@
 <template>
   <div v-if="schedule" class="hours" :class="{ 'hours--compact': compact, 'hours--status': statusOnly }">
     <div class="hours-head">
-      <span class="hours-title">Parking hours</span>
+      <span class="hours-title">{{ t('hoursTitle') }}</span>
       <span v-if="status" class="hours-pill" :class="status.paid ? 'is-paid' : 'is-free'">
         <span class="hours-dot" />
         {{ status.label }}
@@ -13,7 +13,7 @@
     <dl v-if="!statusOnly" class="hours-rows">
       <div v-for="row in summary" :key="row.label" class="hours-row">
         <dt>{{ row.label }}</dt>
-        <dd :class="{ 'is-free-day': row.value === 'Free' }">{{ row.value }}</dd>
+        <dd :class="{ 'is-free-day': row.free }">{{ row.value }}</dd>
       </div>
     </dl>
   </div>
@@ -27,6 +27,7 @@ const props = defineProps<{
 }>()
 
 const { schedule, status, summary } = useParkingHours(() => props.cityId)
+const { t } = useLang()
 </script>
 
 <style scoped>

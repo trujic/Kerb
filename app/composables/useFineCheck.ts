@@ -25,20 +25,21 @@ export interface FineResult {
 }
 
 export const useFineCheck = () => {
+  const { t } = useLang()
   const result = ref<FineResult | null>(null)
   const pending = ref(false)
   const error = ref<string | null>(null)
 
   const check = async (plate: string) => {
     const clean = plate.trim().toUpperCase().replace(/[\s-]/g, '')
-    if (clean.length < 4) { error.value = 'Enter a valid plate'; return }
+    if (clean.length < 4) { error.value = t('enterValidPlate'); return }
     pending.value = true
     error.value = null
     result.value = null
     try {
       result.value = await $fetch<FineResult>('/api/fine-check', { query: { plate: clean } })
     } catch (e: any) {
-      error.value = e?.data?.statusMessage || e?.statusMessage || 'Could not check fines right now. Try again.'
+      error.value = e?.data?.statusMessage || e?.statusMessage || t('fineCheckFail')
     } finally {
       pending.value = false
     }

@@ -1,12 +1,9 @@
 <template>
   <div class="fine-check">
     <div class="fc-head">
-      <p class="section-label">Parking fines</p>
-      <h3 class="fc-title">Check your plate for a fine</h3>
-      <p class="fc-sub">
-        Novi Sad doesn't notify you — no SMS, no ticket on the windscreen. Check your
-        plate against the official records.
-      </p>
+      <p class="section-label">{{ t('finesLabel') }}</p>
+      <h3 class="fc-title">{{ t('fineCheckTitle') }}</h3>
+      <p class="fc-sub">{{ t('fineCheckSub') }}</p>
     </div>
 
     <form class="fc-form" @submit.prevent="run">
@@ -21,7 +18,7 @@
         @input="plate = plate.toUpperCase()"
       />
       <button class="fc-btn" type="submit" :disabled="pending || plate.trim().length < 4">
-        {{ pending ? 'Checking…' : 'Check' }}
+        {{ pending ? t('checking') : t('checkBtn') }}
       </button>
     </form>
 
@@ -31,43 +28,35 @@
     <div v-else-if="result && !result.hasFines" class="fc-clear">
       <span class="fc-clear-icon">✓</span>
       <div>
-        <p class="fc-clear-title">No outstanding fines for {{ result.plate }}</p>
-        <p class="fc-clear-sub">
-          Checked {{ checkedTime }}. Fines can take days to appear — check again later
-          if you parked recently.
-        </p>
+        <p class="fc-clear-title">{{ t('noFines', { plate: result.plate }) }}</p>
+        <p class="fc-clear-sub">{{ t('noFinesSub', { time: checkedTime }) }}</p>
       </div>
     </div>
 
     <!-- Fines found -->
     <div v-else-if="result && result.hasFines" class="fc-results">
       <div class="fc-total">
-        <span class="fc-total-label">
-          {{ result.count }} outstanding {{ result.count === 1 ? 'fine' : 'fines' }} ·
-          {{ result.plate }}
-        </span>
+        <span class="fc-total-label">{{ totalLabel }}</span>
         <span class="fc-total-amount">{{ fmt(result.totalDue) }} {{ result.currency }}</span>
       </div>
 
       <div v-for="(f, i) in result.fines" :key="f.ticketNo ?? i" class="fc-fine">
         <div class="fc-fine-top">
           <span class="fc-fine-amount">{{ fmt(f.amount) }} {{ result.currency }}</span>
-          <span class="fc-fine-flag">unpaid</span>
+          <span class="fc-fine-flag">{{ t('unpaid') }}</span>
         </div>
         <p v-if="f.status" class="fc-fine-status">{{ f.status }}</p>
         <p class="fc-fine-meta">
-          <span v-if="f.ticketNo">Order #{{ f.ticketNo }}</span>
+          <span v-if="f.ticketNo">{{ t('orderNo', { no: f.ticketNo }) }}</span>
           <span v-if="f.recipient"> · {{ f.recipient }}</span>
         </p>
       </div>
 
-      <p class="fc-src">From official JKP Parking servis records · checked {{ checkedTime }}</p>
+      <p class="fc-src">{{ t('fineSrc', { time: checkedTime }) }}</p>
     </div>
 
     <!-- Idle -->
-    <p v-else class="fc-src fc-src--idle">
-      Official data from JKP Parking servis — Kerb only relays it.
-    </p>
+    <p v-else class="fc-src fc-src--idle">{{ t('fineIdle') }}</p>
   </div>
 </template>
 
@@ -75,7 +64,19 @@
 const props = defineProps<{ initialPlate?: string | null }>()
 
 const { result, pending, error, check } = useFineCheck()
+const { t, lang } = useLang()
 const plate = ref(props.initialPlate ?? '')
+
+// Serbian counts decline: 1 kazna, 2–4 kazne, 5+ kazni.
+const totalLabel = computed(() => {
+  const r = result.value
+  if (!r) return ''
+  if (lang.value === 'sr') {
+    const w = r.count === 1 ? 'kazna' : r.count < 5 ? 'kazne' : 'kazni'
+    return `${r.count} ${w} za naplatu · ${r.plate}`
+  }
+  return `${r.count} outstanding ${r.count === 1 ? 'fine' : 'fines'} · ${r.plate}`
+})
 
 // Adopt the dashboard's plate once it's known, without clobbering manual input.
 watch(() => props.initialPlate, (p) => { if (p && !plate.value) plate.value = p })

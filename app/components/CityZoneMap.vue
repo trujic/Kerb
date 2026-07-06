@@ -8,7 +8,7 @@
     <!-- ── cadastre / cadastre_approx: interactive reference map ── -->
     <template v-if="tier === 'cadastre' || tier === 'cadastre_approx'">
       <div v-if="tier === 'cadastre_approx'" class="czm-warn">
-        ⚠️ {{ cityName }} publishes no official vector map — these zone areas are
+        <Icon name="alert" :size="13" /> {{ cityName }} publishes no official vector map — these zone areas are
         <strong>approximate</strong>, coarsely traced from the official zone image. Treat them as a
         rough guide and confirm on the sign before you pay.
       </div>
@@ -71,10 +71,10 @@
     <!-- ── street_lists: coarse, with an honest caveat ── -->
     <template v-else-if="tier === 'street_lists'">
       <div class="czm-warn">
-        ⚠️ No official cadastre is published for {{ cityName }} — zone areas here are approximate.
+        <Icon name="alert" :size="13" /> No official cadastre is published for {{ cityName }} — zone areas here are approximate.
         Confirm on the sign before you pay.
       </div>
-      <NuxtLink to="/" class="czm-scan">📸 Scan the sign to confirm + map it →</NuxtLink>
+      <NuxtLink to="/" class="czm-scan"><Icon name="camera" :size="14" /> Scan the sign to confirm + map it →</NuxtLink>
     </template>
 
     <!-- ── none: no source we can back ── -->
@@ -84,7 +84,7 @@
         <p class="czm-none-sub">
           Kerb doesn't draw maps it can't back with a source. Here the sign — and your scans — are the map.
         </p>
-        <NuxtLink to="/" class="czm-scan">📸 Scan a sign to start the map →</NuxtLink>
+        <NuxtLink to="/" class="czm-scan"><Icon name="camera" :size="14" /> Scan a sign to start the map →</NuxtLink>
       </div>
     </template>
   </div>

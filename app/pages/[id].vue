@@ -90,15 +90,20 @@
                       <span class="zone-price">{{ zone.price }}</span>
                     </div>
                     <p class="zone-rules">{{ zone.rules }}</p>
-                    <a
-                      v-if="zone.sms_shortcode"
-                      :href="smsHref(zone)"
-                      class="zone-sms"
-                      :style="{ color: zone.color }"
-                    >
-                      Pay by SMS → {{ zone.sms_shortcode }}
-                      <span v-if="guestPlate" class="zone-sms-plate">{{ guestPlate.toUpperCase() }}</span>
-                    </a>
+                    <!-- Same pay ritual as the dashboard: the slide IS the sign check -->
+                    <div v-if="zone.sms_shortcode" class="zone-pay-slide">
+                      <SlideToConfirm
+                        :key="zone.id"
+                        :label="t('sendSms', { code: zone.sms_shortcode })"
+                        :done-label="t('openingSms')"
+                        :color="zone.color"
+                        @confirm="payZone(zone)"
+                      />
+                      <p class="zone-pay-hint">
+                        {{ t('slideConfirms') }}
+                        <span v-if="guestPlate" class="zone-sms-plate">{{ guestPlate.toUpperCase() }}</span>
+                      </p>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -193,18 +198,15 @@ const isStale = computed(() => {
   return Date.now() - d.getTime() > 365 * 86_400_000
 })
 
+const { t } = useLang()
+
 // Guest plate (saved on device) prefills the SMS body, matching the home flow.
 const GUEST_PLATE_KEY = 'kerb_guest_plate'
 const guestPlate = ref('')
 onMounted(() => {
   if (import.meta.client) guestPlate.value = localStorage.getItem(GUEST_PLATE_KEY) ?? ''
 })
-const smsHref = (zone: any) => {
-  const body = guestPlate.value.trim()
-    ? `?body=${encodeURIComponent(guestPlate.value.trim().toUpperCase())}`
-    : ''
-  return `sms:${zone.sms_shortcode}${body}`
-}
+const payZone = (zone: any) => openSms(smsHref(zone.sms_shortcode, guestPlate.value))
 
 const SITE = 'https://kerbo.netlify.app'
 const ogTitle = computed(() =>
@@ -263,18 +265,18 @@ useSeoMeta({
 }
 @media (max-width: 480px) { .live-detail { display: none; } }
 
-/* Tappable SMS shortcode on each zone card */
-.zone-sms {
-  display: inline-flex;
+/* Slide-to-pay on each zone card — same ritual as the dashboard */
+.zone-pay-slide { margin-top: 12px; }
+.zone-pay-hint {
+  display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
-  margin-top: 10px;
-  font-family: var(--font-mono);
-  font-size: 13px;
-  font-weight: 600;
-  letter-spacing: 0.3px;
+  margin-top: 7px;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.4;
 }
-.zone-sms:active { opacity: 0.7; }
 .zone-sms-plate {
   font-size: 11px;
   color: var(--text2);
@@ -434,9 +436,8 @@ useSeoMeta({
   color: var(--text2);
 }
 .sms-box {
-  background: var(--bg2);
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--blue);
+  background: var(--blue-bg);
+  border: 1px solid var(--blue-border);
   border-radius: var(--r-md);
   padding: 14px 16px;
   font-size: 13px;

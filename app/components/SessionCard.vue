@@ -5,24 +5,24 @@
         <span class="session-dot" :style="{ background: session.zone_color || 'var(--text2)' }" />
         {{ session.zone_name }}
       </span>
-      <span class="session-label">Active parking</span>
+      <span class="session-label">{{ t('activeParking') }}</span>
     </div>
 
-    <p v-if="session.street_name" class="session-street">📍 {{ session.street_name }}</p>
+    <p v-if="session.street_name" class="session-street"><Icon name="pin" :size="12" /> {{ session.street_name }}</p>
 
     <div class="session-time">
       <template v-if="expired">
-        <span class="session-count expired">Expired</span>
-        <span class="session-ago">{{ agoText }} ago · risk of fine</span>
+        <span class="session-count expired">{{ t('expired') }}</span>
+        <span class="session-ago">{{ t('agoRisk', { time: agoText }) }}</span>
       </template>
       <template v-else>
         <span class="session-count">{{ remainingText }}</span>
-        <span class="session-ago">left{{ session.price ? ` · ${session.price}` : '' }}</span>
+        <span class="session-ago">{{ t('left') }}{{ session.price ? ` · ${session.price}` : '' }}</span>
       </template>
     </div>
 
     <p v-if="atZoneLimit" class="session-warn">
-      ⚠️ You've reached this zone's limit — you must move the car (no re-pay here).
+      <Icon name="alert" :size="13" /> {{ t('limitWarn') }}
     </p>
 
     <div class="session-actions">
@@ -31,14 +31,14 @@
         type="button"
         class="se-btn se-extend"
         @click="$emit('extend')"
-      >+ Extend 1h</button>
+      >{{ t('extend1h') }}</button>
       <button
         v-if="session.lat != null && session.lng != null"
         type="button"
         class="se-btn"
         @click="$emit('locate')"
-      >🚗 Find my car</button>
-      <button type="button" class="se-btn se-end" @click="$emit('end')">End</button>
+      ><Icon name="car" :size="14" /> {{ t('findMyCar') }}</button>
+      <button type="button" class="se-btn se-end" @click="$emit('end')">{{ t('end') }}</button>
     </div>
   </div>
 </template>
@@ -54,6 +54,8 @@ const props = defineProps<{
 }>()
 
 defineEmits<{ extend: []; end: []; locate: [] }>()
+
+const { t } = useLang()
 
 const expired = computed(() => props.remainingMs !== null && props.remainingMs <= 0)
 
@@ -72,15 +74,14 @@ const agoText = computed(() => (props.remainingMs ? fmt(-props.remainingMs) : ''
 
 <style scoped>
 .session {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-left: 4px solid var(--green);
+  background: var(--green-bg);
+  border: 1px solid var(--green-border);
   border-radius: var(--r-lg);
   padding: 16px 18px;
   margin-bottom: 20px;
 }
-.session.is-limit { border-left-color: var(--amber); }
-.session.is-expired { border-left-color: var(--red); background: var(--red-bg); }
+.session.is-limit { background: var(--amber-bg); border-color: var(--amber-border); }
+.session.is-expired { background: var(--red-bg); border-color: var(--red-border); }
 
 .session-top {
   display: flex;

@@ -26,7 +26,7 @@
               aria-label="Expand map"
               @click="mapExpanded = true"
             >
-              <span>⤢</span> Explore zones
+              <Icon name="expand" :size="14" /> {{ t('exploreZones') }}
             </button>
           </div>
         </ClientOnly>
@@ -37,7 +37,7 @@
             <div v-if="mapExpanded" class="map-fs" role="dialog" aria-label="Zone map">
               <div class="map-fs-bar">
                 <span class="map-fs-title">
-                  {{ detectedCity!.flag }} {{ detectedCity!.name }} · parking zones
+                  {{ detectedCity!.flag }} {{ detectedCity!.name }} · {{ t('parkingZones') }}
                 </span>
                 <button
                   class="map-fs-close"
@@ -68,26 +68,25 @@
         <!-- Detected-location line — minimal: where you are, not a city banner -->
         <div class="gps-detected">
           <span class="gps-detected-where">
-            <span class="gps-detected-pin">📍</span>
+            <span class="gps-detected-pin"><Icon name="pin" :size="13" /></span>
             <template v-if="detectedStreet"><strong>{{ detectedStreet }}</strong> · </template>{{ detectedCity!.name }}
-            <span class="gps-detected-tag">detected</span>
+            <span class="gps-detected-tag">{{ t('detected') }}</span>
           </span>
-          <NuxtLink :to="`/${detectedCity!.id}`" class="gps-detected-guide">Full guide →</NuxtLink>
+          <NuxtLink :to="`/${detectedCity!.id}`" class="gps-detected-guide">{{ t('fullGuide') }}</NuxtLink>
         </div>
 
         <!-- Armed night pre-pay — scheduled for the next paid window, not live yet -->
         <div v-if="displaySession && displaySession.type === 'armed'" class="armed-card">
           <div class="armed-main">
-            <span class="armed-moon">🌙</span>
+            <span class="armed-moon"><Icon name="moon" :size="20" /></span>
             <div>
-              <p class="armed-title">Armed for the morning · {{ displaySession.zone_name }}</p>
+              <p class="armed-title">{{ t('armedTitle', { zone: displaySession.zone_name }) }}</p>
               <p class="armed-sub">
-                Pre-paid {{ clockOf(displaySession.started_at) }}–{{ clockOf(displaySession.expires_at) }}.
-                We can't ping you yet — set an alarm to re-check the sign.
+                {{ t('armedSub', { start: clockOf(displaySession.started_at), end: clockOf(displaySession.expires_at) }) }}
               </p>
             </div>
           </div>
-          <button type="button" class="armed-cancel" @click="onEndSession">Cancel</button>
+          <button type="button" class="armed-cancel" @click="onEndSession">{{ t('cancel') }}</button>
         </div>
 
         <!-- Active parking session -->
@@ -104,11 +103,11 @@
 
         <!-- ═══ FREE-NOW SURFACE — when no payment is needed, the screen IS the answer ═══ -->
         <div v-if="freeSurface" class="free-surface">
-          <span class="free-now-tag"><span class="free-now-dot" />Free now</span>
-          <h2 class="free-now-title">No need to pay right now</h2>
+          <span class="free-now-tag"><span class="free-now-dot" />{{ t('freeNow') }}</span>
+          <h2 class="free-now-title">{{ t('freeTitle') }}</h2>
           <p class="free-now-sub">
-            Parking is free in {{ detectedCity!.name }}.<template v-if="nextWindow">
-              Charging resumes <strong>{{ nextWindow.dayLabel }} {{ nextWindow.start }}</strong>.</template><template v-else-if="hoursStatus?.detail"> {{ hoursStatus.detail }}.</template>
+            {{ t('freeSub', { city: detectedCity!.name }) }}<template v-if="nextWindow">
+              {{ t('chargingResumes') }} <strong>{{ dayWord(nextWindow.dayLabel) }} {{ nextWindow.start }}</strong>.</template><template v-else-if="hoursStatus?.detail"> {{ hoursStatus.detail }}.</template>
           </p>
           <div class="free-now-actions">
             <button
@@ -116,8 +115,8 @@
               type="button"
               class="free-prepay-btn"
               @click="statusToPrepay"
-            >Pre-pay {{ nextWindow!.start }}–{{ nextWindow!.end }} →</button>
-            <button type="button" class="free-browse-btn" @click="browseAnyway">Browse zones</button>
+            >{{ t('prepayBtn', { start: nextWindow!.start, end: nextWindow!.end }) }}</button>
+            <button type="button" class="free-browse-btn" @click="browseAnyway">{{ t('browseZones') }}</button>
           </div>
         </div>
 
@@ -128,18 +127,21 @@
           <button
             type="button" role="tab" class="gps-tab"
             :class="{ on: activeTab === 'pay' }"
+            :aria-selected="activeTab === 'pay'"
             @click="activeTab = 'pay'"
-          >Pay</button>
+          >{{ t('tabPay') }}</button>
           <button
             type="button" role="tab" class="gps-tab"
             :class="{ on: activeTab === 'find' }"
+            :aria-selected="activeTab === 'find'"
             @click="activeTab = 'find'"
-          >Find</button>
+          >{{ t('tabFind') }}</button>
           <button
             type="button" role="tab" class="gps-tab"
             :class="{ on: activeTab === 'info' }"
+            :aria-selected="activeTab === 'info'"
             @click="activeTab = 'info'"
-          >Info</button>
+          >{{ t('tabInfo') }}</button>
         </div>
 
         <!-- ═══ PAY PANEL — the 10-second job: status → zone → pay ═══ -->
@@ -149,14 +151,14 @@
 
         <!-- No paid parking at the user's spot -->
         <div v-if="parkingState === 'none' && nearest" class="gps-noparking">
-          <div class="np-icon">🅿️</div>
+          <div class="np-icon"><Icon name="parking" :size="24" /></div>
           <div class="np-text">
-            <p class="np-title">No paid zone where you're standing</p>
+            <p class="np-title">{{ t('noParkingTitle') }}</p>
             <p class="np-sub">
-              Parking here is likely free. Nearest paid parking is
-              <strong>~{{ formatDist(nearest.distanceM) }}</strong> away —
+              {{ t('noParkingSub') }}
+              <strong>~{{ formatDist(nearest.distanceM) }}</strong> {{ t('awayOn') }}
               <span :style="{ color: zoneColor(nearest.zoneName) }">{{ nearest.zoneName }}</span>
-              on {{ nearest.streetName }}.
+              · {{ nearest.streetName }}.
             </p>
           </div>
         </div>
@@ -166,17 +168,17 @@
           <!-- ── Honest framing: GPS narrows it down, the sign decides ── -->
           <div class="zone-pick-head">
             <p class="zone-pick-title">
-              <template v-if="!freeNow && parkingState === 'on'">You're in a paid parking area</template>
+              <template v-if="!freeNow && parkingState === 'on'">{{ t('paidAreaTitle') }}</template>
               <template v-else-if="!freeNow && parkingState === 'near' && nearest">
-                Paid parking ~{{ formatDist(nearest.distanceM) }} away
+                {{ t('paidNearTitle', { dist: formatDist(nearest.distanceM) }) }}
               </template>
-              <template v-else>Parking zones in {{ detectedCity!.name }}</template>
+              <template v-else>{{ t('zonesInTitle', { city: detectedCity!.name }) }}</template>
             </p>
             <p class="zone-pick-hint">
-              🪧 Tap the zone printed on the sign next to your car — that's the one that counts.
+              <Icon name="sign" :size="14" /> {{ t('signHint') }}
             </p>
             <p v-if="mapApprox" class="zone-pick-approx">
-              ⚠️ {{ detectedCity!.name }}'s zone areas are approximate (no official map) — use this to narrow it down, then trust the sign.
+              <Icon name="alert" :size="13" /> {{ t('approxWarn', { city: detectedCity!.name }) }}
             </p>
           </div>
 
@@ -199,13 +201,13 @@
                 <span class="zone-pick-stripe" :style="{ background: zone.color }" />
                 <span class="zone-pick-info">
                   <span class="zone-pick-name">{{ zone.name }}</span>
-                  <span v-if="zone.name === likelyZoneName" class="zone-pick-tag">📍 likely yours</span>
+                  <span v-if="zone.name === likelyZoneName" class="zone-pick-tag"><Icon name="pin" :size="10" /> {{ t('likelyYours') }}</span>
                   <span
                     v-if="zoneLimits[zone.name]"
                     class="zone-pick-limit"
                     :class="{ 'zone-pick-limit--cap': zoneLimits[zone.name]!.cap }"
                     :style="zoneLimits[zone.name]!.cap ? { color: zone.color, borderColor: zone.color } : null"
-                  >{{ zoneLimits[zone.name]!.cap ? zoneLimits[zone.name]!.label : 'No limit' }}</span>
+                  >{{ zoneLimits[zone.name]!.cap ? zoneLimits[zone.name]!.label : t('noLimit') }}</span>
                 </span>
                 <span class="zone-pick-price" :style="{ color: zone.color }">{{ zone.price }}</span>
                 <span class="zone-pick-radio" :class="{ on: zone.name === selectedZoneName }">
@@ -215,34 +217,31 @@
 
               <!-- Chosen → the same card expands to pay. No second header. -->
               <div v-if="zone.name === selectedZoneName" class="zone-pay">
-                <p v-if="zoneLimits[zone.name]?.note" class="zone-pay-note">{{ zoneLimits[zone.name]!.note }}</p>
                 <p v-if="parkingState === 'near'" class="zone-act-caution">
-                  ⚠️ GPS puts you near a boundary — only pay this zone if the sign says
+                  <Icon name="alert" :size="13" /> {{ t('boundaryCaution') }}
                   <strong>{{ zone.name }}</strong>.
                 </p>
                 <div v-if="!user" class="zone-plate">
                   <PlateInput v-model="guestPlate" />
                   <span class="zone-plate-hint">
-                    Saved on this device · prefilled into the SMS · 📷 scan it instead of typing.
-                    <NuxtLink to="/login">Create an account</NuxtLink> to sync it.
+                    {{ t('plateHint') }} · <NuxtLink to="/login">{{ t('plateSync') }}</NuxtLink>
                   </span>
                 </div>
                 <template v-if="zone.sms_shortcode">
                   <!-- ── Night pre-pay: free now, the SMS carries over to the next window ── -->
                   <div v-if="nightPrepay" class="prepay">
                     <p class="prepay-note">
-                      🌙 Free until <strong>{{ nextWindow!.start }}</strong>. Per the official carry-over rule,
-                      an SMS you send now applies to <strong>{{ nextWindow!.dayLabel }} {{ nextWindow!.start }}–{{ nextWindow!.end }}</strong> —
-                      not the moment you send it.
+                      <Icon name="moon" :size="13" />
+                      {{ t('prepayNote', { time: nextWindow!.start, day: dayWord(nextWindow!.dayLabel), start: nextWindow!.start, end: nextWindow!.end }) }}
                     </p>
                     <SlideToConfirm
                       :key="'pp-' + zone.name"
-                      :label="`Send SMS → ${zone.sms_shortcode}`"
-                      done-label="Opening SMS…"
+                      :label="t('sendSms', { code: zone.sms_shortcode })"
+                      :done-label="t('openingSms')"
                       :color="zone.color"
                       @confirm="pay(zone, { armed: true })"
                     />
-                    <p class="pay-note">🪧 Sliding confirms you've checked the sign.</p>
+                    <p class="pay-note">{{ t('slideConfirms') }} {{ t('smsToOperator') }}</p>
                   </div>
 
                   <!-- ── Paid hours: the slide IS the sign-confirmation ── -->
@@ -250,76 +249,77 @@
                     <template v-if="!skipConfirm">
                       <SlideToConfirm
                         :key="zone.name"
-                        :label="`Send SMS → ${zone.sms_shortcode}`"
-                        done-label="Opening SMS…"
+                        :label="t('sendSms', { code: zone.sms_shortcode })"
+                        :done-label="t('openingSms')"
                         :color="zone.color"
                         @confirm="pay(zone)"
                       />
-                      <p class="pay-note">🪧 Sliding confirms you've checked the sign.</p>
+                      <p class="pay-note">{{ t('slideConfirms') }} {{ t('smsToOperator') }}</p>
                     </template>
                     <!-- Responsibility mode: fast tap, no per-pay confirm -->
                     <button
                       v-else
                       type="button"
                       class="zone-act-btn"
-                      :style="{ background: zone.color }"
+                      :style="{ background: zone.color, color: inkOn(zone.color) }"
                       @click="pay(zone)"
                     >
-                      <span v-if="defaultPlate">Pay {{ zone.name }} · {{ defaultPlate }}</span>
-                      <span v-else>Pay {{ zone.name }}</span>
+                      <span v-if="defaultPlate">{{ t('payZone', { zone: zone.name }) }} · {{ defaultPlate }}</span>
+                      <span v-else>{{ t('payZone', { zone: zone.name }) }}</span>
                       <span class="zone-act-arrow">→ {{ zone.sms_shortcode }}</span>
                     </button>
 
                     <!-- Persisted opt-out: take responsibility, skip the per-pay slide -->
                     <label class="zone-resp" :class="{ 'zone-resp--on': skipConfirm }">
                       <input v-model="skipConfirm" type="checkbox" class="zone-resp-box" />
-                      <span v-if="!skipConfirm">Don't ask each time — I'll check the sign myself</span>
-                      <span v-else>Confirmation off — tap to turn it back on</span>
+                      <span v-if="!skipConfirm">{{ t('respOff') }}</span>
+                      <span v-else>{{ t('respOn') }}</span>
                     </label>
                   </template>
                 </template>
 
-                <p class="zone-act-foot">
-                  <NuxtLink
-                    v-if="user && zone.sms_shortcode && !defaultPlate"
-                    to="/profile"
-                    class="zone-act-link"
-                  >Add a plate for one-tap SMS</NuxtLink>
-                  <span class="zone-act-src">
-                    Your phone sends the SMS to the parking operator.
-                  </span>
-                </p>
+                <NuxtLink
+                  v-if="user && zone.sms_shortcode && !defaultPlate"
+                  to="/profile"
+                  class="zone-act-link"
+                >{{ t('addPlate') }}</NuxtLink>
+
+                <!-- The rule fine print earns its place behind one calm disclosure -->
+                <details v-if="zoneLimits[zone.name]?.note" class="zone-pay-more">
+                  <summary>{{ t('ruleDetails') }}</summary>
+                  <p>{{ zoneLimits[zone.name]!.note }}</p>
+                </details>
               </div>
             </div>
           </div>
 
           <!-- Escape hatch to the spatial tools when the likely zone isn't enough -->
           <button type="button" class="zone-unsure" @click="activeTab = 'find'">
-            🪧 Not sure which zone? Scan the sign or ask AI →
+            <Icon name="sign" :size="14" /> {{ t('notSure') }}
           </button>
         </div>
         </div><!-- /pay panel -->
 
         <!-- ═══ FIND ZONE PANEL — "which zone am I actually in?" ═══ -->
         <div v-show="activeTab === 'find'" class="gps-panel">
-          <p class="panel-lead">📍 The map up top shows where you are. Use these to pin the exact zone.</p>
+          <p class="panel-lead"><Icon name="pin" :size="13" /> {{ t('findLead') }}</p>
 
           <!-- Scan the sign — the sign is ground truth: read it, confirm, pin it, pay -->
           <button type="button" class="scan-cta" @click="showScan = true">
-            <span class="scan-cta-icon">📸</span>
+            <span class="scan-cta-icon"><Icon name="camera" :size="22" /></span>
             <span class="scan-cta-text">
-              <span class="scan-cta-title">Scan the sign</span>
-              <span class="scan-cta-sub">Read the zone off the sign, confirm it on the map, then pay</span>
+              <span class="scan-cta-title">{{ t('scanTitle') }}</span>
+              <span class="scan-cta-sub">{{ t('scanSub') }}</span>
             </span>
             <span class="scan-cta-arrow">→</span>
           </button>
 
           <!-- Ask AI — geometry + registry decide, never a remembered guess -->
           <button type="button" class="ai-cta" @click="showAi = true">
-            <span class="ai-cta-icon">🧠</span>
+            <span class="ai-cta-icon"><Icon name="ai" :size="20" /></span>
             <span class="ai-cta-text">
-              <span class="ai-cta-title">New here? How parking works</span>
-              <span class="ai-cta-sub">When you pay, the zones, and how — in plain language</span>
+              <span class="ai-cta-title">{{ t('aiTitle') }}</span>
+              <span class="ai-cta-sub">{{ t('aiSub') }}</span>
             </span>
             <span class="ai-cta-arrow">→</span>
           </button>
@@ -334,18 +334,18 @@
           >
             <span
               class="nsign-arrow"
-              :style="{ transform: `rotate(${nearestSignArrow - 90}deg)`, color: nearestSign.report.zone_color || 'var(--blue)' }"
-            >➤</span>
+              :style="{ transform: `rotate(${nearestSignArrow}deg)`, color: nearestSign.report.zone_color || 'var(--blue)' }"
+            ><Icon name="nav-arrow" :size="20" /></span>
             <span class="nsign-text">
               <span class="nsign-title">
-                Nearest confirmed sign · {{ formatDist(nearestSign.distanceM) }}
+                {{ t('nearestSign', { dist: formatDist(nearestSign.distanceM) }) }}
               </span>
               <span class="nsign-sub">
                 <span :style="{ color: nearestSign.report.zone_color || 'var(--text2)' }">{{ nearestSign.report.zone_name }}</span>
-                · confirmed {{ relTime(nearestSign.report.created_at) }}
+                · {{ t('confirmedAgo', { time: relTime(nearestSign.report.created_at) }) }}
               </span>
             </span>
-            <span class="nsign-go">Lead me →</span>
+            <span class="nsign-go">{{ t('leadMe') }}</span>
           </button>
         </div><!-- /find panel -->
 
@@ -356,10 +356,10 @@
 
         <!-- Guest → account nudge (memory + reminders + fine alerts) -->
         <div v-if="!user" class="guest-upsell">
-          <span class="guest-upsell-icon">🔔</span>
+          <span class="guest-upsell-icon"><Icon name="bell" :size="16" /></span>
           <p class="guest-upsell-text">
-            You're paying as a guest. <NuxtLink to="/login">Create a free account</NuxtLink>
-            to track your session, get an expiry reminder, and watch your plate for fines.
+            {{ t('guestPre') }} <NuxtLink to="/login">{{ t('createAccount') }}</NuxtLink>
+            {{ t('guestPost') }}
           </p>
         </div>
 
@@ -368,13 +368,13 @@
 
         <!-- Fine warning -->
         <div v-if="cityDetail.fine" class="gps-fine">
-          <span class="gps-fine-label">Fine if unpaid</span>
+          <span class="gps-fine-label">{{ t('fineIfUnpaid') }}</span>
           <span class="gps-fine-amount">{{ cityDetail.fine }}</span>
         </div>
 
         <!-- Recent sessions -->
         <div v-if="pastSessions.length" class="gps-history">
-          <p class="section-label">Recent sessions</p>
+          <p class="section-label">{{ t('recentSessions') }}</p>
           <div
             v-for="s in pastSessions"
             :key="s.id"
@@ -429,24 +429,24 @@
         <Teleport to="body">
           <Transition name="status-sheet">
             <div v-if="showStatusSheet" class="status-scrim" role="dialog" aria-label="Parking status" @click.self="dismissStatus">
-              <div class="status-sheet">
-                <p class="status-kicker"><span class="status-free-dot" />Parking status · {{ detectedCity!.name }}</p>
+              <div ref="statusSheetEl" class="status-sheet" tabindex="-1">
+                <p class="status-kicker"><span class="status-free-dot" />{{ t('statusKicker') }} · {{ detectedCity!.name }}</p>
                 <p class="status-headline">
-                  <template v-if="nextWindow?.dayLabel === 'today'">Free until {{ nextWindow.start }}</template>
-                  <template v-else>Free right now — no payment needed</template>
+                  <template v-if="nextWindow?.dayLabel === 'today'">{{ t('statusFreeUntil', { time: nextWindow.start }) }}</template>
+                  <template v-else>{{ t('statusFreeNow') }}</template>
                 </p>
                 <p class="status-body">
-                  You don't need to pay in {{ detectedCity!.name }} right now.<template v-if="statusCanPrepay">
-                    The next paid window is <strong>{{ nextWindow!.dayLabel }} {{ nextWindow!.start }}–{{ nextWindow!.end }}</strong> — pre-pay it now to be covered the moment it opens.</template><template v-else-if="hoursStatus?.detail"> {{ hoursStatus.detail }}.</template>
+                  {{ t('statusBody', { city: detectedCity!.name }) }}<template v-if="statusCanPrepay">
+                    {{ t('statusPrepay', { day: dayWord(nextWindow!.dayLabel), start: nextWindow!.start, end: nextWindow!.end }) }}</template><template v-else-if="hoursStatus?.detail"> {{ hoursStatus.detail }}.</template>
                 </p>
                 <div class="status-actions">
                   <template v-if="statusCanPrepay">
-                    <button type="button" class="status-secondary" @click="dismissStatus">Not now</button>
+                    <button type="button" class="status-secondary" @click="dismissStatus">{{ t('notNow') }}</button>
                     <button type="button" class="status-primary" @click="statusToPrepay">
-                      Pre-pay {{ nextWindow!.start }}–{{ nextWindow!.end }}
+                      {{ t('prepaySheetBtn', { start: nextWindow!.start, end: nextWindow!.end }) }}
                     </button>
                   </template>
-                  <button v-else type="button" class="status-primary" @click="dismissStatus">Got it</button>
+                  <button v-else type="button" class="status-primary" @click="dismissStatus">{{ t('gotIt') }}</button>
                 </div>
               </div>
             </div>
@@ -458,15 +458,15 @@
       <ClientOnly>
         <Teleport to="body">
           <div v-if="showSentPrompt" class="sent" role="dialog" aria-label="Confirm SMS sent">
-            <div class="sent-sheet">
-              <p class="sent-title">Did your SMS send?</p>
+            <div ref="sentSheetEl" class="sent-sheet" tabindex="-1">
+              <p class="sent-title">{{ t('sentTitle') }}</p>
               <p class="sent-sub">
-                Your phone should have opened a message to <strong>{{ pendingPay?.zone.sms_shortcode }}</strong>.
-                The operator's reply SMS is your official receipt — keep it.
+                {{ t('sentBody1') }} <strong>{{ pendingPay?.zone.sms_shortcode }}</strong>.
+                {{ t('sentBody2') }}
               </p>
               <div class="sent-actions">
-                <button type="button" class="sent-no" @click="onSentNo">Not yet</button>
-                <button type="button" class="sent-yes" @click="onSentYes">Yes, sent it</button>
+                <button type="button" class="sent-no" @click="onSentNo">{{ t('sentNo') }}</button>
+                <button type="button" class="sent-yes" @click="onSentYes">{{ t('sentYes') }}</button>
               </div>
             </div>
           </div>
@@ -477,20 +477,18 @@
     <!-- ── HERO (default, non-GPS) ── -->
     <section v-else class="hero">
       <div class="container">
-        <p class="section-label fade-up">Street parking · Europe</p>
+        <p class="section-label fade-up">{{ t('heroLabel') }}</p>
         <h1 class="fade-up-2">
-          Parking rules for<br />any city, organized.
+          {{ t('heroTitle1') }}<br />{{ t('heroTitle2') }}
         </h1>
         <p class="hero-sub fade-up-3">
-          Zones, prices, and how to pay — pulled from official sources
-          and organized so you don't have to figure it out alone.
-          Always confirm with local signage before you park.
+          {{ t('heroSub') }}
         </p>
 
         <!-- GPS detecting state -->
         <div v-if="detecting" class="gps-detecting fade-up-3">
-          <span class="gps-icon">📍</span>
-          <span>Detecting your location…</span>
+          <span class="gps-icon"><Icon name="pin" :size="15" /></span>
+          <span>{{ t('detecting') }}</span>
         </div>
         <div v-else-if="gpsError" class="gps-error fade-up-3">
           <p class="gps-error-text">{{ gpsError }}</p>
@@ -500,7 +498,7 @@
             type="button"
             class="gps-ai-help"
             @click="showCityHelp = true"
-          >🧠 Ask AI how parking works in {{ unsupportedCity }} →</button>
+          ><Icon name="ai" :size="15" /> Ask AI how parking works in {{ unsupportedCity }} →</button>
         </div>
 
         <ClientOnly>
@@ -523,7 +521,7 @@
               v-model="searchQuery"
               class="search-input"
               type="text"
-              placeholder="Search city — Novi Sad, Belgrade, Niš..."
+              :placeholder="t('searchPlaceholder')"
               autocomplete="off"
               @focus="searchFocused = true"
               @blur="setTimeout(() => (searchFocused = false), 150)"
@@ -531,7 +529,7 @@
               @keydown.enter="goToFirstResult"
               @keydown.escape="searchResults = []"
             />
-            <button class="search-btn" @click="goToFirstResult">Find →</button>
+            <button class="search-btn" @click="goToFirstResult">{{ t('findBtn') }}</button>
           </div>
           <Transition name="dropdown">
           <div v-if="searchResults.length" class="search-dropdown">
@@ -656,6 +654,18 @@
 <script setup lang="ts">
 const { getCities, searchCities, getCity } = useCity()
 const { user, getProfile } = useAuth()
+const { t, lang } = useLang()
+
+// Day labels come from useParkingHours as canonical EN tokens; translate at render.
+const DAY_SR: Record<string, string> = {
+  Mon: 'pon', Tue: 'uto', Wed: 'sre', Thu: 'čet', Fri: 'pet', Sat: 'sub', Sun: 'ned',
+}
+const dayWord = (label?: string | null) => {
+  if (label === 'today') return t('today')
+  if (label === 'tomorrow') return t('tomorrow')
+  if (!label) return ''
+  return lang.value === 'sr' ? (DAY_SR[label] ?? label) : label
+}
 const { detectCity, detectedCity, detectedStreet, coords, detecting, gpsError, suggestedZoneName, unsupportedCity, startTracking, stopTracking } = useGPS()
 const showCityHelp = ref(false) // AI orientation panel for cities we don't cover yet
 const {
@@ -753,9 +763,19 @@ watch(mapExpanded, (open) => {
     leadSignPoint.value = null   // and the lead-to-sign pointer
   }
 })
+// Escape closes whatever is on top: SMS-sent sheet → status sheet → map.
+// (ScanSign / AskAi / CityHelp handle their own Escape via useDialogBehavior.)
 const onKeydown = (e: KeyboardEvent) => {
-  if (e.key === 'Escape') mapExpanded.value = false
+  if (e.key !== 'Escape') return
+  if (showSentPrompt.value) { onSentNo(); return }
+  if (showStatusSheet.value) { dismissStatus(); return }
+  mapExpanded.value = false
 }
+
+// Move focus into the bottom sheets when they open so keyboard/SR users land there.
+const statusSheetEl = ref<HTMLElement | null>(null)
+const sentSheetEl = ref<HTMLElement | null>(null)
+watch(showStatusSheet, (open) => { if (open) nextTick(() => statusSheetEl.value?.focus()) })
 onMounted(() => window.addEventListener('keydown', onKeydown))
 onUnmounted(() => {
   window.removeEventListener('keydown', onKeydown)
@@ -980,6 +1000,7 @@ const guestPayload = (zone: any, armed: boolean) => ({
 // returns to the tab, ask. Only on "yes" do we record a (self-reported) session.
 const pendingPay = ref<{ zone: any; armed: boolean } | null>(null)
 const showSentPrompt = ref(false)
+watch(showSentPrompt, (open) => { if (open) nextTick(() => sentSheetEl.value?.focus()) })
 let _visHandler: (() => void) | null = null
 const armSentPrompt = () => {
   if (!import.meta.client || _visHandler) return
@@ -1052,40 +1073,22 @@ const pastSessions = computed(() =>
 )
 
 const relTime = (iso: string) => {
+  const sr = lang.value === 'sr'
   const diff = Date.now() - new Date(iso).getTime()
   const min = Math.round(diff / 60000)
-  if (min < 1) return 'just now'
-  if (min < 60) return `${min} min ago`
+  if (min < 1) return sr ? 'upravo sada' : 'just now'
+  if (min < 60) return sr ? `pre ${min} min` : `${min} min ago`
   const h = Math.round(min / 60)
-  if (h < 24) return `${h}h ago`
+  if (h < 24) return sr ? `pre ${h}h` : `${h}h ago`
   const d = Math.round(h / 24)
-  return d === 1 ? 'yesterday' : `${d} days ago`
+  if (d === 1) return sr ? 'juče' : 'yesterday'
+  return sr ? `pre ${d} dana` : `${d} days ago`
 }
 
 const clockOf = (iso: string | null) =>
   iso ? new Date(iso).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }) : ''
 
-const smsLink = (zone: any) => {
-  if (!defaultPlate.value) return `sms:${zone.sms_shortcode}`
-  // Body-prefill separator differs by platform: iOS wants '&body=', Android
-  // (and most others) want '?body='. Getting this wrong silently drops the plate.
-  const ua = import.meta.client ? navigator.userAgent : ''
-  const sep = /iP(hone|ad|od)/i.test(ua) ? '&' : '?'
-  return `sms:${zone.sms_shortcode}${sep}body=${encodeURIComponent(defaultPlate.value)}`
-}
-
-// Open the SMS composer via a synthesized anchor click rather than location.href.
-// In an installed PWA on Android, navigating the window to an sms: scheme can
-// drop the ?body query; a real link click hands the intent over intact.
-const openSms = (url: string) => {
-  if (!import.meta.client) return
-  const a = document.createElement('a')
-  a.href = url
-  a.style.display = 'none'
-  document.body.appendChild(a)
-  a.click()
-  a.remove()
-}
+const smsLink = (zone: any) => smsHref(zone.sms_shortcode, defaultPlate.value)
 
 watch(detectedCity, async (city) => {
   if (!city) return
@@ -1572,7 +1575,7 @@ h2 {
   transition: background 150ms;
 }
 .map-expand-btn span { font-size: 15px; line-height: 1; }
-.map-expand-btn:hover { background: #fff; }
+.map-expand-btn:hover { background: var(--bg3); color: var(--text); }
 
 /* ── Fullscreen interactive map ── */
 .map-fs {
@@ -1608,7 +1611,7 @@ h2 {
   justify-content: center;
   font-size: 16px;
   color: var(--text2);
-  background: var(--bg2, #f3f4f6);
+  background: var(--bg3);
   border: 1px solid var(--border);
   border-radius: 50%;
   cursor: pointer;
@@ -1618,24 +1621,6 @@ h2 {
   flex: 1 1 auto;
   min-height: 0;
 }
-.compass-btn {
-  position: absolute;
-  bottom: 10px;
-  right: 10px;
-  background: rgba(255,255,255,0.92);
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
-  padding: 6px 12px;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text2);
-  backdrop-filter: blur(8px);
-  cursor: pointer;
-  box-shadow: var(--shadow-sm);
-  transition: background 150ms;
-}
-.compass-btn:hover { background: #fff; }
-
 .hero-gps {
   padding: 44px 0 40px;
   border-bottom: 1px solid var(--border);
@@ -1859,10 +1844,9 @@ h2 {
   border-radius: var(--r-md);
 }
 .np-icon {
-  font-size: 24px;
   line-height: 1;
   flex-shrink: 0;
-  filter: grayscale(0.3);
+  color: var(--green);
 }
 .np-title { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 2px; }
 .np-sub { font-size: 13px; color: var(--muted); line-height: 1.5; }
@@ -1910,7 +1894,7 @@ h2 {
 }
 .scan-cta:hover { border-color: var(--blue); }
 .scan-cta:active { transform: scale(0.99); }
-.scan-cta-icon { font-size: 22px; line-height: 1; flex-shrink: 0; }
+.scan-cta-icon { line-height: 1; flex-shrink: 0; color: var(--blue); }
 .scan-cta-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .scan-cta-title { font-size: 14px; font-weight: 700; color: var(--text); letter-spacing: -0.2px; }
 .scan-cta-sub { font-size: 12px; color: var(--muted); line-height: 1.4; }
@@ -1934,7 +1918,7 @@ h2 {
 }
 .ai-cta:hover { border-color: var(--blue); }
 .ai-cta:active { transform: scale(0.99); }
-.ai-cta-icon { font-size: 20px; line-height: 1; flex-shrink: 0; }
+.ai-cta-icon { line-height: 1; flex-shrink: 0; color: var(--text2); }
 .ai-cta-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .ai-cta-title { font-size: 14px; font-weight: 700; color: var(--text); letter-spacing: -0.2px; }
 .ai-cta-sub { font-size: 12px; color: var(--muted); line-height: 1.4; }
@@ -2003,7 +1987,7 @@ h2 {
   border-radius: var(--r-lg);
 }
 .armed-main { display: flex; align-items: flex-start; gap: 12px; min-width: 0; }
-.armed-moon { font-size: 22px; line-height: 1; flex-shrink: 0; }
+.armed-moon { line-height: 1; flex-shrink: 0; color: var(--amber); }
 .armed-title { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 2px; }
 .armed-sub { font-size: 12px; color: var(--muted); line-height: 1.5; }
 .armed-cancel {
@@ -2031,6 +2015,7 @@ h2 {
   padding: 16px;
   padding-bottom: max(16px, env(safe-area-inset-bottom));
 }
+.status-sheet:focus, .sent-sheet:focus { outline: none; } /* container focus, not interactive */
 .status-sheet {
   width: 100%;
   max-width: 440px;
@@ -2202,7 +2187,7 @@ h2 {
   border-radius: 20px;
 }
 .zone-pick-limit {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   font-family: var(--font-mono);
   text-transform: uppercase;
@@ -2242,17 +2227,27 @@ h2 {
   padding: 13px 14px 14px;
   border-top: 1px solid var(--border);
 }
-.zone-pay-note {
+/* Rule fine print — collapsed by default, one tap away */
+.zone-pay-more { margin-top: 12px; }
+.zone-pay-more summary {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+}
+.zone-pay-more summary:hover { color: var(--text2); }
+.zone-pay-more p {
+  margin-top: 6px;
   font-size: 12.5px;
   color: var(--text2);
   line-height: 1.5;
-  margin-bottom: 13px;
 }
 /* Tiny sign-check reassurance under the slide — keeps the track itself terse */
 .pay-note {
   margin-top: 8px;
-  font-size: 11.5px;
-  color: var(--muted2);
+  font-size: 12.5px;
+  color: var(--muted);
   text-align: center;
   line-height: 1.4;
 }
@@ -2269,23 +2264,18 @@ h2 {
   gap: 8px;
   padding: 13px 16px;
   border-radius: var(--r-md);
+  border: none;
+  font-family: inherit;
   font-size: 14px;
   font-weight: 600;
-  color: #fff;
+  cursor: pointer;
   text-decoration: none;
   transition: filter 150ms var(--ease-out);
 }
 .zone-act-btn:hover { filter: brightness(0.9); }
 .zone-act-arrow { margin-left: auto; opacity: 0.85; }
-.zone-act-foot {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-top: 12px;
-}
-.zone-act-link { font-size: 12px; color: var(--blue); font-weight: 500; }
+.zone-act-link { display: inline-block; margin-top: 12px; font-size: 12px; color: var(--blue); font-weight: 500; }
 .zone-act-link:hover { text-decoration: underline; }
-.zone-act-src { font-size: 11px; color: var(--muted2); line-height: 1.45; }
 
 /* Guest plate entry (no account) */
 .zone-plate { margin: 0 0 12px; }
@@ -2310,7 +2300,7 @@ h2 {
   text-transform: none;
   color: var(--muted2);
 }
-.zone-plate-hint { display: block; margin-top: 6px; font-size: 11px; color: var(--muted2); line-height: 1.45; }
+.zone-plate-hint { display: block; margin-top: 6px; font-size: 12px; color: var(--muted); line-height: 1.45; }
 .zone-plate-hint a { color: var(--blue); }
 .zone-plate-hint a:hover { text-decoration: underline; }
 
@@ -2325,7 +2315,7 @@ h2 {
   border: 1px solid var(--blue-border);
   border-radius: var(--r-md);
 }
-.guest-upsell-icon { font-size: 16px; line-height: 1.4; flex-shrink: 0; }
+.guest-upsell-icon { line-height: 1.4; flex-shrink: 0; color: var(--blue); }
 .guest-upsell-text { font-size: 13px; color: var(--text2); line-height: 1.5; }
 .guest-upsell-text a { color: var(--blue); font-weight: 500; }
 .guest-upsell-text a:hover { text-decoration: underline; }

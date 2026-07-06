@@ -15,7 +15,7 @@
       <div class="container">
         <!-- On-location? The fastest, most accurate contribution is a sign scan. -->
         <NuxtLink to="/" class="scan-promo">
-          <span class="scan-promo-icon">📸</span>
+          <span class="scan-promo-icon"><Icon name="camera" :size="22" /></span>
           <span class="scan-promo-text">
             <span class="scan-promo-title">Standing next to a parking sign? Scan it.</span>
             <span class="scan-promo-sub">

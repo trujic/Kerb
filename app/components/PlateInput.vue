@@ -21,12 +21,12 @@
       <button
         type="button"
         class="plate-cam"
-        :aria-label="busy ? 'Reading plate…' : 'Scan plate with camera'"
+        :aria-label="busy ? t('plateReadingAria') : t('plateScanAria')"
         :disabled="busy"
         @click="pick"
       >
         <span v-if="busy" class="plate-spin" />
-        <span v-else>📷</span>
+        <Icon v-else name="camera" :size="18" />
       </button>
       <input
         ref="fileEl"
@@ -40,9 +40,9 @@
 
     <p class="plate-hint">
       <span v-if="confidence !== null" class="plate-conf">
-        read {{ Math.round(confidence * 100) }}% — check every character
+        {{ t('plateConf', { pct: Math.round(confidence * 100) }) }}
       </span>
-      Č, Š, Ž, Đ, Ć read correctly — no typos, no blocked payments.
+      {{ t('plateOcrHint') }}
     </p>
     <p v-if="scanError" class="plate-err">{{ scanError }}</p>
   </div>
@@ -57,6 +57,7 @@ const props = withDefaults(defineProps<{
 const emit = defineEmits<{ 'update:modelValue': [v: string] }>()
 
 const { readPlate } = usePlateScan('ocr')
+const { t } = useLang()
 
 const fileEl = ref<HTMLInputElement | null>(null)
 const busy = ref(false)
@@ -83,10 +84,10 @@ const onFile = async (e: Event) => {
       emit('update:modelValue', res.plate)
       confidence.value = res.confidence
     } else {
-      scanError.value = "Couldn't read a plate. Fill the frame with it, straight on and level, then retake — or just type it in."
+      scanError.value = t('plateNoRead')
     }
   } catch {
-    scanError.value = 'Plate read failed. Type it in instead.'
+    scanError.value = t('plateFail')
   } finally {
     busy.value = false
     if (fileEl.value) fileEl.value.value = ''
@@ -142,6 +143,7 @@ const onFile = async (e: Event) => {
   align-items: center;
   justify-content: center;
   font-size: 18px;
+  color: #11131A;
   background: #E6E7E2;
   border: none;
   border-left: 1px solid rgba(0,0,0,0.12);
@@ -159,7 +161,7 @@ const onFile = async (e: Event) => {
   animation: plate-spin 0.7s linear infinite;
 }
 @keyframes plate-spin { to { transform: rotate(360deg); } }
-.plate-hint { margin-top: 7px; font-size: 11px; color: var(--muted2); line-height: 1.45; }
+.plate-hint { margin-top: 7px; font-size: 12px; color: var(--muted); line-height: 1.45; }
 .plate-conf {
   display: inline-block;
   margin-right: 6px;

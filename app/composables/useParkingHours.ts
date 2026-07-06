@@ -41,6 +41,7 @@ const SCHEDULES: Record<string, CitySchedule> = {
 }
 
 const DAY_ABBR = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const DAY_ABBR_SR = ['ned', 'pon', 'uto', 'sre', 'čet', 'pet', 'sub']
 const WEEKDAY_TO_INDEX: Record<string, number> = {
   Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6,
 }
@@ -52,13 +53,19 @@ const toMinutes = (hhmm: string) => {
 
 export interface ParkingStatus {
   paid: boolean
-  label: string   // short pill text, e.g. "Free now" / "Paid now"
-  detail: string  // e.g. "Free at 21:00" / "Charging from 07:00"
+  label: string   // short pill text, localized ("Free now" / "Besplatno sada")
+  detail: string  // localized ("Free at 21:00" / "Besplatno od 21:00")
+  // Structured fields so consumers never parse the localized strings:
+  kind: 'paid' | 'before-window' | 'after-window' | 'free-today'
+  at: string | null // the pivotal HH:MM (free-at time when paid, charge-start when free)
 }
 
-export interface ScheduleRow { label: string; value: string }
+export interface ScheduleRow { label: string; value: string; free: boolean }
 
 export const useParkingHours = (cityId: MaybeRefOrGetter<string | null | undefined>) => {
+  const { lang, t } = useLang()
+  const dayAbbr = (d: number) => (lang.value === 'sr' ? DAY_ABBR_SR[d] : DAY_ABBR[d])
+
   const schedule = computed<CitySchedule | null>(
     () => SCHEDULES[toValue(cityId) ?? ''] ?? null,
   )
@@ -113,8 +120,12 @@ export const useParkingHours = (cityId: MaybeRefOrGetter<string | null | undefin
       const nxt = nextChargingDay(c.day)
       return {
         paid: false,
-        label: 'Free now',
-        detail: nxt ? `Charging resumes ${DAY_ABBR[nxt.day]} ${nxt.window.start}` : 'Free today',
+        label: t('freeNowPill'),
+        detail: nxt
+          ? t('chargingResumesDay', { day: dayAbbr(nxt.day), time: nxt.window.start })
+          : t('freeToday'),
+        kind: 'free-today',
+        at: nxt?.window.start ?? null,
       }
     }
 
@@ -122,17 +133,33 @@ export const useParkingHours = (cityId: MaybeRefOrGetter<string | null | undefin
     const end = toMinutes(today.end)
 
     if (c.minutes < start) {
-      return { paid: false, label: 'Free now', detail: `Charging from ${today.start}` }
+      return {
+        paid: false,
+        label: t('freeNowPill'),
+        detail: t('chargingFrom', { time: today.start }),
+        kind: 'before-window',
+        at: today.start,
+      }
     }
     if (c.minutes >= end) {
       const nxt = nextChargingDay(c.day)
       return {
         paid: false,
-        label: 'Free now',
-        detail: nxt ? `Charging resumes ${DAY_ABBR[nxt.day]} ${nxt.window.start}` : 'Free now',
+        label: t('freeNowPill'),
+        detail: nxt
+          ? t('chargingResumesDay', { day: dayAbbr(nxt.day), time: nxt.window.start })
+          : t('freeNowPill'),
+        kind: 'after-window',
+        at: nxt?.window.start ?? null,
       }
     }
-    return { paid: true, label: 'Paid now', detail: `Free at ${today.end}` }
+    return {
+      paid: true,
+      label: t('paidNowPill'),
+      detail: t('freeAt', { time: today.end }),
+      kind: 'paid',
+      at: today.end,
+    }
   })
 
   const paidNow = computed<boolean | null>(() => status.value?.paid ?? null)
@@ -170,7 +197,7 @@ export const useParkingHours = (cityId: MaybeRefOrGetter<string | null | undefin
     const order = [1, 2, 3, 4, 5, 6, 0] // Mon … Sun
     const valueOf = (d: number) => {
       const w = s.days[d]
-      return w ? `${w.start}–${w.end}` : 'Free'
+      return w ? `${w.start}–${w.end}` : null // null = free all day
     }
     const rows: ScheduleRow[] = []
     let i = 0
@@ -179,8 +206,8 @@ export const useParkingHours = (cityId: MaybeRefOrGetter<string | null | undefin
       let j = i
       while (j + 1 < order.length && valueOf(order[j + 1]) === v) j++
       const label =
-        i === j ? DAY_ABBR[order[i]] : `${DAY_ABBR[order[i]]}–${DAY_ABBR[order[j]]}`
-      rows.push({ label, value: v })
+        i === j ? dayAbbr(order[i]) : `${dayAbbr(order[i])}–${dayAbbr(order[j])}`
+      rows.push({ label, value: v ?? t('free'), free: v === null })
       i = j + 1
     }
     return rows

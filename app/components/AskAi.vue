@@ -2,8 +2,8 @@
   <Teleport to="body">
     <div class="ai" role="dialog" aria-label="How parking works here">
       <div class="ai-bar">
-        <span class="ai-title">🧠 Parking in {{ cityName }}, simply</span>
-        <button class="ai-close" type="button" aria-label="Close" @click="$emit('close')">✕</button>
+        <span class="ai-title"><Icon name="ai" :size="15" /> {{ t('aiPanelTitle', { city: cityName }) }}</span>
+        <button ref="closeEl" class="ai-close" type="button" aria-label="Close" @click="$emit('close')">✕</button>
       </div>
 
       <div class="ai-body">
@@ -13,18 +13,18 @@
         <div class="g-now" :class="status?.paid ? 'is-paid' : 'is-free'">
           <span class="g-now-dot" />
           <div class="g-now-text">
-            <p class="g-now-label">{{ status?.paid ? 'You pay right now' : 'It’s free right now 🎉' }}</p>
+            <p class="g-now-label">{{ status?.paid ? t('aiPaidNow') : t('aiFreeNow') }}</p>
             <p class="g-now-detail">{{ nowDetail }}</p>
           </div>
         </div>
 
         <!-- 2. How to pay — three tiny steps + the numbers -->
         <section v-if="status?.paid && payableZones.length" class="g-sec">
-          <p class="g-sec-title">Pay in 3 steps</p>
+          <p class="g-sec-title">{{ t('pay3Steps') }}</p>
           <ol class="g-steps">
-            <li>Look at the coloured sign next to your car.</li>
-            <li>Send your plate in a text to that colour’s number.</li>
-            <li>Done. Keep the text — that’s your ticket.</li>
+            <li>{{ t('step1') }}</li>
+            <li>{{ t('step2') }}</li>
+            <li>{{ t('step3') }}</li>
           </ol>
           <div class="g-codes">
             <button
@@ -40,22 +40,22 @@
               <span class="g-code-num">{{ z.sms_shortcode }}</span>
             </button>
           </div>
-          <p class="g-note">Tap your colour and we’ll fill in your plate for you.</p>
+          <p class="g-note">{{ t('tapColour') }}</p>
         </section>
 
         <!-- When it's free, the basics are: you don't need to do anything -->
         <section v-else class="g-sec">
-          <p class="g-free-line">Nothing to do — just park. 🚗</p>
-          <p class="g-note">When paying starts again, come back here and we’ll show you how.</p>
+          <p class="g-free-line">{{ t('nothingToDo') }}</p>
+          <p class="g-note">{{ t('whenPayingStarts') }}</p>
         </section>
 
         <!-- The single sure thing -->
-        <button class="ai-btn" type="button" @click="$emit('scan')">📸 Scan the sign by your car</button>
+        <button class="ai-btn" type="button" @click="$emit('scan')"><Icon name="camera" :size="15" /> {{ t('scanByCar') }}</button>
 
         <!-- ── MORE, IF YOU WANT IT · tucked away ─────────────────────────── -->
 
         <details class="g-more">
-          <summary>🗓️ When do you have to pay?</summary>
+          <summary><Icon name="clock" :size="13" /> {{ t('whenPay') }}</summary>
           <div class="g-more-body">
             <dl class="g-days">
               <div v-for="r in dayRows" :key="r.label" class="g-day" :class="{ 'is-free': r.free }">
@@ -63,12 +63,12 @@
                 <dd>{{ r.value }}</dd>
               </div>
             </dl>
-            <p class="g-note">Any other time, parking is free — no ticket needed.</p>
+            <p class="g-note">{{ t('otherTimeFree') }}</p>
           </div>
         </details>
 
         <details class="g-more">
-          <summary>🎨 What are the colours?</summary>
+          <summary><Icon name="sign" :size="13" /> {{ t('whatColours') }}</summary>
           <div class="g-more-body">
             <div class="g-zones">
               <span
@@ -82,19 +82,19 @@
                 <span v-if="z.price" class="g-zone-price">{{ z.price }}</span>
               </span>
             </div>
-            <p class="g-note">Each colour is a zone. Nearer the centre usually costs more. The sign by your car shows your colour.</p>
+            <p class="g-note">{{ t('coloursNote') }}</p>
           </div>
         </details>
 
         <details v-if="whereLine" class="g-more">
-          <summary>📍 Where am I standing?</summary>
+          <summary><Icon name="pin" :size="13" /> {{ t('whereAmI') }}</summary>
           <div class="g-more-body">
             <p class="g-where-text">{{ whereLine }}</p>
-            <p class="g-note">Not sure? The sign next to your car is always right.</p>
+            <p class="g-note">{{ t('whereNote') }}</p>
           </div>
         </details>
 
-        <p v-if="sourceName" class="g-source">Straight from {{ sourceName }}{{ confirmedAt ? ` · checked ${confirmedAt}` : '' }}.</p>
+        <p v-if="sourceName" class="g-source">{{ t('straightFrom', { source: sourceName }) }}{{ confirmedAt ? ` · ${t('checkedOn', { date: confirmedAt })}` : '' }}.</p>
       </div>
     </div>
   </Teleport>
@@ -114,10 +114,15 @@ const props = defineProps<{
   confirmedAt?: string | null
 }>()
 
-defineEmits<{ pick: [zone: string]; scan: []; close: [] }>()
+const emit = defineEmits<{ pick: [zone: string]; scan: []; close: [] }>()
+
+// Escape closes; focus lands on the close button and returns to the opener.
+const closeEl = ref<HTMLElement | null>(null)
+useDialogBehavior(() => emit('close'), () => closeEl.value)
 
 // Hours + live status come straight from our registry — no model, no guessing.
 const { summary, status } = useParkingHours(() => props.cityId)
+const { t } = useLang()
 
 // "Blue Zone" → "Blue", "Extra Zone" → "Extra"; leave anything else intact.
 const shortZone = (name: string) => name.replace(/\s*zone\s*/i, ' ').trim() || name
@@ -126,8 +131,8 @@ const shortZone = (name: string) => name.replace(/\s*zone\s*/i, ' ').trim() || n
 const dayRows = computed(() =>
   summary.value.map((r) => ({
     label: r.label,
-    free: r.value === 'Free',
-    value: r.value === 'Free' ? 'Free' : r.value.replace(/:00/g, ''),
+    free: r.free,
+    value: r.free ? r.value : r.value.replace(/:00/g, ''),
   })),
 )
 
@@ -135,10 +140,11 @@ const dayRows = computed(() =>
 const payableZones = computed(() => props.zones.filter((z) => z.sms_shortcode))
 
 // One plain line under the headline — friendlier than the raw schedule wording.
+// Built from the structured status fields, never by parsing the localized text.
 const nowDetail = computed(() =>
   status.value?.paid
-    ? (status.value.detail ? `Free again at ${status.value.detail.replace(/^Free at\s*/i, '')}.` : 'You need a ticket right now.')
-    : 'No ticket needed. Just park.',
+    ? (status.value.at ? t('aiFreeAgain', { time: status.value.at }) : t('aiNeedTicket'))
+    : t('aiNoTicket'),
 )
 
 // One plain line from the GPS verdict — context, never the whole story.
@@ -148,13 +154,13 @@ const whereLine = computed<string | null>(() => {
   switch (v.state) {
     case 'assert':
     case 'triangulated':
-      return v.zone ? `You’re most likely in the ${shortZone(v.zone.name)} zone.` : null
+      return v.zone ? t('whereAssert', { zone: shortZone(v.zone.name) }) : null
     case 'disambiguate':
-      return 'You’re between two zones — let the sign decide.'
+      return t('whereBetween')
     case 'route_to_sign':
-      return 'A zone border runs through here — read the sign by your car.'
+      return t('whereBorder')
     case 'none':
-      return 'No paid zone right where you’re standing.'
+      return t('whereNone')
     default:
       return null
   }

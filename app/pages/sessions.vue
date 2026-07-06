@@ -13,7 +13,7 @@
       <section v-if="pushSupported || pushError" class="reminders-wrap">
         <div class="reminders">
           <div class="rem-text">
-            <p class="rem-title">🔔 Expiry reminders</p>
+            <p class="rem-title"><Icon name="bell" :size="14" /> Expiry reminders</p>
             <p class="rem-sub">{{ reminderSub }}</p>
           </div>
           <button

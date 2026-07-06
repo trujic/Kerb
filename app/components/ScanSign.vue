@@ -3,8 +3,8 @@
     <div class="scan" role="dialog" aria-label="Scan the parking sign">
       <!-- Bar -->
       <div class="scan-bar">
-        <span class="scan-title">🪧 Scan the sign</span>
-        <button class="scan-close" type="button" aria-label="Close" @click="$emit('close')">✕</button>
+        <span class="scan-title"><Icon name="sign" :size="15" /> Scan the sign</span>
+        <button ref="closeEl" class="scan-close" type="button" aria-label="Close" @click="$emit('close')">✕</button>
       </div>
 
       <div class="scan-body" :class="{ 'scan-body--cam': step === 'capture' && cameraOn }">
@@ -58,7 +58,7 @@
           <!-- Fallback: live camera denied/unsupported → native capture -->
           <template v-else>
             <div class="scan-hero">
-              <div class="scan-hero-icon">📸</div>
+              <div class="scan-hero-icon"><Icon name="camera" :size="30" /></div>
               <p class="scan-hero-title">Photograph the parking sign</p>
               <p class="scan-hero-sub">
                 The sign is the source of truth. Snap the colored zone sign next to your car —
@@ -84,7 +84,7 @@
               Last free scan — create an account to keep going.
             </p>
             <p v-if="!coords" class="scan-warn">
-              ⚠️ Location not available yet — we need your GPS to pin the sign. Allow location and try again.
+              <Icon name="alert" :size="13" /> Location not available yet — we need your GPS to pin the sign. Allow location and try again.
             </p>
           </template>
         </template>
@@ -129,7 +129,7 @@
             ✓ Colour and text both read <strong>{{ read.zone?.name }}</strong>.
           </p>
           <p v-else-if="read?.corroboration === 'conflict'" class="scan-corr warn">
-            ⚠ The colour looks like <strong>{{ read.color?.zone?.name }}</strong> but the text read
+            <Icon name="alert" :size="13" /> The colour looks like <strong>{{ read.color?.zone?.name }}</strong> but the text read
             <strong>{{ read.zone?.name }}</strong> — look again and pick what the sign actually says.
           </p>
           <p v-else-if="read?.corroboration === 'color-only'" class="scan-corr">
@@ -164,7 +164,7 @@
           <!-- GPS cross-check: read vs registry -->
           <div v-if="crossCheck" class="scan-xcheck" :class="crossCheck">
             <template v-if="crossCheck === 'match'">✓ Matches the registry for this spot.</template>
-            <template v-else>⚠️ Differs from the registry here — trust the sign in front of you, and make sure you scanned the one next to your car.</template>
+            <template v-else><Icon name="alert" :size="13" /> Differs from the registry here — trust the sign in front of you, and make sure you scanned the one next to your car.</template>
           </div>
 
           <p v-if="submitError" class="scan-warn">{{ submitError }}</p>
@@ -234,6 +234,10 @@ const emit = defineEmits<{
 
 const { readSign, submit, compressImage, FREE_SCANS, scansUsed, incScan } = useSignScan('ocr')
 const user = useSupabaseUser()
+
+// Escape closes; focus lands on the close button and returns to the opener.
+const closeEl = ref<HTMLElement | null>(null)
+useDialogBehavior(() => emit('close'), () => closeEl.value)
 
 // Guest scan meter (best-effort, on-device). Logged-in users aren't metered yet.
 const used = ref(0)

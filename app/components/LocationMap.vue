@@ -6,7 +6,7 @@
       class="lm-compass"
       type="button"
       @click.stop="$emit('enableCompass')"
-    >🧭 Enable compass</button>
+    ><Icon name="compass" :size="14" /> Enable compass</button>
     <button
       v-if="interactive && !follow"
       class="lm-recenter"
@@ -221,7 +221,7 @@ watchEffect((onCleanup) => {
       : ''
     const icon = L.divIcon({
       className: '',
-      html: `<div class="lm-sign-wrap" style="--sign:${color}">${arrow}<span class="lm-sign">🪧</span></div>`,
+      html: `<div class="lm-sign-wrap" style="--sign:${color}">${arrow}<span class="lm-sign"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3M12 13v8M8 21h8"/><path d="M5 6h12.5L20 9.5 17.5 13H5z"/></svg></span></div>`,
       iconSize: [40, 40],
       iconAnchor: [20, 20],
     })
@@ -376,6 +376,7 @@ onMounted(async () => {
   justify-content: center;
   font-size: 13px;
   line-height: 1;
+  color: var(--sign, #2563EB);
   background: #fff;
   border: 2px solid var(--sign, #2563EB);
   border-radius: 50%;
