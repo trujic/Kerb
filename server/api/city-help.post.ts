@@ -190,8 +190,10 @@ export default defineEventHandler(async (event) => {
   if (key) {
     try {
       data = await askGemini(city, lat, lng, key)
-    } catch {
-      // Don't 500 the UI — fall back to the labelled stub on any model/parse error.
+    } catch (e) {
+      // Don't 500 the UI — fall back to the labelled stub on any model/parse error,
+      // but log it so a misconfigured key/model is diagnosable in the server logs.
+      console.error('[city-help] Gemini call failed, serving stub:', e)
       data = stubFor(city)
     }
   } else {
