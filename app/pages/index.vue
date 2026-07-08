@@ -144,9 +144,9 @@
           >{{ t('tabInfo') }}</button>
         </div>
 
-        <!-- ═══ PAY PANEL — the 10-second job: status → zone → pay ═══ -->
+        <!-- ═══ PAY PANEL — the 10-second job: vehicle → zone → pay ═══ -->
         <div v-show="activeTab === 'pay'" class="gps-panel">
-        <!-- Live paid status — when free, the zone header already says so (no double text) -->
+        <!-- Live paid status — when free, the pre-pay note already says so -->
         <ParkingHours v-if="!freeNow" :city-id="detectedCity!.id" compact status-only class="gps-hours" />
 
         <!-- No paid parking at the user's spot -->
@@ -163,140 +163,148 @@
           </div>
         </div>
 
-        <!-- Zone cards -->
-        <div class="gps-zones">
-          <!-- ── Honest framing: GPS narrows it down, the sign decides ── -->
-          <div class="zone-pick-head">
-            <p class="zone-pick-title">
-              <template v-if="!freeNow && parkingState === 'on'">{{ t('paidAreaTitle') }}</template>
-              <template v-else-if="!freeNow && parkingState === 'near' && nearest">
-                {{ t('paidNearTitle', { dist: formatDist(nearest.distanceM) }) }}
-              </template>
-              <template v-else>{{ t('zonesInTitle', { city: detectedCity!.name }) }}</template>
-            </p>
-            <p class="zone-pick-hint">
-              <Icon name="sign" :size="14" /> {{ t('signHint') }}
-            </p>
-            <p v-if="mapApprox" class="zone-pick-approx">
-              <Icon name="alert" :size="13" /> {{ t('approxWarn', { city: detectedCity!.name }) }}
-            </p>
+        <!-- ── Step 1 · Vehicle — which car the SMS pays for, confirmed at a glance ── -->
+        <div class="pay-step">
+          <p class="pay-step-label">1 · {{ t('stepVehicle') }}</p>
+          <div v-if="!user">
+            <PlateInput v-model="guestPlate" />
+            <span class="zone-plate-hint">
+              {{ t('plateHint') }} · <NuxtLink to="/login">{{ t('plateSync') }}</NuxtLink>
+            </span>
           </div>
+          <div v-else-if="defaultPlate" class="veh-row">
+            <span class="veh-plate"><Icon name="car" :size="16" /> {{ defaultPlate }}</span>
+            <NuxtLink to="/profile" class="veh-edit">{{ t('editPlate') }}</NuxtLink>
+          </div>
+          <NuxtLink v-else to="/profile" class="veh-add">{{ t('addPlate') }} →</NuxtLink>
+        </div>
 
-          <!-- Selectable zones — likely floats up; the chosen one expands in place to pay -->
-          <div class="zone-pick-list" :class="{ 'zone-pick-list--free': freeNow }">
+        <!-- ── Step 2 · Zone — GPS's best guess as the hero; the sign decides ── -->
+        <div v-if="selectedZone" class="pay-step">
+          <p class="pay-step-label">2 · {{ t('stepZone') }}</p>
+          <div
+            class="zone-hero"
+            :class="{ 'zone-hero--free': freeNow }"
+            :style="{ borderColor: selectedZone.color }"
+          >
             <div
-              v-for="zone in orderedZones"
-              :key="zone.id"
-              class="zone-pick"
-              :class="{ 'zone-pick--active': zone.name === selectedZoneName }"
-              :style="zone.name === selectedZoneName ? { borderColor: zone.color } : null"
+              class="zone-hero-head"
+              :style="{ background: selectedZone.color, color: inkOn(selectedZone.color) }"
             >
-              <!-- Identity row — zone · likely · limit · price, all on one line -->
-              <button
-                type="button"
-                class="zone-pick-row"
-                :style="zone.name === selectedZoneName ? { background: zone.color + '0d' } : null"
-                @click="selectZone(zone.name)"
-              >
-                <span class="zone-pick-stripe" :style="{ background: zone.color }" />
-                <span class="zone-pick-info">
-                  <span class="zone-pick-name">{{ zone.name }}</span>
-                  <span v-if="zone.name === likelyZoneName" class="zone-pick-tag"><Icon name="pin" :size="10" /> {{ t('likelyYours') }}</span>
-                  <span
-                    v-if="zoneLimits[zone.name]"
-                    class="zone-pick-limit"
-                    :class="{ 'zone-pick-limit--cap': zoneLimits[zone.name]!.cap }"
-                    :style="zoneLimits[zone.name]!.cap ? { color: zone.color, borderColor: zone.color } : null"
-                  >{{ zoneLimits[zone.name]!.cap ? zoneLimits[zone.name]!.label : t('noLimit') }}</span>
+              <span class="zone-hero-id">
+                <span class="zone-hero-name">{{ selectedZone.name }}</span>
+                <span v-if="selectedZone.name === likelyZoneName" class="zone-hero-tag">
+                  <Icon name="pin" :size="10" /> {{ t('likelyYours') }}
                 </span>
-                <span class="zone-pick-price" :style="{ color: zone.color }">{{ zone.price }}</span>
-                <span class="zone-pick-radio" :class="{ on: zone.name === selectedZoneName }">
-                  <span v-if="zone.name === selectedZoneName">✓</span>
+              </span>
+              <span class="zone-hero-meta">
+                <span class="zone-hero-price">{{ selectedZone.price }}</span>
+                <span class="zone-hero-limit">
+                  {{ zoneLimits[selectedZone.name]?.cap ? zoneLimits[selectedZone.name]!.label : t('noLimit') }}
                 </span>
-              </button>
-
-              <!-- Chosen → the same card expands to pay. No second header. -->
-              <div v-if="zone.name === selectedZoneName" class="zone-pay">
-                <p v-if="parkingState === 'near'" class="zone-act-caution">
-                  <Icon name="alert" :size="13" /> {{ t('boundaryCaution') }}
-                  <strong>{{ zone.name }}</strong>.
-                </p>
-                <div v-if="!user" class="zone-plate">
-                  <PlateInput v-model="guestPlate" />
-                  <span class="zone-plate-hint">
-                    {{ t('plateHint') }} · <NuxtLink to="/login">{{ t('plateSync') }}</NuxtLink>
-                  </span>
-                </div>
-                <template v-if="zone.sms_shortcode">
-                  <!-- ── Night pre-pay: free now, the SMS carries over to the next window ── -->
-                  <div v-if="nightPrepay" class="prepay">
-                    <p class="prepay-note">
-                      <Icon name="moon" :size="13" />
-                      {{ t('prepayNote', { time: nextWindow!.start, day: dayWord(nextWindow!.dayLabel), start: nextWindow!.start, end: nextWindow!.end }) }}
-                    </p>
-                    <SlideToConfirm
-                      :key="'pp-' + zone.name"
-                      :label="t('sendSms', { code: zone.sms_shortcode })"
-                      :done-label="t('openingSms')"
-                      :color="zone.color"
-                      @confirm="pay(zone, { armed: true })"
-                    />
-                    <p class="pay-note">{{ t('slideConfirms') }} {{ t('smsToOperator') }}</p>
-                  </div>
-
-                  <!-- ── Paid hours: the slide IS the sign-confirmation ── -->
-                  <template v-else>
-                    <template v-if="!skipConfirm">
-                      <SlideToConfirm
-                        :key="zone.name"
-                        :label="t('sendSms', { code: zone.sms_shortcode })"
-                        :done-label="t('openingSms')"
-                        :color="zone.color"
-                        @confirm="pay(zone)"
-                      />
-                      <p class="pay-note">{{ t('slideConfirms') }} {{ t('smsToOperator') }}</p>
-                    </template>
-                    <!-- Responsibility mode: fast tap, no per-pay confirm -->
-                    <button
-                      v-else
-                      type="button"
-                      class="zone-act-btn"
-                      :style="{ background: zone.color, color: inkOn(zone.color) }"
-                      @click="pay(zone)"
-                    >
-                      <span v-if="defaultPlate">{{ t('payZone', { zone: zone.name }) }} · {{ defaultPlate }}</span>
-                      <span v-else>{{ t('payZone', { zone: zone.name }) }}</span>
-                      <span class="zone-act-arrow">→ {{ zone.sms_shortcode }}</span>
-                    </button>
-
-                    <!-- Persisted opt-out: take responsibility, skip the per-pay slide -->
-                    <label class="zone-resp" :class="{ 'zone-resp--on': skipConfirm }">
-                      <input v-model="skipConfirm" type="checkbox" class="zone-resp-box" />
-                      <span v-if="!skipConfirm">{{ t('respOff') }}</span>
-                      <span v-else>{{ t('respOn') }}</span>
-                    </label>
-                  </template>
-                </template>
-
-                <NuxtLink
-                  v-if="user && zone.sms_shortcode && !defaultPlate"
-                  to="/profile"
-                  class="zone-act-link"
-                >{{ t('addPlate') }}</NuxtLink>
-
-                <!-- The rule fine print earns its place behind one calm disclosure -->
-                <details v-if="zoneLimits[zone.name]?.note" class="zone-pay-more">
-                  <summary>{{ t('ruleDetails') }}</summary>
-                  <p>{{ zoneLimits[zone.name]!.note }}</p>
-                </details>
-              </div>
+              </span>
+            </div>
+            <div class="zone-hero-body">
+              <p class="zone-hero-check"><Icon name="sign" :size="14" /> {{ t('heroCheckSign') }}</p>
+              <p v-if="parkingState === 'near'" class="zone-act-caution">
+                <Icon name="alert" :size="13" /> {{ t('boundaryCaution') }}
+                <strong>{{ selectedZone.name }}</strong>.
+              </p>
+              <p v-if="mapApprox" class="zone-pick-approx">
+                <Icon name="alert" :size="13" /> {{ t('approxWarn', { city: detectedCity!.name }) }}
+              </p>
+              <details v-if="zoneLimits[selectedZone.name]?.note" class="zone-pay-more">
+                <summary>{{ t('ruleDetails') }}</summary>
+                <p>{{ zoneLimits[selectedZone.name]!.note }}</p>
+              </details>
             </div>
           </div>
 
-          <!-- Escape hatch to the spatial tools when the likely zone isn't enough -->
-          <button type="button" class="zone-unsure" @click="activeTab = 'find'">
-            <Icon name="sign" :size="14" /> {{ t('notSure') }}
+          <!-- The one escape hatch: every other zone + the ground-truth tools -->
+          <button type="button" class="zone-wrong" @click="wrongZone = !wrongZone">
+            <Icon name="sign" :size="15" /> {{ t('wrongZone') }}
+            <span class="zone-wrong-chev">{{ wrongZone ? '▴' : '▾' }}</span>
           </button>
+          <div v-if="wrongZone" class="zone-alt">
+            <button
+              v-for="zone in altZones"
+              :key="zone.id"
+              type="button"
+              class="zone-alt-row"
+              @click="selectZone(zone.name)"
+            >
+              <span class="zone-alt-stripe" :style="{ background: zone.color }" />
+              <span class="zone-alt-name">{{ zone.name }}</span>
+              <span
+                v-if="zoneLimits[zone.name]?.cap"
+                class="zone-alt-limit"
+                :style="{ color: zone.color, borderColor: zone.color }"
+              >{{ zoneLimits[zone.name]!.label }}</span>
+              <span class="zone-alt-price" :style="{ color: zone.color }">{{ zone.price }}</span>
+            </button>
+            <div class="zone-alt-tools">
+              <button type="button" class="zone-alt-tool" @click="showScan = true">
+                <Icon name="camera" :size="15" /> {{ t('scanTitle') }}
+              </button>
+              <button type="button" class="zone-alt-tool" @click="showAi = true">
+                <Icon name="ai" :size="15" /> {{ t('askAiShort') }}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Step 3 · Pay — one always-visible action ── -->
+        <div v-if="selectedZone?.sms_shortcode" class="pay-step">
+          <p class="pay-step-label">3 · {{ t('stepPay') }}</p>
+
+          <!-- Night pre-pay: free now, the SMS carries over to the next window -->
+          <div v-if="nightPrepay" class="prepay">
+            <p class="prepay-note">
+              <Icon name="moon" :size="13" />
+              {{ t('prepayNote', { time: nextWindow!.start, day: dayWord(nextWindow!.dayLabel), start: nextWindow!.start, end: nextWindow!.end }) }}
+            </p>
+            <SlideToConfirm
+              :key="'pp-' + selectedZone.name"
+              :label="t('sendSms', { code: selectedZone.sms_shortcode })"
+              :done-label="t('openingSms')"
+              :color="selectedZone.color"
+              @confirm="pay(selectedZone, { armed: true })"
+            />
+            <p class="pay-note">{{ t('slideConfirms') }} {{ t('smsToOperator') }}</p>
+          </div>
+
+          <!-- Paid hours: the slide IS the sign-confirmation -->
+          <template v-else>
+            <template v-if="!skipConfirm">
+              <SlideToConfirm
+                :key="selectedZone.name"
+                :label="t('sendSms', { code: selectedZone.sms_shortcode })"
+                :done-label="t('openingSms')"
+                :color="selectedZone.color"
+                @confirm="pay(selectedZone)"
+              />
+              <p class="pay-note">{{ t('slideConfirms') }} {{ t('smsToOperator') }}</p>
+            </template>
+            <!-- Responsibility mode: fast tap, no per-pay confirm -->
+            <button
+              v-else
+              type="button"
+              class="zone-act-btn"
+              :style="{ background: selectedZone.color, color: inkOn(selectedZone.color) }"
+              @click="pay(selectedZone)"
+            >
+              <span v-if="defaultPlate">{{ t('payZone', { zone: selectedZone.name }) }} · {{ defaultPlate }}</span>
+              <span v-else>{{ t('payZone', { zone: selectedZone.name }) }}</span>
+              <span class="zone-act-arrow">→ {{ selectedZone.sms_shortcode }}</span>
+            </button>
+
+            <!-- Persisted opt-out: take responsibility, skip the per-pay slide -->
+            <label class="zone-resp" :class="{ 'zone-resp--on': skipConfirm }">
+              <input v-model="skipConfirm" type="checkbox" class="zone-resp-box" />
+              <span v-if="!skipConfirm">{{ t('respOff') }}</span>
+              <span v-else>{{ t('respOn') }}</span>
+            </label>
+          </template>
         </div>
         </div><!-- /pay panel -->
 
@@ -872,14 +880,11 @@ const zoneLimits = computed<Record<string, ReturnType<typeof limitOf>>>(() => {
   return m
 })
 
-// Likely zone floats to the top; the rest keep their original order.
-const orderedZones = computed(() => {
-  const likely = likelyZoneName.value
-  if (!likely) return allZones.value
-  return [...allZones.value].sort(
-    (a, b) => (a.name === likely ? -1 : b.name === likely ? 1 : 0),
-  )
-})
+// "Wrong zone?" escape hatch — every zone except the hero, plus scan/AI tools.
+const wrongZone = ref(false)
+const altZones = computed(() =>
+  allZones.value.filter((z: any) => z.name !== selectedZoneName.value),
+)
 
 // What the user is about to pay for. Seeded from the likely zone, but theirs to change.
 const selectedZoneName = ref<string | null>(null)
@@ -891,7 +896,11 @@ const selectedZone = computed(
 // the early fallback (first zone, while GPS is still resolving) sticks and the
 // open card disagrees with the "likely yours" tag.
 const userPickedZone = ref(false)
-const selectZone = (name: string) => { selectedZoneName.value = name; userPickedZone.value = true }
+const selectZone = (name: string) => {
+  selectedZoneName.value = name
+  userPickedZone.value = true
+  wrongZone.value = false // picking from the escape hatch promotes it to the hero
+}
 
 // Follow the likely zone until the user picks; afterwards only repair invalid picks.
 watch([likelyZoneName, allZones], () => {
@@ -1793,28 +1802,193 @@ h2 {
 }
 .free-prepay-btn:active, .free-browse-btn:active { transform: scale(0.98); }
 
-/* "Not sure?" escape hatch from Pay → Find */
-.zone-unsure {
+/* ── Pay panel: 3-step wizard (vehicle → zone → pay) ── */
+.gps-hours { margin-bottom: 20px; }
+.pay-step { margin-bottom: 22px; }
+.pay-step-label {
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+/* Step 1 — vehicle at a glance */
+.veh-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+}
+.veh-plate {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-family: var(--font-mono);
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--text);
+}
+.veh-edit { font-size: 12px; font-weight: 600; color: var(--blue); flex-shrink: 0; }
+.veh-edit:hover { text-decoration: underline; }
+.veh-add {
   display: block;
+  padding: 12px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--blue);
+  background: var(--bg2);
+  border: 1px dashed var(--border2);
+  border-radius: var(--r-md);
+  transition: border-color 150ms var(--ease-out);
+}
+.veh-add:hover { border-color: var(--blue); }
+
+/* Step 2 — the hero zone card: identity loud, honesty attached */
+.zone-hero {
+  border: 1.5px solid;
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  background: var(--bg);
+  box-shadow: var(--shadow-sm);
+}
+/* Free-now: calm the card but keep it tappable/readable */
+.zone-hero--free { opacity: 0.62; filter: saturate(0.65); transition: opacity 150ms var(--ease-out); }
+.zone-hero--free:hover { opacity: 1; filter: none; }
+.zone-hero-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 15px 16px;
+}
+.zone-hero-id { display: flex; flex-direction: column; align-items: flex-start; gap: 5px; min-width: 0; }
+.zone-hero-name { font-size: 21px; font-weight: 800; letter-spacing: -0.3px; line-height: 1.1; }
+.zone-hero-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border: 1px solid currentColor;
+  padding: 2px 8px;
+  border-radius: 20px;
+}
+.zone-hero-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+  flex-shrink: 0;
+  text-align: right;
+}
+.zone-hero-price { font-size: 17px; font-weight: 700; font-family: var(--font-mono); letter-spacing: -0.5px; }
+.zone-hero-limit {
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  opacity: 0.85;
+}
+.zone-hero-body { padding: 12px 14px; }
+.zone-hero-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  font-size: 13px;
+  color: var(--text2);
+  line-height: 1.5;
+}
+.zone-hero-check + .zone-act-caution,
+.zone-hero-body .zone-pick-approx { margin-top: 10px; }
+.zone-hero-body .zone-act-caution { margin: 10px 0 0; }
+
+/* The one escape hatch — wrong zone opens every alternative + the tools */
+.zone-wrong {
+  display: flex;
+  align-items: center;
+  gap: 9px;
   width: 100%;
-  margin-top: 14px;
-  padding: 11px 14px;
+  margin-top: 10px;
+  padding: 13px 14px;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--amber);
+  text-align: left;
+  background: var(--amber-bg);
+  border: 1.5px solid var(--amber-border);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  transition: border-color 150ms var(--ease-out);
+}
+.zone-wrong:hover { border-color: var(--amber); }
+.zone-wrong-chev { margin-left: auto; font-size: 11px; }
+.zone-alt {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+.zone-alt-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  padding: 0 14px 0 0;
+  background: var(--bg);
+  border: 1.5px solid var(--border);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 150ms var(--ease-out);
+}
+.zone-alt-row:hover { border-color: var(--border2); }
+.zone-alt-stripe { width: 5px; align-self: stretch; flex-shrink: 0; min-height: 46px; }
+.zone-alt-name { font-size: 14px; font-weight: 600; color: var(--text); flex: 1; min-width: 0; padding: 12px 0; }
+.zone-alt-limit {
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 2px 7px;
+  border: 1px solid;
+  border-radius: 20px;
+  flex-shrink: 0;
+}
+.zone-alt-price { font-size: 15px; font-weight: 700; font-family: var(--font-mono); letter-spacing: -0.5px; flex-shrink: 0; }
+.zone-alt-tools { display: flex; gap: 8px; margin-top: 2px; }
+.zone-alt-tool {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 11px 12px;
   font-family: inherit;
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--text2);
-  text-align: center;
   background: var(--bg2);
   border: 1px dashed var(--border2);
   border-radius: var(--r-md);
   cursor: pointer;
   transition: border-color 150ms var(--ease-out), color 150ms var(--ease-out);
 }
-.zone-unsure:hover { border-color: var(--blue); color: var(--blue); }
-
-/* Zone pay cards */
-.gps-hours { margin-bottom: 20px; }
-.gps-zones { margin-bottom: 20px; }
+.zone-alt-tool:hover { border-color: var(--blue); color: var(--blue); }
 
 /* Recent sessions */
 .gps-history { margin-top: 24px; }
@@ -1852,22 +2026,8 @@ h2 {
 .np-sub { font-size: 13px; color: var(--muted); line-height: 1.5; }
 .np-sub strong { color: var(--text); font-weight: 600; }
 
-/* ── Zone picker (GPS narrows, the sign decides) ── */
-.zone-pick-head { margin-bottom: 12px; }
-.zone-pick-title {
-  font-size: 15px;
-  font-weight: 700;
-  letter-spacing: -0.2px;
-  color: var(--text);
-  margin-bottom: 4px;
-}
-.zone-pick-hint {
-  font-size: 13px;
-  color: var(--muted);
-  line-height: 1.5;
-}
+/* Approximate-geometry honesty note (hero card body) */
 .zone-pick-approx {
-  margin-top: 8px;
   padding: 8px 11px;
   font-size: 12px;
   line-height: 1.45;
@@ -1951,15 +2111,6 @@ h2 {
 .nsign-title { font-size: 13px; font-weight: 700; color: var(--text); letter-spacing: -0.1px; }
 .nsign-sub { font-size: 12px; color: var(--muted); }
 .nsign-go { font-size: 12px; font-weight: 600; color: var(--blue); flex-shrink: 0; white-space: nowrap; }
-
-.zone-pick-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-/* Free-now: calm the cards but keep them tappable */
-.zone-pick-list--free { opacity: 0.62; filter: saturate(0.65); transition: opacity 150ms var(--ease-out); }
-.zone-pick-list--free:hover { opacity: 1; filter: none; }
 
 /* Night pre-pay */
 .prepay-note {
@@ -2139,94 +2290,6 @@ h2 {
   cursor: pointer;
 }
 .sent-yes:active, .sent-no:active { transform: scale(0.98); }
-.zone-pick {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  background: var(--bg);
-  border: 1.5px solid var(--border);
-  border-radius: var(--r-md);
-  overflow: hidden;
-  transition: border-color 150ms var(--ease-out), box-shadow 150ms var(--ease-out);
-}
-.zone-pick:hover { border-color: var(--border2); }
-.zone-pick--active { box-shadow: var(--shadow-sm); }
-.zone-pick-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  text-align: left;
-  padding: 0;
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-family: inherit;
-  transition: background 150ms var(--ease-out);
-}
-.zone-pick-stripe { width: 5px; align-self: stretch; flex-shrink: 0; min-height: 48px; }
-.zone-pick-info {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-  padding: 13px 0;
-}
-.zone-pick-name { font-size: 14px; font-weight: 600; color: var(--text); }
-.zone-pick-tag {
-  font-size: 10px;
-  font-family: var(--font-mono);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--text2);
-  background: var(--bg3);
-  border: 1px solid var(--border);
-  padding: 2px 7px;
-  border-radius: 20px;
-}
-.zone-pick-limit {
-  font-size: 11px;
-  font-weight: 700;
-  font-family: var(--font-mono);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--muted);
-}
-.zone-pick-limit--cap {
-  padding: 2px 7px;
-  border: 1px solid;
-  border-radius: 20px;
-}
-.zone-pick-price {
-  font-size: 16px;
-  font-weight: 700;
-  font-family: var(--font-mono);
-  letter-spacing: -0.5px;
-  flex-shrink: 0;
-}
-.zone-pick-radio {
-  flex-shrink: 0;
-  width: 22px;
-  height: 22px;
-  margin-right: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1.5px solid var(--border2);
-  border-radius: 50%;
-  font-size: 12px;
-  color: #fff;
-  transition: background 150ms, border-color 150ms;
-}
-.zone-pick-radio.on { background: var(--text); border-color: var(--text); color: var(--bg); }
-
-/* Chosen zone expands the same card to pay — no duplicate header */
-.zone-pay {
-  padding: 13px 14px 14px;
-  border-top: 1px solid var(--border);
-}
 /* Rule fine print — collapsed by default, one tap away */
 .zone-pay-more { margin-top: 12px; }
 .zone-pay-more summary {
@@ -2262,6 +2325,7 @@ h2 {
   display: flex;
   align-items: center;
   gap: 8px;
+  width: 100%;
   padding: 13px 16px;
   border-radius: var(--r-md);
   border: none;
@@ -2274,32 +2338,8 @@ h2 {
 }
 .zone-act-btn:hover { filter: brightness(0.9); }
 .zone-act-arrow { margin-left: auto; opacity: 0.85; }
-.zone-act-link { display: inline-block; margin-top: 12px; font-size: 12px; color: var(--blue); font-weight: 500; }
-.zone-act-link:hover { text-decoration: underline; }
 
-/* Guest plate entry (no account) */
-.zone-plate { margin: 0 0 12px; }
-.zone-plate-input {
-  width: 100%;
-  padding: 11px 14px;
-  font-family: var(--font-mono);
-  font-size: 15px;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  color: var(--text);
-  background: var(--bg);
-  border: 1.5px solid var(--border2);
-  border-radius: var(--r-md);
-  outline: none;
-  transition: border-color 150ms var(--ease-out), box-shadow 150ms var(--ease-out);
-}
-.zone-plate-input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px var(--blue-bg); }
-.zone-plate-input::placeholder {
-  font-family: var(--font-body);
-  letter-spacing: 0;
-  text-transform: none;
-  color: var(--muted2);
-}
+/* Guest plate hint (under the plate field, step 1) */
 .zone-plate-hint { display: block; margin-top: 6px; font-size: 12px; color: var(--muted); line-height: 1.45; }
 .zone-plate-hint a { color: var(--blue); }
 .zone-plate-hint a:hover { text-decoration: underline; }

@@ -38,14 +38,17 @@ const dict = {
   today: { sr: 'danas', en: 'today' },
   tomorrow: { sr: 'sutra', en: 'tomorrow' },
 
-  // Zone picker
-  paidAreaTitle: { sr: 'Nalaziš se u zoni naplate', en: "You're in a paid parking area" },
-  paidNearTitle: { sr: 'Naplata parkinga ~{dist} odavde', en: 'Paid parking ~{dist} away' },
-  zonesInTitle: { sr: 'Zone parkiranja u {city}', en: 'Parking zones in {city}' },
-  signHint: {
-    sr: 'Izaberi zonu koja piše na tabli pored auta — samo ona važi.',
-    en: "Tap the zone printed on the sign next to your car — that's the one that counts.",
+  // Pay wizard: vehicle → zone → pay
+  stepVehicle: { sr: 'Vozilo', en: 'Vehicle' },
+  stepZone: { sr: 'Zona', en: 'Zone' },
+  stepPay: { sr: 'Plati', en: 'Pay' },
+  editPlate: { sr: 'Izmeni', en: 'Edit' },
+  heroCheckSign: {
+    sr: 'Proveri da se poklapa sa tablom pored auta — samo ona važi.',
+    en: "Check it matches the sign next to your car — that's the one that counts.",
   },
+  wrongZone: { sr: 'Pogrešna zona? Pogledaj sve zone', en: 'Wrong zone? See all zones' },
+  askAiShort: { sr: 'Pitaj AI', en: 'Ask AI' },
   approxWarn: {
     sr: 'Granice zona u {city} su približne (nema zvanične mape) — ovde suzi izbor, a veruj tabli.',
     en: "{city}'s zone areas are approximate (no official map) — use this to narrow it down, then trust the sign.",
@@ -72,7 +75,6 @@ const dict = {
   addPlate: { sr: 'Dodaj tablice za SMS jednim dodirom', en: 'Add a plate for one-tap SMS' },
   smsToOperator: { sr: 'Tvoj telefon šalje SMS operateru parkinga.', en: 'Your phone sends the SMS to the parking operator.' },
   ruleDetails: { sr: 'Detalji pravila', en: 'Rule details' },
-  notSure: { sr: 'Nisi siguran koja zona? Skeniraj tablu ili pitaj AI →', en: 'Not sure which zone? Scan the sign or ask AI →' },
   prepayNote: {
     sr: 'Besplatno do {time}. Po zvaničnom pravilu prenosa, SMS poslat sada važi za {day} {start}–{end} — ne od trenutka slanja.',
     en: 'Free until {time}. Per the official carry-over rule, an SMS you send now applies to {day} {start}–{end} — not the moment you send it.',
