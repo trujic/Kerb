@@ -33,11 +33,8 @@ const dict = {
   today: { sr: 'danas', en: 'today' },
   tomorrow: { sr: 'sutra', en: 'tomorrow' },
 
-  // Pay wizard: vehicle → zone → pay
-  stepVehicle: { sr: 'Vozilo', en: 'Vehicle' },
-  stepZone: { sr: 'Zona', en: 'Zone' },
-  stepPay: { sr: 'Plati', en: 'Pay' },
-  editPlate: { sr: 'Izmeni', en: 'Edit' },
+  // Pay surface: zone card → covered-until → slide
+  coveredUntil: { sr: 'Pokriveno do {time}', en: 'Covered until {time}' },
   managePlates: { sr: 'Upravljaj tablicama →', en: 'Manage plates →' },
   heroCheckSign: {
     sr: 'Proveri da se poklapa sa tablom pored auta — samo ona važi.',

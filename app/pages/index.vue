@@ -11,7 +11,7 @@
               :lng="coords!.lng"
               :accuracy="coords!.accuracy"
               :heading="heading"
-              :height="152"
+              :height="118"
               :zones="displayZones"
               :highlight="highlightPoint"
               :signs="signReports"
@@ -122,9 +122,6 @@
 
         <!-- ═══ FULL DASHBOARD — paid now, or browsing while free ═══ -->
         <template v-else>
-        <!-- Live paid status — when free, the pre-pay note already says so -->
-        <ParkingHours v-if="!freeNow && !noZoneHere" :city-id="detectedCity!.id" compact status-only class="gps-hours" />
-
         <!-- ═══ No paid parking here — the answer IS the screen; no zones to render ═══ -->
         <div v-if="noZoneHere" class="gps-noparking">
           <div class="np-main">
@@ -149,45 +146,21 @@
           </div>
         </div>
 
-        <!-- ═══ PAY WIZARD — the 10-second job: vehicle → zone → pay ═══ -->
+        <!-- ═══ PAY SURFACE — one screen: zone → slide; plate is a chip once known ═══ -->
         <template v-else>
-        <!-- ── Step 1 · Vehicle — which car the SMS pays for, confirmed at a glance ── -->
-        <div class="pay-step">
-          <p class="pay-step-label">1 · {{ t('stepVehicle') }}</p>
+        <!-- First run only: no plate yet — the one moment it deserves the space -->
+        <div v-if="!defaultPlate" class="pay-step">
           <div v-if="!user">
             <PlateInput v-model="guestPlate" />
             <span class="zone-plate-hint">
               {{ t('plateHint') }} · <NuxtLink to="/login">{{ t('plateSync') }}</NuxtLink>
             </span>
           </div>
-          <template v-else-if="defaultPlate">
-            <button type="button" class="veh-row" @click="plateOpen = !plateOpen">
-              <span class="veh-plate"><Icon name="car" :size="16" /> {{ defaultPlate }}</span>
-              <span class="veh-edit">{{ t('editPlate') }} {{ plateOpen ? '▴' : '▾' }}</span>
-            </button>
-            <!-- All saved plates inline — switch cars without leaving the flow -->
-            <div v-if="plateOpen" class="veh-list">
-              <button
-                v-for="p in profilePlates"
-                :key="p.id"
-                type="button"
-                class="veh-opt"
-                :class="{ on: p.plate === defaultPlate }"
-                @click="choosePlate(p.plate)"
-              >
-                <span class="veh-opt-plate">{{ p.plate }}</span>
-                <span v-if="p.label" class="veh-opt-label">{{ p.label }}</span>
-                <span v-if="p.plate === defaultPlate" class="veh-opt-on"><Icon name="check" :size="13" /></span>
-              </button>
-              <NuxtLink to="/profile" class="veh-manage">{{ t('managePlates') }}</NuxtLink>
-            </div>
-          </template>
           <NuxtLink v-else to="/profile" class="veh-add">{{ t('addPlate') }} →</NuxtLink>
         </div>
 
-        <!-- ── Step 2 · Zone — GPS's best guess as the hero; the sign decides ── -->
+        <!-- ── Zone — GPS's best guess as the hero; the sign decides ── -->
         <div v-if="selectedZone" class="pay-step">
-          <p class="pay-step-label">2 · {{ t('stepZone') }}</p>
           <div
             class="zone-hero"
             :class="{ 'zone-hero--free': freeNow }"
@@ -225,43 +198,43 @@
               </details>
             </div>
           </div>
-
-          <!-- The one escape hatch: every other zone + the ground-truth tools -->
-          <button type="button" class="zone-wrong" @click="wrongZone = !wrongZone">
-            <Icon name="sign" :size="15" /> {{ t('wrongZone') }}
-            <span class="zone-wrong-chev">{{ wrongZone ? '▴' : '▾' }}</span>
-          </button>
-          <div v-if="wrongZone" class="zone-alt">
-            <button
-              v-for="zone in altZones"
-              :key="zone.id"
-              type="button"
-              class="zone-alt-row"
-              @click="selectZone(zone.name)"
-            >
-              <span class="zone-alt-stripe" :style="{ background: zone.color }" />
-              <span class="zone-alt-name">{{ zone.name }}</span>
-              <span
-                v-if="zoneLimits[zone.name]?.cap"
-                class="zone-alt-limit"
-                :style="{ color: zone.color, borderColor: zone.color }"
-              >{{ zoneLimits[zone.name]!.label }}</span>
-              <span class="zone-alt-price" :style="{ color: zone.color }">{{ zone.price }}</span>
-            </button>
-            <div class="zone-alt-tools">
-              <button type="button" class="zone-alt-tool" @click="showScan = true">
-                <Icon name="camera" :size="15" /> {{ t('scanTitle') }}
-              </button>
-              <button type="button" class="zone-alt-tool" @click="showAi = true">
-                <Icon name="ai" :size="15" /> {{ t('askAiShort') }}
-              </button>
-            </div>
-          </div>
         </div>
 
-        <!-- ── Step 3 · Pay — one always-visible action ── -->
+        <!-- ── Pay — consequence first, then the gesture ── -->
         <div v-if="selectedZone?.sms_shortcode" class="pay-step">
-          <p class="pay-step-label">3 · {{ t('stepPay') }}</p>
+          <!-- Covered-until + the plate this SMS pays for -->
+          <div v-if="!nightPrepay || defaultPlate" class="pay-summary">
+            <span v-if="!nightPrepay" class="pay-until">
+              <strong>{{ t('coveredUntil', { time: coveredUntil }) }}</strong> · {{ selectedZone.price }}
+            </span>
+            <button
+              v-if="defaultPlate"
+              type="button"
+              class="plate-chip"
+              @click="plateOpen = !plateOpen"
+            >{{ defaultPlate }} <span class="plate-chip-chev">{{ plateOpen ? '▴' : '▾' }}</span></button>
+          </div>
+          <!-- Chip open → saved plates (account) or edit the device plate (guest) -->
+          <div v-if="plateOpen && defaultPlate" class="veh-list">
+            <template v-if="user">
+              <button
+                v-for="p in profilePlates"
+                :key="p.id"
+                type="button"
+                class="veh-opt"
+                :class="{ on: p.plate === defaultPlate }"
+                @click="choosePlate(p.plate)"
+              >
+                <span class="veh-opt-plate">{{ p.plate }}</span>
+                <span v-if="p.label" class="veh-opt-label">{{ p.label }}</span>
+                <span v-if="p.plate === defaultPlate" class="veh-opt-on"><Icon name="check" :size="13" /></span>
+              </button>
+              <NuxtLink to="/profile" class="veh-manage">{{ t('managePlates') }}</NuxtLink>
+            </template>
+            <div v-else class="veh-guest-edit">
+              <PlateInput v-model="guestPlate" />
+            </div>
+          </div>
 
           <!-- Night pre-pay: free now, the SMS carries over to the next window -->
           <div v-if="nightPrepay" class="prepay">
@@ -305,7 +278,41 @@
             </button>
           </template>
         </div>
-        </template><!-- /pay wizard -->
+
+        <!-- The one escape hatch, after the primary action: every other zone + tools -->
+        <template v-if="selectedZone">
+          <button type="button" class="zone-wrong" @click="wrongZone = !wrongZone">
+            <Icon name="sign" :size="15" /> {{ t('wrongZone') }}
+            <span class="zone-wrong-chev">{{ wrongZone ? '▴' : '▾' }}</span>
+          </button>
+          <div v-if="wrongZone" class="zone-alt">
+            <button
+              v-for="zone in altZones"
+              :key="zone.id"
+              type="button"
+              class="zone-alt-row"
+              @click="selectZone(zone.name)"
+            >
+              <span class="zone-alt-stripe" :style="{ background: zone.color }" />
+              <span class="zone-alt-name">{{ zone.name }}</span>
+              <span
+                v-if="zoneLimits[zone.name]?.cap"
+                class="zone-alt-limit"
+                :style="{ color: zone.color, borderColor: zone.color }"
+              >{{ zoneLimits[zone.name]!.label }}</span>
+              <span class="zone-alt-price" :style="{ color: zone.color }">{{ zone.price }}</span>
+            </button>
+            <div class="zone-alt-tools">
+              <button type="button" class="zone-alt-tool" @click="showScan = true">
+                <Icon name="camera" :size="15" /> {{ t('scanTitle') }}
+              </button>
+              <button type="button" class="zone-alt-tool" @click="showAi = true">
+                <Icon name="ai" :size="15" /> {{ t('askAiShort') }}
+              </button>
+            </div>
+          </div>
+        </template>
+        </template><!-- /pay surface -->
 
         <!-- ═══ BELOW THE FOLD — the sign tools, one scroll past the pay job ═══ -->
         <div class="below-section">
@@ -805,7 +812,17 @@ watch(guestPlate, (v) => {
 const SKIP_CONFIRM_KEY = 'kerb_skip_sign_confirm'
 const skipConfirm = ref(false)
 
-// ── Step 1 vehicle picker — all saved plates, switchable without leaving the flow ──
+// "Covered until" — one SMS buys one hour; show the consequence before the slide.
+// Ticks every 30s so a dashboard left open doesn't promise a stale time.
+const nowTick = ref(Date.now())
+let tickTimer: ReturnType<typeof setInterval> | undefined
+onMounted(() => { tickTimer = setInterval(() => (nowTick.value = Date.now()), 30_000) })
+onUnmounted(() => { if (tickTimer) clearInterval(tickTimer) })
+const coveredUntil = computed(() =>
+  new Date(nowTick.value + 3_600_000).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }),
+)
+
+// ── Plate chip picker — all saved plates, switchable without leaving the flow ──
 const profilePlates = computed<any[]>(() => userProfile.value?.plates ?? [])
 const plateOpen = ref(false)
 const chosenPlate = ref<string | null>(null) // per-visit override of the default plate
@@ -1771,41 +1788,46 @@ h2 {
 }
 .free-prepay-btn:active, .free-browse-btn:active { transform: scale(0.98); }
 
-/* ── Pay panel: 3-step wizard (vehicle → zone → pay) ── */
+/* ── Pay surface: zone card → covered-until summary → slide ── */
 .gps-hours { margin-bottom: 20px; }
-.pay-step { margin-bottom: 22px; }
-.pay-step-label {
-  font-size: 11px;
-  font-weight: 700;
-  font-family: var(--font-mono);
-  letter-spacing: 0.8px;
-  text-transform: uppercase;
-  color: var(--muted);
-  margin-bottom: 8px;
-}
+.pay-step { margin-bottom: 16px; }
 
-/* Step 1 — vehicle at a glance; tap to switch between saved plates */
-.veh-row {
+/* Consequence line + the plate the SMS pays for */
+.pay-summary {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  width: 100%;
-  padding: 12px 14px;
-  font-family: inherit;
-  text-align: left;
-  background: var(--bg2);
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
-  cursor: pointer;
-  transition: border-color 150ms var(--ease-out);
+  gap: 10px;
+  min-height: 30px;
+  margin-bottom: 8px;
 }
-.veh-row:hover { border-color: var(--border2); }
+.pay-until { font-size: 13px; color: var(--muted); }
+.pay-until strong { color: var(--text); font-weight: 700; }
+.plate-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  padding: 5px 11px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--text2);
+  background: var(--bg2);
+  border: 1px solid var(--border2);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: border-color 150ms var(--ease-out), color 150ms var(--ease-out);
+}
+.plate-chip:hover { border-color: var(--blue); color: var(--text); }
+.plate-chip-chev { font-size: 10px; color: var(--muted); }
+.veh-guest-edit { padding: 8px; }
 .veh-list {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  margin-top: 6px;
+  margin-bottom: 8px;
   padding: 6px;
   background: var(--bg2);
   border: 1px solid var(--border);
@@ -1840,18 +1862,6 @@ h2 {
   margin-top: 2px;
 }
 .veh-manage:hover { text-decoration: underline; }
-.veh-plate {
-  display: inline-flex;
-  align-items: center;
-  gap: 9px;
-  font-family: var(--font-mono);
-  font-size: 17px;
-  font-weight: 700;
-  letter-spacing: 2px;
-  color: var(--text);
-}
-.veh-edit { font-size: 12px; font-weight: 600; color: var(--blue); flex-shrink: 0; }
-.veh-edit:hover { text-decoration: underline; }
 .veh-add {
   display: block;
   padding: 12px 14px;
