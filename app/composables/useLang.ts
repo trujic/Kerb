@@ -8,11 +8,6 @@ export type Lang = 'sr' | 'en'
 const LANG_KEY = 'kerb_lang'
 
 const dict = {
-  // Tabs
-  tabPay: { sr: 'Plati', en: 'Pay' },
-  tabFind: { sr: 'Nađi', en: 'Find' },
-  tabInfo: { sr: 'Info', en: 'Info' },
-
   // Detected line
   detected: { sr: 'lokacija', en: 'detected' },
   fullGuide: { sr: 'Ceo vodič →', en: 'Full guide →' },
@@ -43,6 +38,7 @@ const dict = {
   stepZone: { sr: 'Zona', en: 'Zone' },
   stepPay: { sr: 'Plati', en: 'Pay' },
   editPlate: { sr: 'Izmeni', en: 'Edit' },
+  managePlates: { sr: 'Upravljaj tablicama →', en: 'Manage plates →' },
   heroCheckSign: {
     sr: 'Proveri da se poklapa sa tablom pored auta — samo ona važi.',
     en: "Check it matches the sign next to your car — that's the one that counts.",
@@ -62,6 +58,7 @@ const dict = {
   noParkingTitle: { sr: 'Nema naplate tu gde stojiš', en: "No paid zone where you're standing" },
   noParkingSub: { sr: 'Parkiranje ovde je verovatno besplatno. Najbliža naplata je', en: 'Parking here is likely free. Nearest paid parking is' },
   awayOn: { sr: 'odavde —', en: 'away —' },
+  scanContribute: { sr: 'Vidiš tablu? Skeniraj je', en: 'See a sign? Scan it' },
 
   // Pay card
   plateHint: { sr: 'Sačuvano na uređaju · ide u SMS', en: 'Saved on this device · prefilled into the SMS' },
@@ -70,8 +67,6 @@ const dict = {
   openingSms: { sr: 'Otvaram SMS…', en: 'Opening SMS…' },
   slideConfirms: { sr: 'Prevlačenjem potvrđuješ da si proverio tablu.', en: "Sliding confirms you've checked the sign." },
   payZone: { sr: 'Plati {zone}', en: 'Pay {zone}' },
-  respOff: { sr: 'Ne pitaj svaki put — sam proveravam tablu', en: "Don't ask each time — I'll check the sign myself" },
-  respOn: { sr: 'Potvrda isključena — dodirni da je vratiš', en: 'Confirmation off — tap to turn it back on' },
   addPlate: { sr: 'Dodaj tablice za SMS jednim dodirom', en: 'Add a plate for one-tap SMS' },
   smsToOperator: { sr: 'Tvoj telefon šalje SMS operateru parkinga.', en: 'Your phone sends the SMS to the parking operator.' },
   ruleDetails: { sr: 'Detalji pravila', en: 'Rule details' },
@@ -87,8 +82,8 @@ const dict = {
   sentNo: { sr: 'Još nije', en: 'Not yet' },
   sentYes: { sr: 'Da, poslat je', en: 'Yes, sent it' },
 
-  // Find panel
-  findLead: { sr: 'Mapa gore pokazuje gde si. Ovim alatima potvrdi tačnu zonu.', en: 'The map up top shows where you are. Use these to pin the exact zone.' },
+  // Sign tools (below the pay wizard)
+  findLabel: { sr: 'Proveri tačnu zonu', en: 'Pin the exact zone' },
   scanTitle: { sr: 'Skeniraj tablu', en: 'Scan the sign' },
   scanSub: { sr: 'Pročitaj zonu sa table, potvrdi na mapi, pa plati', en: 'Read the zone off the sign, confirm it on the map, then pay' },
   aiTitle: { sr: 'Prvi put ovde? Kako radi parkiranje', en: 'New here? How parking works' },

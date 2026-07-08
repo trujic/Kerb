@@ -122,47 +122,35 @@
 
         <!-- ═══ FULL DASHBOARD — paid now, or browsing while free ═══ -->
         <template v-else>
-        <!-- ── TABS — split the stack: do it / figure it out / look it up ── -->
-        <div class="gps-tabs" role="tablist">
-          <button
-            type="button" role="tab" class="gps-tab"
-            :class="{ on: activeTab === 'pay' }"
-            :aria-selected="activeTab === 'pay'"
-            @click="activeTab = 'pay'"
-          >{{ t('tabPay') }}</button>
-          <button
-            type="button" role="tab" class="gps-tab"
-            :class="{ on: activeTab === 'find' }"
-            :aria-selected="activeTab === 'find'"
-            @click="activeTab = 'find'"
-          >{{ t('tabFind') }}</button>
-          <button
-            type="button" role="tab" class="gps-tab"
-            :class="{ on: activeTab === 'info' }"
-            :aria-selected="activeTab === 'info'"
-            @click="activeTab = 'info'"
-          >{{ t('tabInfo') }}</button>
-        </div>
-
-        <!-- ═══ PAY PANEL — the 10-second job: vehicle → zone → pay ═══ -->
-        <div v-show="activeTab === 'pay'" class="gps-panel">
         <!-- Live paid status — when free, the pre-pay note already says so -->
-        <ParkingHours v-if="!freeNow" :city-id="detectedCity!.id" compact status-only class="gps-hours" />
+        <ParkingHours v-if="!freeNow && !noZoneHere" :city-id="detectedCity!.id" compact status-only class="gps-hours" />
 
-        <!-- No paid parking at the user's spot -->
-        <div v-if="parkingState === 'none' && nearest" class="gps-noparking">
-          <div class="np-icon"><Icon name="parking" :size="24" /></div>
-          <div class="np-text">
-            <p class="np-title">{{ t('noParkingTitle') }}</p>
-            <p class="np-sub">
-              {{ t('noParkingSub') }}
-              <strong>~{{ formatDist(nearest.distanceM) }}</strong> {{ t('awayOn') }}
-              <span :style="{ color: zoneColor(nearest.zoneName) }">{{ nearest.zoneName }}</span>
-              · {{ nearest.streetName }}.
-            </p>
+        <!-- ═══ No paid parking here — the answer IS the screen; no zones to render ═══ -->
+        <div v-if="noZoneHere" class="gps-noparking">
+          <div class="np-main">
+            <div class="np-icon"><Icon name="parking" :size="24" /></div>
+            <div class="np-text">
+              <p class="np-title">{{ t('noParkingTitle') }}</p>
+              <p class="np-sub">
+                {{ t('noParkingSub') }}
+                <strong>~{{ formatDist(nearest!.distanceM) }}</strong> {{ t('awayOn') }}
+                <span :style="{ color: zoneColor(nearest!.zoneName) }">{{ nearest!.zoneName }}</span>
+                · {{ nearest!.streetName }}.
+              </p>
+            </div>
+          </div>
+          <div class="np-actions">
+            <button type="button" class="np-btn" @click="mapExpanded = true">
+              <Icon name="expand" :size="14" /> {{ t('browseZones') }}
+            </button>
+            <button type="button" class="np-btn" @click="showScan = true">
+              <Icon name="camera" :size="14" /> {{ t('scanContribute') }}
+            </button>
           </div>
         </div>
 
+        <!-- ═══ PAY WIZARD — the 10-second job: vehicle → zone → pay ═══ -->
+        <template v-else>
         <!-- ── Step 1 · Vehicle — which car the SMS pays for, confirmed at a glance ── -->
         <div class="pay-step">
           <p class="pay-step-label">1 · {{ t('stepVehicle') }}</p>
@@ -172,10 +160,28 @@
               {{ t('plateHint') }} · <NuxtLink to="/login">{{ t('plateSync') }}</NuxtLink>
             </span>
           </div>
-          <div v-else-if="defaultPlate" class="veh-row">
-            <span class="veh-plate"><Icon name="car" :size="16" /> {{ defaultPlate }}</span>
-            <NuxtLink to="/profile" class="veh-edit">{{ t('editPlate') }}</NuxtLink>
-          </div>
+          <template v-else-if="defaultPlate">
+            <button type="button" class="veh-row" @click="plateOpen = !plateOpen">
+              <span class="veh-plate"><Icon name="car" :size="16" /> {{ defaultPlate }}</span>
+              <span class="veh-edit">{{ t('editPlate') }} {{ plateOpen ? '▴' : '▾' }}</span>
+            </button>
+            <!-- All saved plates inline — switch cars without leaving the flow -->
+            <div v-if="plateOpen" class="veh-list">
+              <button
+                v-for="p in profilePlates"
+                :key="p.id"
+                type="button"
+                class="veh-opt"
+                :class="{ on: p.plate === defaultPlate }"
+                @click="choosePlate(p.plate)"
+              >
+                <span class="veh-opt-plate">{{ p.plate }}</span>
+                <span v-if="p.label" class="veh-opt-label">{{ p.label }}</span>
+                <span v-if="p.plate === defaultPlate" class="veh-opt-on"><Icon name="check" :size="13" /></span>
+              </button>
+              <NuxtLink to="/profile" class="veh-manage">{{ t('managePlates') }}</NuxtLink>
+            </div>
+          </template>
           <NuxtLink v-else to="/profile" class="veh-add">{{ t('addPlate') }} →</NuxtLink>
         </div>
 
@@ -297,20 +303,13 @@
               <span v-else>{{ t('payZone', { zone: selectedZone.name }) }}</span>
               <span class="zone-act-arrow">→ {{ selectedZone.sms_shortcode }}</span>
             </button>
-
-            <!-- Persisted opt-out: take responsibility, skip the per-pay slide -->
-            <label class="zone-resp" :class="{ 'zone-resp--on': skipConfirm }">
-              <input v-model="skipConfirm" type="checkbox" class="zone-resp-box" />
-              <span v-if="!skipConfirm">{{ t('respOff') }}</span>
-              <span v-else>{{ t('respOn') }}</span>
-            </label>
           </template>
         </div>
-        </div><!-- /pay panel -->
+        </template><!-- /pay wizard -->
 
-        <!-- ═══ FIND ZONE PANEL — "which zone am I actually in?" ═══ -->
-        <div v-show="activeTab === 'find'" class="gps-panel">
-          <p class="panel-lead"><Icon name="pin" :size="13" /> {{ t('findLead') }}</p>
+        <!-- ═══ BELOW THE FOLD — the sign tools, one scroll past the pay job ═══ -->
+        <div class="below-section">
+          <p class="section-label">{{ t('findLabel') }}</p>
 
           <!-- Scan the sign — the sign is ground truth: read it, confirm, pin it, pay -->
           <button type="button" class="scan-cta" @click="showScan = true">
@@ -355,10 +354,10 @@
             </span>
             <span class="nsign-go">{{ t('leadMe') }}</span>
           </button>
-        </div><!-- /find panel -->
+        </div><!-- /sign tools -->
 
-        <!-- ═══ INFO PANEL — reference & reassurance, never urgent ═══ -->
-        <div v-show="activeTab === 'info'" class="gps-panel">
+        <!-- ═══ CITY INFO — reference & reassurance, never urgent ═══ -->
+        <div class="below-section">
         <!-- Full weekly charging schedule (reference) -->
         <ParkingHours :city-id="detectedCity!.id" class="gps-hours" />
 
@@ -396,7 +395,7 @@
             <span class="hist-when">{{ relTime(s.started_at) }}</span>
           </div>
         </div>
-        </div><!-- /info panel -->
+        </div><!-- /city info -->
         </template><!-- /full dashboard -->
       </div>
 
@@ -569,6 +568,8 @@
       </div>
     </section>
 
+    <!-- ── CITY STRIP + CITIES + HOW IT WORKS + CTA (hidden in GPS mode: the city is known) ── -->
+    <template v-if="!gpsMode">
     <!-- ── CITY STRIP ── -->
     <div v-if="stripItems.length" class="city-strip">
       <div class="city-strip-track">
@@ -613,8 +614,6 @@
       </div>
     </section>
 
-    <!-- ── HOW IT WORKS + CTA (hidden in GPS mode) ── -->
-    <template v-if="!gpsMode">
     <!-- ── HOW IT WORKS ── -->
     <section id="how" class="section-how">
       <div class="container">
@@ -696,7 +695,6 @@ const loadingCityDetail = ref(false)
 const userProfile = ref<any>(null)
 const zoneBoundaries = ref<any>(null)
 const mapExpanded = ref(false)
-const activeTab = ref<'pay' | 'find' | 'info'>('pay') // GPS dashboard: split the stack into panels
 const showScan = ref(false)              // scan-the-sign modal
 const showAi = ref(false)                // ask-AI resolver panel
 const signReports = ref<any[]>([])       // confirmed sign scans → map pins
@@ -752,7 +750,7 @@ const freeSurface = computed(() =>
   freeNow.value && !forceBrowse.value && !displaySession.value,
 )
 const browseAnyway = () => { forceBrowse.value = true }
-const statusToPrepay = () => { forceBrowse.value = true; activeTab.value = 'pay'; dismissStatus() }
+const statusToPrepay = () => { forceBrowse.value = true; dismissStatus() }
 
 // Guest sessions (no account), persisted on-device. Created only AFTER the user
 // confirms they sent the SMS. Logged-in users keep the Supabase-backed session.
@@ -802,16 +800,20 @@ watch(guestPlate, (v) => {
   else localStorage.removeItem(GUEST_PLATE_KEY)
 })
 
-// Persisted "I self-check the sign" opt-out — swaps the per-pay slide for a fast tap.
+// "I self-check the sign" opt-out — swaps the per-pay slide for a fast tap.
+// Read-only here; the toggle lives in the profile's Paying section.
 const SKIP_CONFIRM_KEY = 'kerb_skip_sign_confirm'
 const skipConfirm = ref(false)
-watch(skipConfirm, (v) => {
-  if (import.meta.client) localStorage.setItem(SKIP_CONFIRM_KEY, v ? '1' : '0')
-})
+
+// ── Step 1 vehicle picker — all saved plates, switchable without leaving the flow ──
+const profilePlates = computed<any[]>(() => userProfile.value?.plates ?? [])
+const plateOpen = ref(false)
+const chosenPlate = ref<string | null>(null) // per-visit override of the default plate
+const choosePlate = (p: string) => { chosenPlate.value = p; plateOpen.value = false }
 
 const defaultPlate = computed(() => {
-  const plates = userProfile.value?.plates ?? []
-  const saved = (plates.find((p: any) => p.is_default) ?? plates[0])?.plate
+  if (chosenPlate.value) return chosenPlate.value
+  const saved = (profilePlates.value.find((p: any) => p.is_default) ?? profilePlates.value[0])?.plate
   return saved ?? (guestPlate.value.trim() ? guestPlate.value.trim().toUpperCase() : null)
 })
 
@@ -838,6 +840,10 @@ const parkingState = computed<'on' | 'near' | 'none' | null>(() => {
   if (n.distanceM <= nearT) return 'near'
   return 'none'
 })
+
+// No paid parking where the user stands (with geometry to back it) — the wizard
+// yields to a calm "you're fine here" card; zones would only contradict it.
+const noZoneHere = computed(() => parkingState.value === 'none' && !!nearest.value)
 
 const formatDist = (m: number) => {
   if (m >= 1000) return `${(m / 1000).toFixed(1)} km`
@@ -1072,8 +1078,7 @@ const aiSourceName = computed(() => {
 const onAiPick = (zoneName: string) => {
   if (allZones.value.some((z: any) => z.name === zoneName)) selectZone(zoneName)
   showAi.value = false
-  forceBrowse.value = true   // reveal the tabs…
-  activeTab.value = 'pay'     // …and land on the zone, ready to pay
+  forceBrowse.value = true   // reveal the pay wizard with the zone ready to pay
 }
 const onAiScan = () => { showAi.value = false; showScan.value = true }
 
@@ -1679,49 +1684,13 @@ h2 {
 }
 .gps-detected-guide:hover { color: var(--blue-hover); }
 
-/* ── Dashboard tabs — split the stack into do-it / find-it / look-it-up ── */
-.gps-tabs {
-  display: flex;
-  gap: 4px;
-  padding: 4px;
-  margin-bottom: 20px;
-  background: var(--bg2);
-  border: 1px solid var(--border);
-  border-radius: var(--r-lg);
-  position: sticky;
-  top: 53px;
-  z-index: 40;
+/* ── Below-the-fold sections — sign tools + city info, one scroll past pay ── */
+.below-section {
+  margin-top: 30px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
 }
-.gps-tab {
-  flex: 1;
-  padding: 9px 10px;
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--muted);
-  background: transparent;
-  border: none;
-  border-radius: var(--r-md);
-  cursor: pointer;
-  transition: color 150ms var(--ease-out), background 150ms var(--ease-out);
-}
-.gps-tab:hover { color: var(--text2); }
-.gps-tab.on {
-  color: var(--text);
-  background: var(--bg);
-  box-shadow: var(--shadow-sm);
-}
-.gps-panel { animation: panel-in 180ms var(--ease-out); }
-@keyframes panel-in {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: none; }
-}
-.panel-lead {
-  font-size: 13px;
-  color: var(--muted);
-  line-height: 1.5;
-  margin-bottom: 14px;
-}
+.below-section > .section-label { margin-bottom: 12px; }
 
 /* ── Free-now surface — the calm "no payment needed" main screen ── */
 .free-surface {
@@ -1815,17 +1784,62 @@ h2 {
   margin-bottom: 8px;
 }
 
-/* Step 1 — vehicle at a glance */
+/* Step 1 — vehicle at a glance; tap to switch between saved plates */
 .veh-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  width: 100%;
   padding: 12px 14px;
+  font-family: inherit;
+  text-align: left;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  transition: border-color 150ms var(--ease-out);
+}
+.veh-row:hover { border-color: var(--border2); }
+.veh-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+  padding: 6px;
   background: var(--bg2);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
 }
+.veh-opt {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 10px;
+  font-family: inherit;
+  text-align: left;
+  background: transparent;
+  border: none;
+  border-radius: var(--r-sm, 6px);
+  cursor: pointer;
+  transition: background 150ms var(--ease-out);
+}
+.veh-opt:hover { background: var(--bg3); }
+.veh-opt.on { background: var(--bg); box-shadow: var(--shadow-sm); }
+.veh-opt-plate { font-family: var(--font-mono); font-size: 15px; font-weight: 700; letter-spacing: 1.5px; color: var(--text); }
+.veh-opt-label { font-size: 12px; color: var(--muted); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.veh-opt-on { margin-left: auto; color: var(--green); line-height: 1; flex-shrink: 0; }
+.veh-manage {
+  display: block;
+  padding: 9px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--blue);
+  border-top: 1px solid var(--border);
+  margin-top: 2px;
+}
+.veh-manage:hover { text-decoration: underline; }
 .veh-plate {
   display: inline-flex;
   align-items: center;
@@ -2006,17 +2020,15 @@ h2 {
 .hist-street { color: var(--muted); }
 .hist-when { font-size: 12px; color: var(--muted2); font-family: var(--font-mono); flex-shrink: 0; }
 
-/* No paid parking at the user's spot */
+/* No paid parking at the user's spot — the calm answer + what to do instead */
 .gps-noparking {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 14px 16px;
+  padding: 16px;
   margin-bottom: 20px;
   background: var(--green-bg);
   border: 1px solid var(--green-border);
-  border-radius: var(--r-md);
+  border-radius: var(--r-lg);
 }
+.np-main { display: flex; align-items: center; gap: 14px; }
 .np-icon {
   line-height: 1;
   flex-shrink: 0;
@@ -2025,6 +2037,26 @@ h2 {
 .np-title { font-size: 14px; font-weight: 700; color: var(--text); margin-bottom: 2px; }
 .np-sub { font-size: 13px; color: var(--muted); line-height: 1.5; }
 .np-sub strong { color: var(--text); font-weight: 600; }
+.np-actions { display: flex; gap: 8px; margin-top: 14px; }
+.np-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 11px 12px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text2);
+  background: var(--bg);
+  border: 1px solid var(--green-border);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  transition: border-color 150ms var(--ease-out), color 150ms var(--ease-out);
+}
+.np-btn:hover { border-color: var(--green); color: var(--text); }
+.np-btn:active { transform: scale(0.98); }
 
 /* Approximate-geometry honesty note (hero card body) */
 .zone-pick-approx {
@@ -2359,20 +2391,6 @@ h2 {
 .guest-upsell-text { font-size: 13px; color: var(--text2); line-height: 1.5; }
 .guest-upsell-text a { color: var(--blue); font-weight: 500; }
 .guest-upsell-text a:hover { text-decoration: underline; }
-
-/* Responsibility opt-out under the pay control */
-.zone-resp {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  margin-top: 12px;
-  font-size: 12px;
-  color: var(--muted);
-  line-height: 1.45;
-  cursor: pointer;
-}
-.zone-resp-box { margin-top: 1px; flex-shrink: 0; cursor: pointer; }
-.zone-resp--on { color: var(--amber); }
 
 .gps-finecheck { margin-bottom: 20px; }
 

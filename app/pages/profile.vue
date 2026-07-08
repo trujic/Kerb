@@ -102,6 +102,19 @@
             </div>
             <p v-else class="plates-limit">Maximum 3 plates reached.</p>
           </section>
+
+          <!-- Paying preferences -->
+          <section class="profile-section">
+            <h2>Paying</h2>
+            <label class="checkbox-row">
+              <input v-model="skipConfirm" type="checkbox" />
+              <span>Skip the slide-to-confirm — I check the sign myself</span>
+            </label>
+            <p class="section-desc" style="margin-bottom: 0">
+              The pay control becomes a single tap. You take responsibility for matching
+              the zone to the sign next to your car before every payment.
+            </p>
+          </section>
         </div>
 
         <!-- RIGHT: Quick links -->
@@ -149,6 +162,13 @@ const newPlate = reactive({ plate: '', label: '', isDefault: false })
 const savingPlate = ref(false)
 const plateError = ref('')
 
+// "I self-check the sign" opt-out — device-local, read by the homepage pay wizard.
+const SKIP_CONFIRM_KEY = 'kerb_skip_sign_confirm'
+const skipConfirm = ref(false)
+watch(skipConfirm, (v) => {
+  if (import.meta.client) localStorage.setItem(SKIP_CONFIRM_KEY, v ? '1' : '0')
+})
+
 // Load cities for the select
 const { data: cities } = await useAsyncData('profile-cities', async () => {
   const { data } = await supabase.from('cities').select('id, name, country, flag').order('name')
@@ -157,6 +177,7 @@ const { data: cities } = await useAsyncData('profile-cities', async () => {
 
 // Load profile
 onMounted(async () => {
+  skipConfirm.value = localStorage.getItem(SKIP_CONFIRM_KEY) === '1'
   try {
     const profile = await getProfile()
     if (profile) {
