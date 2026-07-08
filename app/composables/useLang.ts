@@ -63,7 +63,7 @@ const dict = {
   // Pay card
   plateHint: { sr: 'Sačuvano na uređaju · ide u SMS', en: 'Saved on this device · prefilled into the SMS' },
   plateSync: { sr: 'Napravi nalog za sinhronizaciju.', en: 'Create an account to sync it.' },
-  sendSms: { sr: 'Pošalji SMS → {code}', en: 'Send SMS → {code}' },
+  sendSms: { sr: 'Prevuci da pošalješ SMS → {code}', en: 'Slide to send SMS → {code}' },
   openingSms: { sr: 'Otvaram SMS…', en: 'Opening SMS…' },
   slideConfirms: { sr: 'Prevlačenjem potvrđuješ da si proverio tablu.', en: "Sliding confirms you've checked the sign." },
   payZone: { sr: 'Plati {zone}', en: 'Pay {zone}' },
