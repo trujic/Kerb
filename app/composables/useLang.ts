@@ -144,6 +144,7 @@ const dict = {
   searchPlaceholder: { sr: 'Pretraži grad: Novi Sad, Beograd, Niš…', en: 'Search city: Novi Sad, Belgrade, Niš…' },
   findBtn: { sr: 'Nađi →', en: 'Find →' },
   detecting: { sr: 'Otkrivam tvoju lokaciju…', en: 'Detecting your location…' },
+  resolvingSpot: { sr: 'Proveravam zonu na tvom mestu…', en: 'Checking the zone where you are…' },
 
   // Hours (rendered by useParkingHours)
   hoursTitle: { sr: 'Radno vreme naplate', en: 'Parking hours' },

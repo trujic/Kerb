@@ -122,8 +122,14 @@
 
         <!-- ═══ FULL DASHBOARD — paid now, or browsing while free ═══ -->
         <template v-else>
+        <!-- Geometry still loading — hold the verdict; never guess a zone to unsay -->
+        <div v-if="!geoResolved" class="gps-detecting gps-resolving">
+          <span class="gps-icon"><Icon name="pin" :size="15" /></span>
+          <span>{{ t('resolvingSpot') }}</span>
+        </div>
+
         <!-- ═══ No paid parking here — the answer IS the screen; no zones to render ═══ -->
-        <div v-if="noZoneHere" class="gps-noparking">
+        <div v-else-if="noZoneHere" class="gps-noparking">
           <div class="np-main">
             <div class="np-icon"><Icon name="parking" :size="24" /></div>
             <div class="np-text">
@@ -701,6 +707,10 @@ const cityDetail = ref<any>(null)
 const loadingCityDetail = ref(false)
 const userProfile = ref<any>(null)
 const zoneBoundaries = ref<any>(null)
+// Geometry + signs fetch has settled (either way). Until then the dashboard holds
+// a "checking your spot" line instead of guessing a zone — the guess used to paint
+// zones[0] (Extra) for a few seconds and then get overwritten by the real verdict.
+const geoResolved = ref(false)
 const mapExpanded = ref(false)
 const showScan = ref(false)              // scan-the-sign modal
 const showAi = ref(false)                // ask-AI resolver panel
@@ -926,10 +936,14 @@ const selectZone = (name: string) => {
 }
 
 // Follow the likely zone until the user picks; afterwards only repair invalid picks.
-watch([likelyZoneName, allZones], () => {
+// The zones[0] fallback is only honest AFTER geometry has settled — before that it
+// painted a confident wrong hero that the real verdict then swapped out from under
+// the user. While unresolved, null keeps the wizard on its "checking" line instead.
+watch([likelyZoneName, allZones, geoResolved], () => {
   const valid = allZones.value.some((z: any) => z.name === selectedZoneName.value)
   if (!userPickedZone.value || !valid) {
-    selectedZoneName.value = likelyZoneName.value ?? allZones.value[0]?.name ?? null
+    selectedZoneName.value = likelyZoneName.value
+      ?? (geoResolved.value ? allZones.value[0]?.name ?? null : null)
   }
 }, { immediate: true })
 
@@ -1123,18 +1137,23 @@ const smsLink = (zone: any) => smsHref(zone.sms_shortcode, defaultPlate.value)
 
 watch(detectedCity, async (city) => {
   if (!city) return
+  geoResolved.value = false
   loadingCityDetail.value = true
   try { cityDetail.value = await getCity(city.id) }
   finally { loadingCityDetail.value = false }
 
   // Load signs + geometry together, then set signs FIRST so the map's first paint
   // is already healed (no old→new flash). displayZones reads both refs.
-  const [geo, reports] = await Promise.all([
-    fetch(`/zones/${city.id}.json`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
-    loadSignReports(city.id),
-  ])
-  signReports.value = reports
-  if (geo) zoneBoundaries.value = geo
+  try {
+    const [geo, reports] = await Promise.all([
+      fetch(`/zones/${city.id}.json`).then((r) => (r.ok ? r.json() : null)).catch(() => null),
+      loadSignReports(city.id),
+    ])
+    signReports.value = reports
+    if (geo) zoneBoundaries.value = geo
+  } finally {
+    geoResolved.value = true // a failed fetch must still release the verdict UI
+  }
 })
 
 // A new confirmed scan: pin it immediately and make it the selected pay zone.
@@ -2436,5 +2455,18 @@ h2 {
   font-size: 14px;
   color: var(--muted);
   margin-bottom: 14px;
+}
+
+/* Dashboard variant: holds the verdict slot while zone geometry loads */
+.gps-resolving {
+  padding: 18px 4px;
+  animation: resolving-pulse 1.6s ease-in-out infinite;
+}
+@keyframes resolving-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gps-resolving { animation: none; }
 }
 </style>
