@@ -78,8 +78,12 @@ const totalLabel = computed(() => {
   return `${r.count} outstanding ${r.count === 1 ? 'fine' : 'fines'} · ${r.plate}`
 })
 
-// Adopt the dashboard's plate once it's known, without clobbering manual input.
-watch(() => props.initialPlate, (p) => { if (p && !plate.value) plate.value = p })
+// Follow the dashboard's plate — including chip switches — without clobbering
+// manual input: only replace the field while it still holds what the dashboard
+// last put there (or is empty). A hand-typed plate stays until cleared.
+watch(() => props.initialPlate, (p, prev) => {
+  if (p && (!plate.value || plate.value === prev)) plate.value = p
+})
 
 const run = () => check(plate.value)
 
