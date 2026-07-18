@@ -40,6 +40,7 @@ export const useGPS = () => {
   const coords = ref<{ lat: number; lng: number; accuracy: number } | null>(null)
   const detecting = ref(false)
   const gpsError = ref<string | null>(null)
+  const gpsDenied = ref(false) // permission denied / no geolocation at all — GPS won't work on this device
   const suggestedZoneName = ref<string | null>(null)
   const detectedStreet = ref<string | null>(null) // reverse-geocoded street at detection
   const unsupportedCity = ref<string | null>(null) // detected a city we have no data for (→ AI help)
@@ -48,11 +49,13 @@ export const useGPS = () => {
     if (!import.meta.client) return null
     if (!navigator.geolocation) {
       gpsError.value = 'Geolocation not supported by your browser.'
+      gpsDenied.value = true
       return null
     }
 
     detecting.value = true
     gpsError.value = null
+    gpsDenied.value = false
     suggestedZoneName.value = null
     unsupportedCity.value = null
 
@@ -127,7 +130,7 @@ export const useGPS = () => {
       unsupportedCity.value = transliterate(rawCity)
       return null
     } catch (e: any) {
-      if (e?.code === 1) gpsError.value = 'Location access denied. Enable it in browser settings.'
+      if (e?.code === 1) { gpsError.value = 'Location access denied. Enable it in browser settings.'; gpsDenied.value = true }
       else if (e?.code === 3) gpsError.value = 'Location request timed out.'
       else gpsError.value = 'Could not detect location.'
       return null
@@ -161,5 +164,5 @@ export const useGPS = () => {
     }
   }
 
-  return { detectCity, detectedCity, detectedStreet, coords, detecting, gpsError, suggestedZoneName, unsupportedCity, startTracking, stopTracking }
+  return { detectCity, detectedCity, detectedStreet, coords, detecting, gpsError, gpsDenied, suggestedZoneName, unsupportedCity, startTracking, stopTracking }
 }

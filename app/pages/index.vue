@@ -122,11 +122,25 @@
 
         <!-- ═══ FULL DASHBOARD — paid now, or browsing while free ═══ -->
         <template v-else>
-        <!-- Geometry still loading — hold the verdict; never guess a zone to unsay -->
-        <div v-if="!geoResolved" class="gps-detecting gps-resolving">
-          <span class="gps-icon"><Icon name="pin" :size="15" /></span>
-          <span>{{ t('resolvingSpot') }}</span>
-        </div>
+        <!-- Geometry still loading — hold the verdict inside the frame the real
+             zone card + slider will fill; never guess a zone to unsay -->
+        <template v-if="!geoResolved">
+          <div class="pay-step" aria-busy="true">
+            <div class="sk-card">
+              <div class="sk sk-card-head" />
+              <div class="sk-card-body">
+                <p class="sk-resolving"><Icon name="pin" :size="13" /> {{ t('resolvingSpot') }}</p>
+              </div>
+            </div>
+          </div>
+          <div class="pay-step" aria-busy="true">
+            <div class="pay-summary">
+              <span class="sk sk-line sk-w45" />
+              <span v-if="defaultPlate" class="sk sk-chip" />
+            </div>
+            <div class="sk sk-slider" />
+          </div>
+        </template>
 
         <!-- ═══ No paid parking here — the answer IS the screen; no zones to render ═══ -->
         <div v-else-if="noZoneHere" class="gps-noparking">
@@ -495,8 +509,44 @@
       </ClientOnly>
     </section>
 
+    <template v-else>
+    <!-- ── GPS SKELETON — returning user: same frame as the dashboard, shimmer in
+         the slots, populated in place once GPS + city data land. No layout swap.
+         Both this and the hero are in the prerendered HTML; an inline head script
+         (see useHead below) picks one before first paint, Vue takes over on mount. ── -->
+    <section class="hero-gps gps-skel" :class="{ 'gps-skel--on': gpsSkeleton }" aria-busy="true">
+      <div class="container">
+        <div v-if="!freeSurface" class="gps-map-wrap"><div class="sk sk-map" /></div>
+        <div class="gps-detected">
+          <span class="gps-detected-where">
+            <span class="gps-detected-pin"><Icon name="pin" :size="13" /></span>
+            {{ t('detecting') }}
+          </span>
+          <span class="sk sk-line sk-guide" />
+        </div>
+        <!-- Free hours expected → the calm free card's footprint -->
+        <div v-if="freeSurface" class="sk sk-free" />
+        <!-- Paid hours expected → zone card + pay line + slider footprints -->
+        <template v-else>
+          <div class="pay-step">
+            <div class="sk-card">
+              <div class="sk sk-card-head" />
+              <div class="sk-card-body"><span class="sk sk-line sk-w60" /></div>
+            </div>
+          </div>
+          <div class="pay-step">
+            <div class="pay-summary">
+              <span class="sk sk-line sk-w45" />
+              <span v-if="defaultPlate" class="sk sk-chip" />
+            </div>
+            <div class="sk sk-slider" />
+          </div>
+        </template>
+      </div>
+    </section>
+
     <!-- ── HERO (default, non-GPS) ── -->
-    <section v-else class="hero">
+    <section class="hero" :class="{ 'hero-off': gpsSkeleton }">
       <div class="container">
         <p class="section-label fade-up">{{ t('heroLabel') }}</p>
         <h1 class="fade-up-2">
@@ -581,9 +631,10 @@
         </div>
       </div>
     </section>
+    </template>
 
     <!-- ── CITY STRIP + CITIES + HOW IT WORKS + CTA (hidden in GPS mode: the city is known) ── -->
-    <template v-if="!gpsMode">
+    <div v-if="!gpsMode" class="mkt" :class="{ 'mkt-off': gpsSkeleton }">
     <!-- ── CITY STRIP ── -->
     <div v-if="stripItems.length" class="city-strip">
       <div class="city-strip-track">
@@ -668,7 +719,7 @@
         </div>
       </div>
     </section>
-    </template>
+    </div>
   </div>
 </template>
 
@@ -687,7 +738,15 @@ const dayWord = (label?: string | null) => {
   if (!label) return ''
   return lang.value === 'sr' ? (DAY_SR[label] ?? label) : label
 }
-const { detectCity, detectedCity, detectedStreet, coords, detecting, gpsError, suggestedZoneName, unsupportedCity, startTracking, stopTracking } = useGPS()
+const { detectCity, detectedCity, detectedStreet, coords, detecting, gpsError, gpsDenied, suggestedZoneName, unsupportedCity, startTracking, stopTracking } = useGPS()
+
+// ── Dashboard skeleton — no layout swap while GPS resolves ────────────────────
+// A returning user's homepage IS the dashboard; flashing the marketing hero for
+// the seconds GPS + city data take, then tearing it out, reads as a glitch.
+// Remember the last GPS city on-device and hold the dashboard's frame (shimmer
+// placeholders in the exact slots) until the real data populates it in place.
+const EXPECT_GPS_KEY = 'kerb_expect_gps_city'
+const expectCityId = ref<string | null>(null)
 const showCityHelp = ref(false) // AI orientation panel for cities we don't cover yet
 const {
   heading, attached: compassAttached, previouslyEnabled: compassWasEnabled,
@@ -731,7 +790,9 @@ watch(user, (u) => {
 }, { immediate: true })
 
 // Time-aware hours — drives free-now desaturation + the night pre-pay path.
-const { paidNow, nextWindow, status: hoursStatus } = useParkingHours(() => detectedCity.value?.id)
+// Falls back to the remembered city so the pre-GPS skeleton already knows which
+// shape is coming (free surface vs. pay dashboard); schedules are static data.
+const { paidNow, nextWindow, status: hoursStatus } = useParkingHours(() => detectedCity.value?.id ?? expectCityId.value)
 const freeNow = computed(() => paidNow.value === false)
 const nightPrepay = computed(() => freeNow.value && !!nextWindow.value)
 
@@ -1185,9 +1246,36 @@ watch(
 // Login only adds memory (session tracking, reminders, fine alerts).
 const gpsMode = computed(() => !!(detectedCity.value && cityDetail.value))
 
+// Hold the dashboard frame for returning users while GPS + city data resolve.
+// Off the moment anything says the dashboard isn't coming: a GPS error (the
+// hero shows it), or a detected city whose detail fetch settled empty.
+const gpsSkeleton = computed(() => {
+  if (!expectCityId.value || gpsMode.value || gpsError.value) return false
+  if (detectedCity.value && !loadingCityDetail.value && !cityDetail.value) return false
+  return true
+})
+
+// A denial or an uncovered city means the dashboard won't come back next open —
+// land on the search hero directly. Transient failures (timeout, no fix) keep
+// the memory: the user is likely still in their city.
+watch([gpsDenied, unsupportedCity], ([denied, unsup]) => {
+  if (!denied && !unsup) return
+  expectCityId.value = null
+  if (import.meta.client) localStorage.removeItem(EXPECT_GPS_KEY)
+})
+
+// The inline head script (below) shows the skeleton before Vue loads via a class
+// on <html>. Once the reactive verdict says the skeleton is over — dashboard in,
+// or detection failed — drop the class so the CSS override can't pin stale UI.
+watch(gpsSkeleton, (on) => {
+  if (import.meta.client && !on) document.documentElement.classList.remove('gps-expected')
+})
+
 // Start live GPS tracking + compass when GPS mode activates
 watch(gpsMode, (active) => {
   if (active) {
+    expectCityId.value = detectedCity.value!.id
+    if (import.meta.client) localStorage.setItem(EXPECT_GPS_KEY, detectedCity.value!.id)
     forceBrowse.value = false   // a fresh open lands on the calm free surface
     startTracking()
     startOrientation()
@@ -1265,6 +1353,10 @@ onMounted(() => {
   if (import.meta.client) {
     guestPlate.value = localStorage.getItem(GUEST_PLATE_KEY) ?? ''
     skipConfirm.value = localStorage.getItem(SKIP_CONFIRM_KEY) === '1'
+    expectCityId.value = localStorage.getItem(EXPECT_GPS_KEY)
+    // No expectation → the gpsSkeleton watcher will never fire; drop the
+    // pre-paint marker here or the head script's class pins the skeleton.
+    if (!expectCityId.value) document.documentElement.classList.remove('gps-expected')
   }
   detectCity()
 
@@ -1277,6 +1369,17 @@ onMounted(() => {
     { threshold: 0.08 }
   )
   document.querySelectorAll('.reveal').forEach((el) => obs.observe(el))
+})
+
+// Pre-hydration switch: the homepage is prerendered as the marketing hero, but a
+// returning GPS user's first paint should be the dashboard skeleton. This runs
+// synchronously in <head>, before first paint, and flips the CSS between the two
+// (both are in the static HTML). Vue reconciles on mount via gpsSkeleton.
+useHead({
+  script: [{
+    innerHTML: `try{if(localStorage.getItem('${EXPECT_GPS_KEY}'))document.documentElement.classList.add('gps-expected')}catch(e){}`,
+    tagPosition: 'head',
+  }],
 })
 
 useSeoMeta({
@@ -2452,16 +2555,56 @@ h2 {
   margin-bottom: 14px;
 }
 
-/* Dashboard variant: holds the verdict slot while zone geometry loads */
-.gps-resolving {
-  padding: 18px 4px;
+/* ── Dashboard skeleton — shimmer placeholders in the real slots ──
+   Sized to the components they stand in for, so data populates in place.
+   Visibility pre-hydration is CSS-only: the inline head script marks <html>
+   with .gps-expected when the last visit ended on the dashboard, which swaps
+   the prerendered hero for the skeleton before first paint. After mount the
+   reactive gpsSkeleton classes take over and the marker class is removed. */
+.gps-skel { display: none; }
+.gps-skel--on,
+html.gps-expected .gps-skel { display: block; }
+html.gps-expected .hero,
+html.gps-expected .mkt,
+.hero-off,
+.mkt-off { display: none; }
+
+.sk {
+  background: var(--bg2);
+  border-radius: var(--r-md);
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+.sk-map { height: 118px; border-radius: var(--r-lg); }         /* LocationMap */
+.sk-line { display: inline-block; height: 12px; border-radius: 6px; }
+.sk-w45 { width: 45%; }
+.sk-w60 { width: 60%; }
+.sk-guide { width: 64px; flex-shrink: 0; }                     /* full-guide link */
+.sk-chip { width: 84px; height: 26px; border-radius: 7px; flex-shrink: 0; } /* plate chip */
+.sk-card {                                                     /* zone hero card */
+  background: var(--bg);
+  border: 1.5px solid var(--border2);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+.sk-card-head { height: 64px; border-radius: 0; }
+.sk-card-body { padding: 12px 14px; }
+.sk-resolving {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.5;
   animation: resolving-pulse 1.6s ease-in-out infinite;
 }
+.sk-slider { height: 54px; border-radius: 999px; }             /* SlideToConfirm */
+.sk-free { height: 208px; border-radius: var(--r-xl); }        /* free-now surface */
 @keyframes resolving-pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.55; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .gps-resolving { animation: none; }
+  .sk, .sk-resolving, .skeleton { animation: none; }
 }
 </style>
