@@ -208,10 +208,15 @@
 
         <!-- ── Pay — consequence first, then the gesture ── -->
         <div v-if="selectedZone?.sms_shortcode" class="pay-step">
-          <!-- Covered-until + the plate this SMS pays for -->
-          <div v-if="!nightPrepay || defaultPlate" class="pay-summary">
+          <!-- Covered-until + the plate this SMS pays for. At night the same line
+               carries the carry-over rule: the SMS pays the next window, not now. -->
+          <div class="pay-summary">
             <span v-if="!nightPrepay" class="pay-until">
               <strong>{{ t('coveredUntil', { time: coveredUntil }) }}</strong> · {{ selectedZone.price }}
+            </span>
+            <span v-else class="pay-until">
+              <Icon name="moon" :size="12" />
+              <strong>{{ t('coveredNext', { day: dayWord(nextWindow!.dayLabel), start: nextWindow!.start, end: nextWindow!.end }) }}</strong> · {{ selectedZone.price }}
             </span>
             <button
               v-if="defaultPlate"
@@ -244,10 +249,6 @@
 
           <!-- Night pre-pay: free now, the SMS carries over to the next window -->
           <div v-if="nightPrepay" class="prepay">
-            <p class="prepay-note">
-              <Icon name="moon" :size="13" />
-              {{ t('prepayNote', { time: nextWindow!.start, day: dayWord(nextWindow!.dayLabel), start: nextWindow!.start, end: nextWindow!.end }) }}
-            </p>
             <SlideToConfirm
               :key="'pp-' + selectedZone.name"
               :label="t('sendSms', { code: selectedZone.sms_shortcode })"
@@ -1820,7 +1821,14 @@ h2 {
   min-height: 30px;
   margin-bottom: 8px;
 }
-.pay-until { font-size: 13px; color: var(--muted); }
+.pay-until {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--muted);
+}
 .pay-until strong { color: var(--text); font-weight: 700; }
 .plate-chip {
   display: inline-flex;
@@ -2172,19 +2180,6 @@ h2 {
 .nsign-title { font-size: 13px; font-weight: 700; color: var(--text); letter-spacing: -0.1px; }
 .nsign-sub { font-size: 12px; color: var(--muted); }
 .nsign-go { font-size: 12px; font-weight: 600; color: var(--blue); flex-shrink: 0; white-space: nowrap; }
-
-/* Night pre-pay */
-.prepay-note {
-  font-size: 12.5px;
-  color: var(--text2);
-  line-height: 1.55;
-  margin-bottom: 12px;
-  padding: 10px 12px;
-  background: var(--amber-bg);
-  border: 1px solid var(--amber-border);
-  border-radius: var(--r-md);
-}
-.prepay-note strong { color: var(--text); font-weight: 700; }
 
 /* Armed (scheduled pre-pay) card */
 .armed-card {

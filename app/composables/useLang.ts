@@ -67,10 +67,7 @@ const dict = {
   addPlate: { sr: 'Dodaj tablice za SMS jednim dodirom', en: 'Add a plate for one-tap SMS' },
   smsToOperator: { sr: 'Tvoj telefon šalje SMS operateru parkinga.', en: 'Your phone sends the SMS to the parking operator.' },
   ruleDetails: { sr: 'Detalji pravila', en: 'Rule details' },
-  prepayNote: {
-    sr: 'Besplatno do {time}. Po zvaničnom pravilu prenosa, SMS poslat sada važi za {day} {start}–{end} — ne od trenutka slanja.',
-    en: 'Free until {time}. Per the official carry-over rule, an SMS you send now applies to {day} {start}–{end} — not the moment you send it.',
-  },
+  coveredNext: { sr: 'Pokriveno {day} {start}–{end}', en: 'Covered {day} {start}–{end}' },
 
   // SMS handoff sheet
   sentTitle: { sr: 'Da li je SMS poslat?', en: 'Did your SMS send?' },
