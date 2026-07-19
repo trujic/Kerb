@@ -61,7 +61,6 @@ const dict = {
   addPlate: { sr: 'Dodaj tablice za SMS jednim dodirom', en: 'Add a plate for one-tap SMS' },
   smsToOperator: { sr: 'Tvoj telefon šalje SMS operateru parkinga.', en: 'Your phone sends the SMS to the parking operator.' },
   ruleDetails: { sr: 'Detalji pravila', en: 'Rule details' },
-  coveredNext: { sr: 'Pokriveno {day} {start}–{end}', en: 'Covered {day} {start}–{end}' },
 
   // SMS handoff sheet
   sentTitle: { sr: 'Da li je SMS poslat?', en: 'Did your SMS send?' },
@@ -110,7 +109,10 @@ const dict = {
   end: { sr: 'Završi', en: 'End' },
 
   // Plate input
-  plateOcrHint: { sr: 'Č, Š, Ž, Đ, Ć se čitaju ispravno — bez grešaka, bez odbijenih plaćanja.', en: 'Č, Š, Ž, Đ, Ć read correctly — no typos, no blocked payments.' },
+  plateOcrHint: {
+    sr: 'Upiši je velikim slovima, tačno kao na tablici — sa kvačicama ako ih ima (Č, Š, Ž, Đ, Ć). Strana tablica: prepiši je tačno kako stoji.',
+    en: 'Type it in capitals, exactly as on the plate — diacritics included (Č, Š, Ž, Đ, Ć). Foreign plate: copy it exactly as written.',
+  },
   plateConf: { sr: 'pročitano {pct}% — proveri svaki znak', en: 'read {pct}% — check every character' },
   plateNoRead: {
     sr: 'Tablica nije pročitana. Popuni kadar tablicom, ravno i u nivou, pa slikaj opet — ili je samo ukucaj.',

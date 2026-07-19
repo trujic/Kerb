@@ -64,7 +64,9 @@ const busy = ref(false)
 const confidence = ref<number | null>(null)
 const scanError = ref('')
 
-const clean = (v: string) => v.toUpperCase().replace(/[^A-ZČŠŽĐĆ0-9]/g, '')
+// Uppercase, letters + digits only — but ANY letters: foreign plates (Ü, Ö, …)
+// are typed exactly as they appear on the vehicle, never silently stripped.
+const clean = (v: string) => v.toUpperCase().replace(/[^\p{L}\p{N}]/gu, '')
 
 const onInput = (e: Event) => {
   confidence.value = null // a manual edit supersedes the read

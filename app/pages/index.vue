@@ -177,6 +177,9 @@
           <!-- Geometry still loading — hold the verdict inside the frame the real
              zone card + slider will fill; never guess a zone to unsay -->
           <template v-if="!geoResolved">
+            <div v-if="!user" class="pay-step" aria-busy="true">
+              <div class="sk sk-plate" />
+            </div>
             <div class="pay-step" aria-busy="true">
               <div class="sk-card">
                 <div class="sk sk-card-head" />
@@ -190,7 +193,7 @@
             <div class="pay-step" aria-busy="true">
               <div class="pay-summary">
                 <span class="sk sk-line sk-w45" />
-                <span v-if="defaultPlate" class="sk sk-chip" />
+                <span v-if="user && defaultPlate" class="sk sk-chip" />
               </div>
               <div class="sk sk-slider" />
             </div>
@@ -226,15 +229,17 @@
           <!-- ═══ PAY SURFACE — one screen: zone → slide; plate is a chip once known ═══ -->
           <template v-else>
             <!-- First run only: no plate yet — the one moment it deserves the space -->
-            <div v-if="!defaultPlate" class="pay-step">
-              <div v-if="!user">
-                <PlateInput v-model="guestPlate" />
-                <span class="zone-plate-hint">
-                  {{ t("plateHint") }} ·
-                  <NuxtLink to="/login">{{ t("plateSync") }}</NuxtLink>
-                </span>
-              </div>
-              <NuxtLink v-else to="/profile" class="veh-add"
+            <!-- Guests always type the plate in the open — exactly as on the
+                 vehicle, capitals and diacritics included; no chip to unfold -->
+            <div v-if="!user" class="pay-step">
+              <PlateInput v-model="guestPlate" />
+              <span class="zone-plate-hint">
+                {{ t("plateHint") }} ·
+                <NuxtLink to="/login">{{ t("plateSync") }}</NuxtLink>
+              </span>
+            </div>
+            <div v-else-if="!defaultPlate" class="pay-step">
+              <NuxtLink to="/profile" class="veh-add"
                 >{{ t("addPlate") }} →</NuxtLink
               >
             </div>
@@ -301,28 +306,21 @@
 
             <!-- ── Pay — consequence first, then the gesture ── -->
             <div v-if="selectedZone?.sms_shortcode" class="pay-step">
-              <!-- Covered-until + the plate this SMS pays for. At night the same line
-               carries the carry-over rule: the SMS pays the next window, not now. -->
-              <div class="pay-summary">
+              <!-- Covered-until + the plate chip (accounts only — guests type the
+               plate in the open above). At night the free-surface tip already
+               explained the carry-over, so no consequence line repeats it here. -->
+              <div
+                v-if="!nightPrepay || (user && defaultPlate)"
+                class="pay-summary"
+              >
                 <span v-if="!nightPrepay" class="pay-until">
                   <strong>{{
                     t("coveredUntil", { time: coveredUntil })
                   }}</strong>
                   · {{ selectedZone.price }}
                 </span>
-                <span v-else class="pay-until">
-                  <Icon name="moon" :size="12" />
-                  <strong>{{
-                    t("coveredNext", {
-                      day: dayWord(nextWindow!.dayLabel),
-                      start: nextWindow!.start,
-                      end: nextWindow!.end,
-                    })
-                  }}</strong>
-                  · {{ selectedZone.price }}
-                </span>
                 <button
-                  v-if="defaultPlate"
+                  v-if="user && defaultPlate"
                   type="button"
                   class="plate-chip"
                   @click="plateOpen = !plateOpen"
@@ -333,32 +331,27 @@
                   }}</span>
                 </button>
               </div>
-              <!-- Chip open → saved plates (account) or edit the device plate (guest) -->
-              <div v-if="plateOpen && defaultPlate" class="veh-list">
-                <template v-if="user">
-                  <button
-                    v-for="p in profilePlates"
-                    :key="p.id"
-                    type="button"
-                    class="veh-opt"
-                    :class="{ on: p.plate === defaultPlate }"
-                    @click="choosePlate(p.plate)"
-                  >
-                    <span class="veh-opt-plate">{{ p.plate }}</span>
-                    <span v-if="p.label" class="veh-opt-label">{{
-                      p.label
-                    }}</span>
-                    <span v-if="p.plate === defaultPlate" class="veh-opt-on"
-                      ><Icon name="check" :size="13"
-                    /></span>
-                  </button>
-                  <NuxtLink to="/profile" class="veh-manage">{{
-                    t("managePlates")
-                  }}</NuxtLink>
-                </template>
-                <div v-else class="veh-guest-edit">
-                  <PlateInput v-model="guestPlate" />
-                </div>
+              <!-- Chip open → the account's saved plates -->
+              <div v-if="plateOpen && user && defaultPlate" class="veh-list">
+                <button
+                  v-for="p in profilePlates"
+                  :key="p.id"
+                  type="button"
+                  class="veh-opt"
+                  :class="{ on: p.plate === defaultPlate }"
+                  @click="choosePlate(p.plate)"
+                >
+                  <span class="veh-opt-plate">{{ p.plate }}</span>
+                  <span v-if="p.label" class="veh-opt-label">{{
+                    p.label
+                  }}</span>
+                  <span v-if="p.plate === defaultPlate" class="veh-opt-on"
+                    ><Icon name="check" :size="13"
+                  /></span>
+                </button>
+                <NuxtLink to="/profile" class="veh-manage">{{
+                  t("managePlates")
+                }}</NuxtLink>
               </div>
 
               <!-- Night pre-pay: free now, the SMS carries over to the next window -->
@@ -676,8 +669,11 @@
           </div>
           <!-- Free hours expected → the calm free card's footprint -->
           <div v-if="freeSurface" class="sk sk-free" />
-          <!-- Paid hours expected → zone card + pay line + slider footprints -->
+          <!-- Paid hours expected → plate + zone card + pay line + slider footprints -->
           <template v-else>
+            <div v-if="!user" class="pay-step">
+              <div class="sk sk-plate" />
+            </div>
             <div class="pay-step">
               <div class="sk-card">
                 <div class="sk sk-card-head" />
@@ -689,7 +685,7 @@
             <div class="pay-step">
               <div class="pay-summary">
                 <span class="sk sk-line sk-w45" />
-                <span v-if="defaultPlate" class="sk sk-chip" />
+                <span v-if="user && defaultPlate" class="sk sk-chip" />
               </div>
               <div class="sk sk-slider" />
             </div>
@@ -2455,9 +2451,6 @@ h2 {
   font-size: 10px;
   color: var(--muted);
 }
-.veh-guest-edit {
-  padding: 8px;
-}
 .veh-list {
   display: flex;
   flex-direction: column;
@@ -3346,6 +3339,10 @@ html.gps-expected .mkt,
   line-height: 1.5;
   animation: resolving-pulse 1.6s ease-in-out infinite;
 }
+.sk-plate {
+  height: 92px;
+  border-radius: var(--r-md);
+} /* PlateInput + hint */
 .sk-slider {
   height: 54px;
   border-radius: 999px;
