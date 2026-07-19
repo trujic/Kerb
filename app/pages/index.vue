@@ -157,14 +157,19 @@
                 })
               }}
             </button>
+            <!-- Why pre-pay exists: the honest observation, framed as a tip
+                 right under the button it explains — not manufactured urgency -->
+            <p v-if="statusCanPrepay" class="free-prepay-tip">
+              <Icon name="alert" :size="14" />
+              <span
+                ><strong>{{ t("tipLabel") }}:</strong>
+                {{ t("prepayWhy", { start: nextWindow!.start }) }}</span
+              >
+            </p>
             <button type="button" class="free-browse-btn" @click="browseAnyway">
               {{ t("browseZones") }}
             </button>
           </div>
-          <!-- Why pre-pay exists: the honest observation, not manufactured urgency -->
-          <p v-if="statusCanPrepay" class="free-prepay-why">
-            {{ t("prepayWhy", { start: nextWindow!.start }) }}
-          </p>
         </div>
 
         <!-- ═══ FULL DASHBOARD — paid now, or browsing while free ═══ -->
@@ -2368,14 +2373,28 @@ h2 {
   border-radius: var(--r-md);
   cursor: pointer;
 }
-.free-prepay-why {
-  margin-top: 12px;
+.free-prepay-tip {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
   font-size: 12.5px;
-  color: var(--muted);
-  line-height: 1.55;
-  max-width: 340px;
-  margin-inline: auto;
+  color: var(--text2);
+  line-height: 1.5;
+  text-align: left;
   text-wrap: pretty;
+  background: var(--amber-bg);
+  border: 1px solid var(--amber-border);
+  border-radius: var(--r-md);
+}
+.free-prepay-tip svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--amber);
+}
+.free-prepay-tip strong {
+  color: var(--amber);
+  font-weight: 700;
 }
 .free-prepay-btn:active,
 .free-browse-btn:active {
