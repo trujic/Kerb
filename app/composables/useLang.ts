@@ -12,24 +12,13 @@ const dict = {
   detected: { sr: 'lokacija', en: 'detected' },
   fullGuide: { sr: 'Ceo vodič →', en: 'Full guide →' },
 
-  // Free-now surface + status sheet
+  // Free-now surface
   freeNow: { sr: 'Besplatno sada', en: 'Free now' },
   freeTitle: { sr: 'Ne moraš da platiš sada', en: 'No need to pay right now' },
   freeSub: { sr: 'Parkiranje je besplatno u {city}.', en: 'Parking is free in {city}.' },
   chargingResumes: { sr: 'Naplata ponovo počinje', en: 'Charging resumes' },
   prepayBtn: { sr: 'Plati unapred {start}–{end} →', en: 'Pre-pay {start}–{end} →' },
   browseZones: { sr: 'Pregledaj zone', en: 'Browse zones' },
-  statusKicker: { sr: 'Status parkinga', en: 'Parking status' },
-  statusFreeUntil: { sr: 'Besplatno do {time}', en: 'Free until {time}' },
-  statusFreeNow: { sr: 'Besplatno sada — ne plaća se', en: 'Free right now — no payment needed' },
-  statusBody: { sr: 'Ne moraš da platiš parking u {city} sada.', en: "You don't need to pay in {city} right now." },
-  statusPrepay: {
-    sr: 'Sledeća naplata je {day} {start}–{end} — plati unapred i pokriven si čim počne.',
-    en: 'The next paid window is {day} {start}–{end} — pre-pay it now to be covered the moment it opens.',
-  },
-  notNow: { sr: 'Ne sada', en: 'Not now' },
-  gotIt: { sr: 'Važi', en: 'Got it' },
-  prepaySheetBtn: { sr: 'Plati unapred {start}–{end}', en: 'Pre-pay {start}–{end}' },
   today: { sr: 'danas', en: 'today' },
   tomorrow: { sr: 'sutra', en: 'tomorrow' },
 

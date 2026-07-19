@@ -459,36 +459,6 @@
         />
       </ClientOnly>
 
-      <!-- Open-the-app status moment — only when no payment is needed -->
-      <ClientOnly>
-        <Teleport to="body">
-          <Transition name="status-sheet">
-            <div v-if="showStatusSheet" class="status-scrim" role="dialog" aria-label="Parking status" @click.self="dismissStatus">
-              <div ref="statusSheetEl" class="status-sheet" tabindex="-1">
-                <p class="status-kicker"><span class="status-free-dot" />{{ t('statusKicker') }} · {{ detectedCity!.name }}</p>
-                <p class="status-headline">
-                  <template v-if="nextWindow?.dayLabel === 'today'">{{ t('statusFreeUntil', { time: nextWindow.start }) }}</template>
-                  <template v-else>{{ t('statusFreeNow') }}</template>
-                </p>
-                <p class="status-body">
-                  {{ t('statusBody', { city: detectedCity!.name }) }}<template v-if="statusCanPrepay">
-                    {{ t('statusPrepay', { day: dayWord(nextWindow!.dayLabel), start: nextWindow!.start, end: nextWindow!.end }) }}</template><template v-else-if="hoursStatus?.detail"> {{ hoursStatus.detail }}.</template>
-                </p>
-                <div class="status-actions">
-                  <template v-if="statusCanPrepay">
-                    <button type="button" class="status-secondary" @click="dismissStatus">{{ t('notNow') }}</button>
-                    <button type="button" class="status-primary" @click="statusToPrepay">
-                      {{ t('prepaySheetBtn', { start: nextWindow!.start, end: nextWindow!.end }) }}
-                    </button>
-                  </template>
-                  <button v-else type="button" class="status-primary" @click="dismissStatus">{{ t('gotIt') }}</button>
-                </div>
-              </div>
-            </div>
-          </Transition>
-        </Teleport>
-      </ClientOnly>
-
       <!-- SMS handoff — the web can't verify the send, so we ask -->
       <ClientOnly>
         <Teleport to="body">
@@ -796,26 +766,8 @@ const { paidNow, nextWindow, status: hoursStatus } = useParkingHours(() => detec
 const freeNow = computed(() => paidNow.value === false)
 const nightPrepay = computed(() => freeNow.value && !!nextWindow.value)
 
-// ── Open-the-app status moment ──────────────────────────────────────────────
-// The first question on every open is "do I even need to pay?". When the answer
-// is "no" (Sunday / after hours / before charging), we surface it once as a sheet
-// so the user gets the news and can leave. When parking IS paid we stay silent
-// and let them go straight to paying — no modal on the critical path.
-const STATUS_SEEN_KEY = 'kerb_status_seen'
-const showStatusSheet = ref(false)
-const todayKey = () => new Date().toISOString().slice(0, 10)
-const maybeShowStatus = () => {
-  if (!import.meta.client) return
-  if (!gpsMode.value || !freeNow.value) return
-  if (localStorage.getItem(STATUS_SEEN_KEY) === todayKey()) return
-  showStatusSheet.value = true
-}
-const dismissStatus = () => {
-  if (import.meta.client) localStorage.setItem(STATUS_SEEN_KEY, todayKey())
-  showStatusSheet.value = false
-}
-// Offer pre-pay when the next paid window is near (later today / tomorrow morning),
-// matching the night pre-pay slider on the Pay tab. Further-off windows just inform.
+// Offer pre-pay on the free surface when the next paid window is near (later
+// today / tomorrow morning). Further-off windows just inform.
 const statusCanPrepay = computed(() =>
   freeNow.value && ['today', 'tomorrow'].includes(nextWindow.value?.dayLabel ?? ''),
 )
@@ -829,7 +781,7 @@ const freeSurface = computed(() =>
   freeNow.value && !forceBrowse.value && !displaySession.value,
 )
 const browseAnyway = () => { forceBrowse.value = true }
-const statusToPrepay = () => { forceBrowse.value = true; dismissStatus() }
+const statusToPrepay = () => { forceBrowse.value = true }
 
 // Guest sessions (no account), persisted on-device. Created only AFTER the user
 // confirms they sent the SMS. Logged-in users keep the Supabase-backed session.
@@ -848,19 +800,16 @@ watch(mapExpanded, (open) => {
     leadSignPoint.value = null   // and the lead-to-sign pointer
   }
 })
-// Escape closes whatever is on top: SMS-sent sheet → status sheet → map.
+// Escape closes whatever is on top: SMS-sent sheet → map.
 // (ScanSign / AskAi / CityHelp handle their own Escape via useDialogBehavior.)
 const onKeydown = (e: KeyboardEvent) => {
   if (e.key !== 'Escape') return
   if (showSentPrompt.value) { onSentNo(); return }
-  if (showStatusSheet.value) { dismissStatus(); return }
   mapExpanded.value = false
 }
 
-// Move focus into the bottom sheets when they open so keyboard/SR users land there.
-const statusSheetEl = ref<HTMLElement | null>(null)
+// Move focus into the SMS-sent sheet when it opens so keyboard/SR users land there.
 const sentSheetEl = ref<HTMLElement | null>(null)
-watch(showStatusSheet, (open) => { if (open) nextTick(() => statusSheetEl.value?.focus()) })
 onMounted(() => window.addEventListener('keydown', onKeydown))
 onUnmounted(() => {
   window.removeEventListener('keydown', onKeydown)
@@ -1284,9 +1233,6 @@ watch(gpsMode, (active) => {
     stopOrientation()
   }
 }, { immediate: true })
-
-// Surface the "do I need to pay?" status moment once the dashboard + hours resolve.
-watch([gpsMode, freeNow], () => maybeShowStatus(), { immediate: true })
 
 const { data: cities, pending, error } = await useAsyncData('cities', getCities, { lazy: true })
 
@@ -2313,95 +2259,8 @@ h2 {
 }
 .armed-cancel:hover { color: var(--text); }
 
-/* ── Open-the-app status sheet ── */
-.status-scrim {
-  position: fixed;
-  inset: 0;
-  z-index: 3400;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  background: rgba(0, 0, 0, 0.55);
-  padding: 16px;
-  padding-bottom: max(16px, env(safe-area-inset-bottom));
-}
-.status-sheet:focus, .sent-sheet:focus { outline: none; } /* container focus, not interactive */
-.status-sheet {
-  width: 100%;
-  max-width: 440px;
-  background: var(--bg2);
-  border: 1px solid var(--border);
-  border-radius: var(--r-xl);
-  padding: 22px 20px;
-  box-shadow: var(--shadow-lg);
-}
-.status-kicker {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 11px;
-  font-family: var(--font-mono);
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  color: var(--muted);
-  margin-bottom: 10px;
-}
-.status-free-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--green);
-  flex-shrink: 0;
-}
-.status-headline {
-  font-size: 22px;
-  font-weight: 700;
-  letter-spacing: -0.3px;
-  line-height: 1.2;
-  color: var(--text);
-  margin-bottom: 8px;
-}
-.status-body {
-  font-size: 14px;
-  color: var(--muted);
-  line-height: 1.6;
-  margin-bottom: 20px;
-}
-.status-body strong { color: var(--text); font-weight: 700; }
-.status-actions { display: flex; gap: 10px; }
-.status-secondary {
-  flex: 1;
-  padding: 13px;
-  font-family: inherit;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text2);
-  background: var(--bg3);
-  border: 1px solid var(--border);
-  border-radius: var(--r-md);
-  cursor: pointer;
-}
-.status-primary {
-  flex: 1;
-  padding: 13px;
-  font-family: inherit;
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--on-accent);
-  background: var(--blue);
-  border: none;
-  border-radius: var(--r-md);
-  cursor: pointer;
-}
-.status-primary:active, .status-secondary:active { transform: scale(0.98); }
-.status-sheet-enter-active, .status-sheet-leave-active { transition: opacity 200ms var(--ease-out); }
-.status-sheet-enter-active .status-sheet, .status-sheet-leave-active .status-sheet {
-  transition: transform 240ms var(--ease-out);
-}
-.status-sheet-enter-from, .status-sheet-leave-to { opacity: 0; }
-.status-sheet-enter-from .status-sheet, .status-sheet-leave-to .status-sheet { transform: translateY(100%); }
-
 /* SMS handoff sheet */
+.sent-sheet:focus { outline: none; } /* container focus, not interactive */
 .sent {
   position: fixed;
   inset: 0;
