@@ -283,7 +283,7 @@ onMounted(async () => {
     mapEl.value?.classList.add('lm-labels')
   }
 
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
     subdomains: 'abcd',
     maxZoom: 19,
     attribution: '&copy; OpenStreetMap &copy; CARTO',
@@ -331,8 +331,8 @@ onMounted(async () => {
 <style>
 /* Permanent street/zone labels — hidden until the map is zoomed in (lm-labels). */
 .leaflet-tooltip.zone-label {
-  background: rgba(22, 24, 28, 0.78);
-  color: #F4F4F0;
+  background: rgba(255, 255, 255, 0.82);
+  color: #40454F;
   border: none;
   box-shadow: none;
   font-family: var(--font-mono, monospace);
@@ -479,7 +479,7 @@ onMounted(async () => {
   justify-content: center;
   font-size: 20px;
   line-height: 1;
-  background: rgba(31, 34, 40, 0.92);
+  background: rgba(255, 255, 255, 0.92);
   color: var(--blue);
   border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 50%;

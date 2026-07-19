@@ -94,7 +94,7 @@ useSeoMeta({ title: 'Not found — Kerb' })
   font-family: var(--font-display);
   font-size: 22px;
   font-weight: 400;
-  color: var(--blue);
+  color: var(--text);
   margin-bottom: 20px;
   letter-spacing: 0.5px;
 }
@@ -149,12 +149,12 @@ useSeoMeta({ title: 'Not found — Kerb' })
   display: inline-block;
   width: 100%;
   padding: 13px;
-  background: var(--blue);
+  background: var(--accent);
   color: var(--on-accent);
   border-radius: var(--r-md);
   font-size: 14px;
   font-weight: 600;
   text-align: center;
 }
-.err-btn:hover { background: var(--blue-hover); }
+.err-btn:hover { background: var(--accent-hover); }
 </style>

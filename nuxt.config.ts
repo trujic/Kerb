@@ -32,10 +32,10 @@ export default defineNuxtConfig({
       title: 'Kerbo — park · pay · zero fines',
       meta: [
         { name: 'description', content: 'AI-assisted street parking for Serbia. Find your zone, pay by SMS, never learn what a zone is.' },
-        { name: 'theme-color', content: '#16181C' },
+        { name: 'theme-color', content: '#F2F3F5' },
         { name: 'mobile-web-app-capable', content: 'yes' },
         { name: 'apple-mobile-web-app-capable', content: 'yes' },
-        { name: 'apple-mobile-web-app-status-bar-style', content: 'black-translucent' },
+        { name: 'apple-mobile-web-app-status-bar-style', content: 'default' },
         { name: 'apple-mobile-web-app-title', content: 'Kerbo' },
         { property: 'og:title', content: 'Kerbo — park · pay · zero fines' },
         { property: 'og:description', content: 'AI-assisted street parking for Serbia. Find your zone, pay by SMS, never learn what a zone is.' },

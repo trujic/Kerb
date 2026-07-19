@@ -76,7 +76,7 @@ const initials = computed(() => {
   position: fixed;
   top: 0; left: 0; right: 0;
   z-index: 100;
-  background: rgba(22, 24, 28, 0.82);
+  background: rgba(255, 255, 255, 0.85);
   border-bottom: 1px solid var(--border);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -92,7 +92,7 @@ const initials = computed(() => {
   font-size: 20px;
   font-weight: 400;
   letter-spacing: 0.5px;
-  color: var(--blue);
+  color: var(--text);
 }
 .nav-links {
   display: flex;
@@ -127,12 +127,12 @@ const initials = computed(() => {
 }
 .nav-btn-ghost:hover { background: var(--bg2); border-color: var(--border2); color: var(--text); }
 .nav-btn-primary {
-  background: var(--blue);
+  background: var(--accent);
   color: var(--on-accent);
   border: none;
   font-weight: 600;
 }
-.nav-btn-primary:hover { background: var(--blue-hover); }
+.nav-btn-primary:hover { background: var(--accent-hover); }
 .nav-lang {
   padding: 6px 10px;
   font-family: var(--font-mono);
@@ -151,7 +151,7 @@ const initials = computed(() => {
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  background: var(--blue);
+  background: var(--accent);
   color: var(--on-accent);
   font-size: 12px;
   font-weight: 600;
@@ -169,7 +169,7 @@ const initials = computed(() => {
   position: fixed;
   bottom: 0; left: 0; right: 0;
   z-index: 100;
-  background: rgba(22, 24, 28, 0.92);
+  background: rgba(255, 255, 255, 0.94);
   border-top: 1px solid var(--border);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);

@@ -154,7 +154,7 @@ onUnmounted(() => {
   border-radius: 999px;
   background: var(--bg2);
   border: 1px solid var(--border2);
-  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.35);
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.09);
   overflow: hidden;
   user-select: none;
   touch-action: pan-y;

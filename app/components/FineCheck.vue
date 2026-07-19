@@ -139,13 +139,13 @@ const checkedTime = computed(() =>
   font-size: 14px;
   font-weight: 600;
   color: var(--on-accent);
-  background: var(--blue);
+  background: var(--accent);
   border: none;
   border-radius: var(--r-md);
   cursor: pointer;
   transition: background 150ms var(--ease-out), opacity 150ms var(--ease-out);
 }
-.fc-btn:hover:not(:disabled) { background: var(--blue-hover); }
+.fc-btn:hover:not(:disabled) { background: var(--accent-hover); }
 .fc-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .fc-error { margin-top: 12px; font-size: 13px; color: var(--red); }

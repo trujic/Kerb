@@ -1,45 +1,53 @@
-/* ── DESIGN TOKENS — "ROAD PAINT" (dark, road-signage) ───────────────────────── */
+/* ── DESIGN TOKENS — "ROAD PAINT" (light, day-at-the-curb) ────────────────────
+   The app is read in direct sunlight next to a car: light gray page, white
+   cards, near-black ink. Yellow is the road-paint brand FILL (always with
+   --on-accent ink, never as text on white); blue is interactive text; amber
+   carries caution; zone colors stay the loudest layer, like the signs. */
 :root {
-  /* Backgrounds — asphalt → card → patch → edge */
-  --bg:      #16181C;   /* asphalt */
-  --bg2:     #1F2228;   /* card */
-  --bg3:     #282C34;   /* patch */
-  --bg4:     #343943;   /* edge */
+  /* Backgrounds — page → card → patch → edge (concrete → white sign) */
+  --bg:      #F2F3F5;   /* page */
+  --bg2:     #FFFFFF;   /* card */
+  --bg3:     #EAECEF;   /* patch / pressed */
+  --bg4:     #DEE1E6;   /* edge / skeleton */
 
   /* Text */
-  --text:    #F4F4F0;
-  --text2:   #D6D9DF;
-  --muted:   #9AA1AD;   /* sub */
-  --muted2:  #6E7682;
+  --text:    #1A1D23;
+  --text2:   #40454F;
+  --muted:   #5B6270;   /* sub */
+  --muted2:  #6E7583;
 
   /* Borders */
-  --border:  #2C313A;
-  --border2: #3C424E;
+  --border:  #E4E6EA;
+  --border2: #C9CDD6;
 
-  /* Accent — road-paint yellow. Kept under the --blue token names so the whole
-     existing UI re-skins from here. White never sits on yellow: use --on-accent. */
-  --blue:        #FFD23F;
-  --blue-hover:  #F2C32B;
-  --blue-bg:     rgba(255, 210, 63, 0.12);
-  --blue-border: rgba(255, 210, 63, 0.34);
-  --on-accent:   #161000;   /* ink for text/icons on the yellow accent */
+  /* Interactive text — links, active nav, focus. Text-safe on white. */
+  --blue:        #1A66D6;
+  --blue-hover:  #124DA8;
+  --blue-bg:     rgba(26, 102, 214, 0.10);
+  --blue-border: rgba(26, 102, 214, 0.35);
 
-  /* Green / success */
-  --green:        #3ECF7A;
-  --green-bg:     rgba(62, 207, 122, 0.13);
-  --green-border: rgba(62, 207, 122, 0.36);
+  /* Brand accent — road-paint yellow, fills only. Ink on it is --on-accent. */
+  --accent:        #FFD23F;
+  --accent-hover:  #F2C32B;
+  --accent-bg:     rgba(255, 210, 63, 0.15);
+  --on-accent:     #161000;
 
-  /* Amber / warn */
-  --amber:        #F5A524;
-  --amber-bg:     rgba(245, 165, 36, 0.13);
-  --amber-border: rgba(245, 165, 36, 0.36);
+  /* Green / success (text-safe even on its own tint; tints for surfaces) */
+  --green:        #10673E;
+  --green-bg:     rgba(16, 103, 62, 0.10);
+  --green-border: rgba(16, 103, 62, 0.35);
 
-  /* Red */
-  --red:        #E25141;
-  --red-bg:     rgba(226, 81, 65, 0.13);
-  --red-border: rgba(226, 81, 65, 0.36);
+  /* Amber / warn (text-safe burnt amber; tints stay warm) */
+  --amber:        #B45309;
+  --amber-bg:     rgba(245, 165, 36, 0.14);
+  --amber-border: rgba(245, 165, 36, 0.45);
 
-  /* Zone paint chips */
+  /* Red (text-safe on white; tints for surfaces) */
+  --red:        #C4382A;
+  --red-bg:     rgba(226, 81, 65, 0.10);
+  --red-border: rgba(226, 81, 65, 0.38);
+
+  /* Zone paint chips — fills for headers, chips, map lines (not text) */
   --zone-extra: #9B6DF2;
   --zone-red:   #E25141;
   --zone-blue:  #4F86F7;
@@ -56,16 +64,16 @@
   --r-lg: 14px;
   --r-xl: 20px;
 
-  /* Shadows — deeper on dark */
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.40), 0 1px 2px rgba(0,0,0,0.30);
-  --shadow-md: 0 4px 14px rgba(0,0,0,0.45), 0 2px 4px rgba(0,0,0,0.30);
-  --shadow-lg: 0 16px 40px rgba(0,0,0,0.55), 0 4px 10px rgba(0,0,0,0.35);
+  /* Shadows — soft on light */
+  --shadow-sm: 0 1px 3px rgba(23,26,31,0.10), 0 1px 2px rgba(23,26,31,0.06);
+  --shadow-md: 0 4px 14px rgba(23,26,31,0.12), 0 2px 4px rgba(23,26,31,0.06);
+  --shadow-lg: 0 16px 40px rgba(23,26,31,0.18), 0 4px 10px rgba(23,26,31,0.08);
 
   /* Easing */
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
 
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 /* ── RESET ──────────────────────────────────────────────────────────────────── */
@@ -142,14 +150,14 @@ h1, .display { font-family: var(--font-display); font-weight: 400; }
   background: var(--bg2);
   white-space: nowrap;
 }
-.tag.zone-extra { background: rgba(155,109,242,0.14); border-color: rgba(155,109,242,0.40); color: #B79DF6; }
-.tag.zone-red   { background: var(--red-bg);   border-color: var(--red-border);   color: #ED8076; }
-.tag.zone-blue  { background: rgba(79,134,247,0.14); border-color: rgba(79,134,247,0.40); color: #8FB2FA; }
+.tag.zone-extra { background: rgba(155,109,242,0.12); border-color: rgba(155,109,242,0.45); color: #6D3FD8; }
+.tag.zone-red   { background: var(--red-bg);   border-color: var(--red-border);   color: #C4382A; }
+.tag.zone-blue  { background: rgba(79,134,247,0.12); border-color: rgba(79,134,247,0.45); color: #2B5FD9; }
 .tag.zone-white { background: var(--bg3);      border-color: var(--border2);      color: var(--muted); }
 
 /* ── BUTTONS ─────────────────────────────────────────────────────────────────── */
 .btn-primary {
-  background: var(--blue);
+  background: var(--accent);
   color: var(--on-accent);
   border: none;
   border-radius: var(--r-md);
@@ -161,7 +169,7 @@ h1, .display { font-family: var(--font-display); font-weight: 400; }
   font-family: var(--font-body);
   display: inline-block;
 }
-.btn-primary:hover { background: var(--blue-hover); }
+.btn-primary:hover { background: var(--accent-hover); }
 .btn-primary:active { transform: scale(0.97); }
 
 .btn-ghost {

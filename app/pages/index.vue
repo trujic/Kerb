@@ -1451,7 +1451,7 @@ h1 {
 }
 .search-input::placeholder { color: var(--muted2); }
 .search-btn {
-  background: var(--blue);
+  background: var(--accent);
   border: none;
   padding: 13px 20px;
   font-size: 13px;
@@ -1461,7 +1461,7 @@ h1 {
   cursor: pointer;
   transition: background 150ms var(--ease-out), transform 150ms var(--ease-out);
 }
-.search-btn:hover { background: var(--blue-hover); }
+.search-btn:hover { background: var(--accent-hover); }
 .search-btn:active { transform: scale(0.97); }
 .search-dropdown {
   position: absolute;
@@ -1666,7 +1666,7 @@ h2 {
   font-size: 12px;
   font-weight: 600;
   color: var(--text2);
-  background: rgba(31, 34, 40, 0.88);
+  background: rgba(255, 255, 255, 0.88);
   border: 1px solid var(--border);
   border-radius: var(--r-md);
   box-shadow: var(--shadow-sm);
@@ -1839,7 +1839,7 @@ h2 {
   font-size: 14px;
   font-weight: 700;
   color: var(--on-accent);
-  background: var(--blue);
+  background: var(--accent);
   border: none;
   border-radius: var(--r-md);
   cursor: pointer;
@@ -1979,9 +1979,11 @@ h2 {
   font-family: var(--font-mono);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  border: 1px solid currentColor;
   padding: 2px 8px;
   border-radius: 20px;
+  /* Road-paint badge: the GPS guess is a caution-colored hint, not a verdict */
+  background: var(--accent);
+  color: var(--on-accent);
 }
 .zone-hero-meta {
   display: flex;
@@ -2302,7 +2304,7 @@ h2 {
   font-size: 14px;
   font-weight: 700;
   color: var(--on-accent);
-  background: var(--blue);
+  background: var(--accent);
   border: none;
   border-radius: var(--r-md);
   cursor: pointer;
@@ -2429,7 +2431,7 @@ html.gps-expected .mkt,
 .mkt-off { display: none; }
 
 .sk {
-  background: var(--bg2);
+  background: var(--bg4);
   border-radius: var(--r-md);
   animation: shimmer 1.4s ease-in-out infinite;
 }

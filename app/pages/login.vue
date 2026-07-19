@@ -124,7 +124,7 @@ useSeoMeta({ title: 'Sign in — Kerb' })
   font-family: var(--font-display);
   font-size: 24px;
   font-weight: 400;
-  color: var(--blue);
+  color: var(--text);
   margin-bottom: 6px;
   letter-spacing: 0.5px;
 }

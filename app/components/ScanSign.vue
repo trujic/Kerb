@@ -532,14 +532,14 @@ onUnmounted(() => {
 .scan-shutter-ring {
   width: 84px; height: 84px;
   border-radius: 50%;
-  border: 3px solid var(--blue);
+  border: 3px solid var(--accent);
   display: flex; align-items: center; justify-content: center;
-  background: var(--blue-bg);
+  background: var(--accent-bg);
   transition: transform 150ms var(--ease-out);
 }
 .scan-shutter:active .scan-shutter-ring { transform: scale(0.94); }
-.scan-shutter-dot { width: 58px; height: 58px; border-radius: 50%; background: var(--blue); }
-.scan-shutter-label { font-size: 14px; font-weight: 600; color: var(--blue); }
+.scan-shutter-dot { width: 58px; height: 58px; border-radius: 50%; background: var(--accent); }
+.scan-shutter-label { font-size: 14px; font-weight: 600; color: var(--text2); }
 .scan-warn {
   font-size: 13px; color: var(--amber, #b45309); line-height: 1.5;
   background: var(--amber-bg, #fffbeb); border: 1px solid var(--amber-border, #fde68a);
