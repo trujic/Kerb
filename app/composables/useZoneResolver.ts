@@ -61,17 +61,24 @@ function originInRing(ring: number[][]): boolean {
 }
 
 // Distance from the user (origin) to a feature — 0 if standing inside a zone area.
+// Polygon rings beyond the first are HOLES (city blocks enclosed by a street
+// network): standing in a hole is NOT inside, and its boundary counts for distance.
 function featureMinDist(geom: any, px: (n: number) => number, py: (n: number) => number): number {
   if (!geom) return Infinity
   if (geom.type === 'Polygon') {
-    const ring = (geom.coordinates?.[0] ?? []).map((c: number[]) => [px(c[0]), py(c[1])])
-    if (ring.length < 3) return Infinity
-    if (originInRing(ring)) return 0
+    const rings = (geom.coordinates ?? [])
+      .map((r: number[][]) => r.map((c: number[]) => [px(c[0]), py(c[1])]))
+      .filter((r: number[][]) => r.length >= 3)
+    if (!rings.length) return Infinity
+    const inHole = rings.slice(1).some((r: number[][]) => originInRing(r))
+    if (originInRing(rings[0]) && !inHole) return 0
     let min = Infinity
-    for (let i = 0; i < ring.length; i++) {
-      const n = (i + 1) % ring.length
-      const d = segDist(ring[i][0], ring[i][1], ring[n][0], ring[n][1])
-      if (d < min) min = d
+    for (const ring of rings) {
+      for (let i = 0; i < ring.length; i++) {
+        const n = (i + 1) % ring.length
+        const d = segDist(ring[i][0], ring[i][1], ring[n][0], ring[n][1])
+        if (d < min) min = d
+      }
     }
     return min
   }

@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+<meta charset="utf-8">
+<title>Kerb · zone editor — Novi Sad</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.17.0/dist/leaflet-geoman.css">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font: 13px/1.5 system-ui, sans-serif; color:#1A1D23; }
+  #map { position:fixed; inset:0 0 0 280px; }
+  #side { position:fixed; inset:0 auto 0 0; width:280px; background:#F2F3F5; border-right:1px solid #C9CDD6; padding:14px; overflow-y:auto; z-index:1000; }
+  h1 { font-size:15px; margin-bottom:2px; }
+  .sub { font-size:11px; color:#5B6270; margin-bottom:14px; }
+  section { margin-bottom:16px; }
+  section > .t { display:block; font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:#5B6270; margin-bottom:6px; }
+  .zones { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+  .zbtn { padding:8px 6px; border:2px solid transparent; border-radius:8px; color:#fff; font-weight:700; cursor:pointer; font-size:12px; }
+  .zbtn.on { border-color:#1A1D23; box-shadow:0 0 0 2px #fff inset; }
+  button, input[type=text] { font:inherit; }
+  .row { display:flex; gap:6px; align-items:center; margin-bottom:6px; }
+  .btn { padding:7px 10px; background:#fff; border:1px solid #C9CDD6; border-radius:8px; cursor:pointer; width:100%; }
+  .btn.primary { background:#FFD23F; border-color:#FFD23F; font-weight:700; }
+  .btn.mini { width:auto; padding:6px 9px; font-size:12px; flex-shrink:0; }
+  .btn.armed { background:#1A66D6; border-color:#1A66D6; color:#fff; }
+  .btn:hover { filter:brightness(.97); }
+  input[type=range] { width:100%; }
+  input[type=text] { width:100%; padding:7px 9px; border:1px solid #C9CDD6; border-radius:8px; }
+  .gcp { background:#fff; border:1px solid #C9CDD6; border-radius:10px; padding:8px; margin-bottom:8px; }
+  .gcp .st { font-size:11px; margin-top:4px; }
+  .gcp .st.ok { color:#10673E; }
+  .gcp .st.todo { color:#B45309; }
+  #selbox { background:#fff; border:1px solid #C9CDD6; border-radius:10px; padding:10px; }
+  #selbox.empty { color:#5B6270; font-size:12px; }
+  .hint { font-size:11px; color:#5B6270; margin-top:4px; }
+  #stats { font-size:12px; color:#40454F; }
+  #toast { position:fixed; bottom:14px; left:300px; background:#1A1D23; color:#fff; padding:8px 14px; border-radius:8px; opacity:0; transition:opacity .2s; z-index:2000; pointer-events:none; }
+</style>
+</head>
+<body>
+<div id="side">
+  <h1>Kerb · zone editor</h1>
+  <div class="sub">Novi Sad — crtaj preko zvanične karte</div>
+
+  <section>
+    <span class="t">Georeferenca — 3 tačke</span>
+    <div class="hint" style="margin:0 0 8px">
+      Za svaku tačku: nalepi koordinate iz Google mape (desni klik → kopiraj),
+      pa klikni <b>isto to mesto na PDF podlozi</b>. Tri tačke, što raširenije.
+    </div>
+    <div id="gcps"></div>
+    <div class="row"><button class="btn primary" id="fit">Razvuci PDF po tačkama</button></div>
+    <div class="hint" id="fitmsg"></div>
+  </section>
+
+  <section>
+    <span class="t">Podloga</span>
+    <div class="row"><input type="range" id="op" min="0" max="100" value="65"></div>
+  </section>
+
+  <section>
+    <span class="t">Aktivna zona (za nove poligone)</span>
+    <div class="zones" id="zones"></div>
+  </section>
+
+  <section>
+    <span class="t">Izabrani poligon</span>
+    <div id="selbox" class="empty">Klikni poligon na mapi.</div>
+  </section>
+
+  <section>
+    <span class="t">Referenca</span>
+    <label style="display:flex;gap:6px;align-items:center;font-size:12px">
+      <input type="checkbox" id="ref" checked> postojeće ulice iz aplikacije
+    </label>
+  </section>
+
+  <section>
+    <span class="t">Fajl</span>
+    <div class="row"><button class="btn" id="imp">Uvezi GeoJSON…</button></div>
+    <div class="row"><button class="btn primary" id="exp">Izvezi novi-sad.json</button></div>
+    <div class="row">
+      <button class="btn" id="bak">Backup stanja</button>
+      <button class="btn" id="res">Vrati backup…</button>
+    </div>
+    <input type="file" id="file" accept=".json,.geojson" style="display:none">
+    <input type="file" id="resfile" accept=".json" style="display:none">
+    <div class="hint">Autosave u browseru posle svake izmene. Backup čuva i kalibraciju i poligone u jedan fajl.</div>
+  </section>
+
+  <section><span class="t">Stanje</span><div id="stats"></div></section>
+</div>
+<div id="map"></div>
+<div id="toast"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-imageoverlay-rotated@0.2.1/Leaflet.ImageOverlay.Rotated.js"></script>
+<script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.17.0/dist/leaflet-geoman.min.js"></script>
+<script>
+const ZONES = {
+  'Extra Zone': '#F97316',
+  'Red Zone':   '#EF4444',
+  'Blue Zone':  '#3B82F6',
+  'White Zone': '#9CA3AF',
+}
+const STORE = 'kerb-zone-editor-novi-sad'
+const CRS = L.CRS.EPSG3857
+const P = (ll) => CRS.project(L.latLng(ll))
+const UNP = (pt) => CRS.unproject(pt)
+
+// ── map ──
+const map = L.map('map', { zoomControl: true }).setView([45.2551, 19.8451], 15)
+L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+  maxZoom: 20, attribution: '© OpenStreetMap © CARTO',
+}).addTo(map)
+
+// ── state ──
+const saved = JSON.parse(localStorage.getItem(STORE) || 'null') || {}
+let activeZone = saved.activeZone || 'Blue Zone'
+let selected = null
+
+// ── rotated sheet overlay ──────────────────────────────────────────────────────
+// The official sheet is ROTATED relative to true north, so an axis-aligned
+// overlay can never line up. Three corners (TL, TR, BL) define the placement;
+// they come from the 3-point georeference below and persist in localStorage.
+const defCorners = { tl: [45.2757, 19.79], tr: [45.2757, 19.92], bl: [45.2304, 19.79] }
+let corners = saved.corners || defCorners
+const overlay = L.imageOverlay.rotated('katastar-1.png',
+  L.latLng(corners.tl), L.latLng(corners.tr), L.latLng(corners.bl),
+  { opacity: (saved.opacity ?? 65) / 100 }).addTo(map)
+document.getElementById('op').value = saved.opacity ?? 65
+document.getElementById('op').oninput = (e) => { overlay.setOpacity(e.target.value / 100); persist() }
+
+// image fraction (fx right, fy down from TL) of a map point under the CURRENT placement
+function fracOf(latlng) {
+  const tl = P(corners.tl), tr = P(corners.tr), bl = P(corners.bl)
+  const u = tr.subtract(tl), v = bl.subtract(tl), w = P(latlng).subtract(tl)
+  const det = u.x * v.y - u.y * v.x
+  return { fx: (w.x * v.y - w.y * v.x) / det, fy: (u.x * w.y - u.y * w.x) / det }
+}
+
+// ── 3 ground-control points: Google coords ↔ a click on the sheet ─────────────
+const gcps = saved.gcps || [{}, {}, {}] // { lat, lng, fx, fy }
+let armed = -1 // which GCP awaits its sheet click
+const gcpPins = []
+function renderGcps() {
+  const box = document.getElementById('gcps')
+  box.innerHTML = ''
+  gcpPins.forEach(m => map.removeLayer(m)); gcpPins.length = 0
+  gcps.forEach((g, i) => {
+    const has = g.lat != null
+    const hasPx = g.fx != null
+    const div = document.createElement('div')
+    div.className = 'gcp'
+    div.innerHTML = `
+      <div class="row" style="margin:0">
+        <input type="text" placeholder="npr. 45.25510, 19.84510" value="${has ? g.lat + ', ' + g.lng : ''}" data-i="${i}">
+        <button class="btn mini ${armed === i ? 'armed' : ''}" data-pick="${i}">${armed === i ? 'klikni…' : 'PDF'}</button>
+      </div>
+      <div class="st ${has && hasPx ? 'ok' : 'todo'}">
+        ${has ? '📍 pin na mapi' : '— bez koordinata'} · ${hasPx ? 'PDF tačka ✓' : 'klikni PDF dugme pa tačku na podlozi'}
+      </div>`
+    box.appendChild(div)
+    if (has) {
+      const m = L.circleMarker([g.lat, g.lng], { radius: 7, color: '#1A66D6', fillColor: '#1A66D6', fillOpacity: 0.9, weight: 2 })
+        .bindTooltip('tačka ' + (i + 1), { permanent: true, direction: 'top', offset: [0, -8] })
+      m.addTo(map); gcpPins.push(m)
+    }
+  })
+  box.querySelectorAll('input').forEach(inp => inp.onchange = (e) => {
+    const i = +e.target.dataset.i
+    const m = e.target.value.match(/(-?\d+\.\d+)[,\s]+(-?\d+\.\d+)/)
+    if (!m) { toast('Ne prepoznajem koordinate — format: 45.25510, 19.84510'); return }
+    gcps[i].lat = +m[1]; gcps[i].lng = +m[2]
+    map.panTo([+m[1], +m[2]])
+    persist(); renderGcps()
+  })
+  box.querySelectorAll('[data-pick]').forEach(b => b.onclick = () => {
+    armed = armed === +b.dataset.pick ? -1 : +b.dataset.pick
+    renderGcps()
+    if (armed >= 0) toast('Klikni tačku ' + (armed + 1) + ' na PDF podlozi')
+  })
+}
+
+document.getElementById('fit').onclick = () => {
+  const ready = gcps.filter(g => g.lat != null && g.fx != null)
+  if (ready.length < 3) { toast('Trebaju sve 3 tačke (koordinate + klik na PDF)'); return }
+  const [a, b, c] = gcps
+  const Pa = P([a.lat, a.lng]), Pb = P([b.lat, b.lng]), Pc = P([c.lat, c.lng])
+  // solve Pi = TL + fxi·u + fyi·v  →  2×2 for u,v, then TL
+  const d1x = b.fx - a.fx, d1y = b.fy - a.fy, d2x = c.fx - a.fx, d2y = c.fy - a.fy
+  const det = d1x * d2y - d1y * d2x
+  if (Math.abs(det) < 1e-4) { toast('Tačke su skoro na istoj liniji — raširi ih'); return }
+  const solve = (q1, q2) => ({ u: (q1 * d2y - q2 * d1y) / det, v: (d1x * q2 - d2x * q1) / det })
+  const sx = solve(Pb.x - Pa.x, Pc.x - Pa.x), sy = solve(Pb.y - Pa.y, Pc.y - Pa.y)
+  const u = L.point(sx.u, sy.u), v = L.point(sx.v, sy.v)
+  const tl = L.point(Pa.x - a.fx * u.x - a.fy * v.x, Pa.y - a.fx * u.y - a.fy * v.y)
+  corners = {
+    tl: [UNP(tl).lat, UNP(tl).lng],
+    tr: [UNP(tl.add(u)).lat, UNP(tl.add(u)).lng],
+    bl: [UNP(tl.add(v)).lat, UNP(tl.add(v)).lng],
+  }
+  overlay.reposition(L.latLng(corners.tl), L.latLng(corners.tr), L.latLng(corners.bl))
+  const rot = (Math.atan2(u.y, u.x) * 180 / Math.PI).toFixed(1)
+  document.getElementById('fitmsg').textContent = `Razvučeno · rotacija ${rot}°`
+  persist()
+  toast('PDF razvučen po tvojim tačkama')
+}
+
+// ── reference: current app street lines ──
+const refLayer = L.layerGroup().addTo(map)
+fetch('../../public/zones/novi-sad.json').then(r => r.json()).then(d => {
+  for (const f of d.features) {
+    const c = f.properties?.color || '#888'
+    const g = f.geometry
+    const lines = g.type === 'LineString' ? [g.coordinates] : g.type === 'MultiLineString' ? g.coordinates : []
+    for (const line of lines) L.polyline(line.map(([x, y]) => [y, x]), { color: c, weight: 2, opacity: 0.5, dashArray: '4 4', interactive: false }).addTo(refLayer)
+  }
+}).catch(() => toast('Referenca nije učitana — pokreni server iz korena repo-a'))
+document.getElementById('ref').onchange = (e) => e.target.checked ? refLayer.addTo(map) : map.removeLayer(refLayer)
+
+// ── drawn features ──
+const drawn = L.featureGroup().addTo(map)
+
+function styleFor(zone) {
+  const c = ZONES[zone] || '#6E7583'
+  return { color: c, fillColor: c, fillOpacity: 0.25, weight: 2 }
+}
+function attach(layer, props) {
+  layer.feature = { type: 'Feature', properties: { name: props.name || '', zone: props.zone || null, color: ZONES[props.zone] || null } }
+  layer.setStyle(styleFor(props.zone))
+  layer.on('click', (e) => {
+    L.DomEvent.stop(e)
+    if (armed >= 0) { sheetClick(e.latlng); return }
+    select(layer)
+  })
+  layer.on('pm:edit', persist)
+  drawn.addLayer(layer)
+}
+function select(layer) {
+  if (selected) selected.setStyle(styleFor(selected.feature.properties.zone))
+  selected = layer
+  layer.setStyle({ ...styleFor(layer.feature.properties.zone), weight: 4, fillOpacity: 0.4 })
+  renderSel()
+}
+function renderSel() {
+  const box = document.getElementById('selbox')
+  if (!selected) { box.className = 'empty'; box.textContent = 'Klikni poligon na mapi.'; return }
+  const p = selected.feature.properties
+  box.className = ''
+  box.innerHTML = `
+    <div class="row"><input type="text" id="selname" placeholder="ime ulice / parkirališta" value="${(p.name || '').replace(/"/g, '&quot;')}"></div>
+    <div class="zones" id="selzones"></div>
+    <div class="row" style="margin-top:6px"><button class="btn" id="deldup">Obriši poligon</button></div>`
+  zoneButtons(document.getElementById('selzones'), p.zone, (z) => {
+    p.zone = z; p.color = ZONES[z]; selected.setStyle({ ...styleFor(z), weight: 4, fillOpacity: 0.4 }); persist()
+  })
+  document.getElementById('selname').oninput = (e) => { p.name = e.target.value; persist() }
+  document.getElementById('deldup').onclick = () => { drawn.removeLayer(selected); selected = null; renderSel(); persist() }
+}
+function zoneButtons(el, current, onPick) {
+  el.innerHTML = ''
+  for (const [z, c] of Object.entries(ZONES)) {
+    const b = document.createElement('button')
+    b.className = 'zbtn' + (z === current ? ' on' : '')
+    b.style.background = c
+    b.textContent = z.replace(' Zone', '')
+    b.onclick = () => { onPick(z); zoneButtons(el, z, onPick) }
+    el.appendChild(b)
+  }
+}
+zoneButtons(document.getElementById('zones'), activeZone, (z) => { activeZone = z; persist() })
+
+map.pm.addControls({ position: 'topright', drawMarker: false, drawCircle: false, drawCircleMarker: false, drawPolyline: false, drawText: false, drawRectangle: true, cutPolygon: false, rotateMode: false })
+map.on('pm:create', (e) => {
+  attach(e.layer, { zone: activeZone })
+  select(e.layer)
+  persist()
+})
+function sheetClick(latlng) {
+  const f = fracOf(latlng)
+  gcps[armed].fx = f.fx; gcps[armed].fy = f.fy
+  armed = -1
+  persist(); renderGcps()
+  toast('PDF tačka upisana')
+}
+map.on('click', (e) => {
+  if (armed >= 0) { sheetClick(e.latlng); return }
+  if (selected) { selected.setStyle(styleFor(selected.feature.properties.zone)); selected = null; renderSel() }
+})
+
+// ── zone inference for messy imported properties ──
+function inferZone(props) {
+  if (ZONES[props?.zone]) return props.zone
+  const vals = Object.values(props || {}).concat(Object.keys(props || {}))
+  for (const v of vals.reverse()) {
+    const m = String(v).toLowerCase().match(/extra|red|blue|white|ekstra|crven|plav|bel/)
+    if (m) {
+      const k = m[0]
+      if (k.startsWith('e')) return 'Extra Zone'
+      if (k === 'red' || k.startsWith('crven')) return 'Red Zone'
+      if (k === 'blue' || k.startsWith('plav')) return 'Blue Zone'
+      return 'White Zone'
+    }
+  }
+  return null
+}
+function importFC(fc, silent) {
+  let n = 0
+  for (const f of fc.features || []) {
+    if (f.geometry?.type !== 'Polygon') continue
+    // all rings: [outer, ...holes] — holes are real (city blocks inside street networks)
+    const layer = L.polygon(f.geometry.coordinates.map(ring => ring.map(([x, y]) => [y, x])))
+    attach(layer, { name: f.properties?.name || '', zone: inferZone(f.properties) })
+    n++
+  }
+  if (!silent) { toast(`Uvezeno ${n} poligona`); persist() }
+  stats()
+}
+document.getElementById('imp').onclick = () => document.getElementById('file').click()
+document.getElementById('file').onchange = (e) => {
+  const f = e.target.files[0]
+  if (!f) return
+  f.text().then(t => importFC(JSON.parse(t)))
+  e.target.value = ''
+}
+
+// ── export in the app's exact format ──
+function toFC() {
+  const features = []
+  drawn.eachLayer(l => {
+    const p = l.feature.properties
+    // getLatLngs() nests: simple polygon → [[outer]], with holes → [[outer],[hole]…]
+    let raw = l.getLatLngs()
+    if (raw.length && !Array.isArray(raw[0])) raw = [raw]
+    const rings = raw
+      .map(r => r.map(ll => [+ll.lng.toFixed(6), +ll.lat.toFixed(6)]))
+      .filter(r => r.length >= 3)
+      .map(r => (r[0][0] !== r.at(-1)[0] || r[0][1] !== r.at(-1)[1]) ? [...r, [...r[0]]] : r)
+    if (!rings.length) return
+    features.push({ type: 'Feature', properties: { name: p.name || '', zone: p.zone, color: ZONES[p.zone] || null }, geometry: { type: 'Polygon', coordinates: rings } })
+  })
+  return { type: 'FeatureCollection', features }
+}
+document.getElementById('exp').onclick = () => {
+  const fc = toFC()
+  const missing = fc.features.filter(f => !f.properties.zone).length
+  if (missing) toast(`Pažnja: ${missing} poligona bez zone`)
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(fc)], { type: 'application/json' }))
+  a.download = 'novi-sad.json'
+  a.click()
+}
+
+// ── full-state backup / restore (calibration + GCPs + polygons in one file) ──
+document.getElementById('bak').onclick = () => {
+  persist()
+  const a = document.createElement('a')
+  a.href = URL.createObjectURL(new Blob([localStorage.getItem(STORE)], { type: 'application/json' }))
+  a.download = 'kerb-editor-backup.json'
+  a.click()
+}
+document.getElementById('res').onclick = () => document.getElementById('resfile').click()
+document.getElementById('resfile').onchange = (e) => {
+  const f = e.target.files[0]
+  if (!f) return
+  f.text().then(t => {
+    JSON.parse(t) // validate before committing
+    localStorage.setItem(STORE, t)
+    location.reload()
+  }).catch(() => toast('Ne mogu da pročitam backup fajl'))
+  e.target.value = ''
+}
+
+// ── persistence ──
+function persist() {
+  localStorage.setItem(STORE, JSON.stringify({
+    activeZone,
+    opacity: +document.getElementById('op').value,
+    corners,
+    gcps,
+    fc: toFC(),
+  }))
+  stats()
+}
+function stats() {
+  const fc = toFC()
+  const per = {}
+  fc.features.forEach(f => { per[f.properties.zone || '—'] = (per[f.properties.zone || '—'] || 0) + 1 })
+  document.getElementById('stats').textContent =
+    `${fc.features.length} poligona · ` + Object.entries(per).map(([z, n]) => `${z.replace(' Zone', '')}: ${n}`).join(' · ')
+}
+function toast(msg) {
+  const t = document.getElementById('toast')
+  t.textContent = msg; t.style.opacity = 1
+  setTimeout(() => (t.style.opacity = 0), 2600)
+}
+
+// test hook — lets automation read placement without reaching into scope
+window.__ed = { get corners() { return corners }, get gcps() { return gcps }, fracOf }
+
+renderGcps()
+if (saved.fc) importFC(saved.fc, true)
+stats()
+</script>
+</body>
+</html>

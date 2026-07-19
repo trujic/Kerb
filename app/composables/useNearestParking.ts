@@ -62,15 +62,25 @@ export const useNearestParking = (
       const zone = f.properties?.zone ?? ''
       const street = f.properties?.name ?? ''
 
-      // Zone-area polygons (e.g. Niš): inside → distance 0; else nearest edge.
+      // Zone-area polygons (Niš areas, Novi Sad street networks): inside → distance 0;
+      // else nearest edge. Rings beyond the first are HOLES (city blocks inside a
+      // street network) — standing in one is outside, and its boundary counts.
       if (geom.type === 'Polygon') {
-        const ring = (geom.coordinates?.[0] ?? []).map(([lng, lat]: number[]) => [px(lng), py(lat)])
-        if (ring.length < 3) continue
-        if (originInRing(ring)) { if (!best || best.dist > 0) best = { dist: 0, cx: 0, cy: 0, zone, street }; continue }
-        for (let i = 0; i < ring.length; i++) {
-          const n = (i + 1) % ring.length
-          const r = closestOnSegment(ring[i][0], ring[i][1], ring[n][0], ring[n][1])
-          if (!best || r.dist < best.dist) best = { dist: r.dist, cx: r.cx, cy: r.cy, zone, street }
+        const rings = (geom.coordinates ?? [])
+          .map((r: number[][]) => r.map(([lng, lat]: number[]) => [px(lng), py(lat)]))
+          .filter((r: number[][]) => r.length >= 3)
+        if (!rings.length) continue
+        const inHole = rings.slice(1).some((r: number[][]) => originInRing(r))
+        if (originInRing(rings[0]) && !inHole) {
+          if (!best || best.dist > 0) best = { dist: 0, cx: 0, cy: 0, zone, street }
+          continue
+        }
+        for (const ring of rings) {
+          for (let i = 0; i < ring.length; i++) {
+            const n = (i + 1) % ring.length
+            const r = closestOnSegment(ring[i][0], ring[i][1], ring[n][0], ring[n][1])
+            if (!best || r.dist < best.dist) best = { dist: r.dist, cx: r.cx, cy: r.cy, zone, street }
+          }
         }
         continue
       }

@@ -130,6 +130,30 @@ watchEffect((onCleanup) => {
   const L     = LRef.value
   if (!L || !map || !zones?.features?.length) return
 
+  // One permanent label per street name: with per-part strip geometry a street
+  // spans many features, and labelling each part drowns the map in repeats.
+  // The longest part carries the label; the rest keep only the hover tooltip.
+  const lenOf = (f: any) => {
+    const g = f.geometry
+    const pts: number[][] =
+      g?.type === 'Polygon' ? g.coordinates[0]
+      : g?.type === 'LineString' ? g.coordinates
+      : g?.type === 'MultiLineString' ? g.coordinates.flat() : []
+    let len = 0
+    for (let i = 0; i + 1 < pts.length; i++) {
+      len += Math.hypot(pts[i + 1][0] - pts[i][0], pts[i + 1][1] - pts[i][1])
+    }
+    return len
+  }
+  const bestLen = new Map<string, number>()
+  const labelCarrier = new Map<string, any>()
+  for (const f of zones.features) {
+    const n = f.properties?.name
+    if (!n) continue
+    const l = lenOf(f)
+    if (l > (bestLen.get(n) ?? -1)) { bestLen.set(n, l); labelCarrier.set(n, f) }
+  }
+
   const layers: any[] = []
   for (const feature of zones.features) {
     const g = feature.geometry
@@ -140,7 +164,8 @@ watchEffect((onCleanup) => {
     let layer: any = null
     if (g.type === 'Polygon') {
       if (g.coordinates[0].length < 3) continue
-      layer = L.polygon(toLatLngs(g.coordinates[0]), {
+      // all rings — holes (city blocks inside street networks) must stay unfilled
+      layer = L.polygon(g.coordinates.map((ring: number[][]) => toLatLngs(ring)), {
         color, fillColor: color, fillOpacity: 0.13, weight: 2, opacity: 0.55,
       })
     } else if (g.type === 'LineString') {
@@ -158,7 +183,8 @@ watchEffect((onCleanup) => {
     if (name) {
       // Permanent street/zone labels on explore maps (revealed when zoomed in, see
       // lm-labels) and on the labelled preview. Plain previews keep the hover tooltip.
-      layer.bindTooltip(name, (props.interactive || props.labels)
+      const wantsPermanent = props.interactive || props.labels
+      layer.bindTooltip(name, wantsPermanent && labelCarrier.get(name) === feature
         ? { permanent: true, direction: 'center', className: 'zone-label' }
         : { sticky: true, className: 'zone-tooltip' })
     }
