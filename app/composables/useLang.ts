@@ -18,6 +18,10 @@ const dict = {
   freeSub: { sr: 'Parkiranje je besplatno u {city}.', en: 'Parking is free in {city}.' },
   chargingResumes: { sr: 'Naplata ponovo počinje', en: 'Charging resumes' },
   prepayBtn: { sr: 'Plati unapred {start}–{end} →', en: 'Pre-pay {start}–{end} →' },
+  prepayWhy: {
+    sr: 'Ujutru se parking najlakše zaboravi — naplata krene u {start} pre nego što se većina seti. Tada najčešće stižu kazne. Platiš li sad, pokriven si čim počne.',
+    en: "Morning is when parking slips the mind — charging starts at {start} before most people think of it. That's when fines usually land. Pay now and you're covered the moment it starts.",
+  },
   browseZones: { sr: 'Pregledaj zone', en: 'Browse zones' },
   today: { sr: 'danas', en: 'today' },
   tomorrow: { sr: 'sutra', en: 'tomorrow' },
