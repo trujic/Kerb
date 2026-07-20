@@ -31,8 +31,8 @@ const dict = {
   coveredUntil: { sr: 'Pokriveno do {time}', en: 'Covered until {time}' },
   managePlates: { sr: 'Upravljaj tablicama →', en: 'Manage plates →' },
   heroCheckSign: {
-    sr: 'Proveri da se poklapa sa tablom pored auta — samo ona važi.',
-    en: "Check it matches the sign next to your car — that's the one that counts.",
+    sr: 'Proveri znak — znak je zvaničan.',
+    en: 'Check the sign — the sign is official.',
   },
   wrongZone: { sr: 'Pogrešna zona? Pogledaj sve zone', en: 'Wrong zone? See all zones' },
   askAiShort: { sr: 'Pitaj AI', en: 'Ask AI' },
@@ -52,7 +52,7 @@ const dict = {
   scanContribute: { sr: 'Vidiš tablu? Skeniraj je', en: 'See a sign? Scan it' },
 
   // Pay card
-  plateHint: { sr: 'Sačuvano na uređaju · ide u SMS', en: 'Saved on this device · prefilled into the SMS' },
+  plateHint: { sr: 'Sačuvano na uređaju · spremno za plaćanje', en: 'Saved on this device · prefilled for payment' },
   plateSync: { sr: 'Napravi nalog za sinhronizaciju.', en: 'Create an account to sync it.' },
   sendSms: { sr: 'Prevuci da pošalješ SMS → {code}', en: 'Slide to send SMS → {code}' },
   openingSms: { sr: 'Otvaram SMS…', en: 'Opening SMS…' },
@@ -109,9 +109,10 @@ const dict = {
   end: { sr: 'Završi', en: 'End' },
 
   // Plate input
+  plateHow: { sr: 'Vidi kako', en: 'See how' },
   plateOcrHint: {
-    sr: 'Upiši je velikim slovima, tačno kao na tablici — sa kvačicama ako ih ima (Č, Š, Ž, Đ, Ć). Strana tablica: prepiši je tačno kako stoji.',
-    en: 'Type it in capitals, exactly as on the plate — diacritics included (Č, Š, Ž, Đ, Ć). Foreign plate: copy it exactly as written.',
+    sr: 'Pogledaj tablicu na autu. Prekucaj svako slovo i broj tačno kako tamo piše — ništa više, ništa manje.',
+    en: 'Look at the plate on your car. Type every letter and number exactly as written there — nothing more, nothing less.',
   },
   plateConf: { sr: 'pročitano {pct}% — proveri svaki znak', en: 'read {pct}% — check every character' },
   plateNoRead: {

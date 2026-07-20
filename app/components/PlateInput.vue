@@ -38,12 +38,17 @@
       />
     </div>
 
-    <p class="plate-hint">
-      <span v-if="confidence !== null" class="plate-conf">
+    <p v-if="confidence !== null" class="plate-hint">
+      <span class="plate-conf">
         {{ t('plateConf', { pct: Math.round(confidence * 100) }) }}
       </span>
-      {{ t('plateOcrHint') }}
     </p>
+    <!-- The how-to hides behind a disclosure: one tap for the six-year-old
+         version, invisible to everyone who already knows their plate. -->
+    <details class="plate-how">
+      <summary>{{ t('plateHow') }}</summary>
+      <p>{{ t('plateOcrHint') }}</p>
+    </details>
     <p v-if="scanError" class="plate-err">{{ scanError }}</p>
   </div>
 </template>
@@ -164,6 +169,19 @@ const onFile = async (e: Event) => {
 }
 @keyframes plate-spin { to { transform: rotate(360deg); } }
 .plate-hint { margin-top: 7px; font-size: 12px; color: var(--muted); line-height: 1.45; }
+.plate-how { margin-top: 6px; }
+.plate-how summary {
+  display: inline-block;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--blue);
+  cursor: pointer;
+  list-style: none;
+}
+.plate-how summary::-webkit-details-marker { display: none; }
+.plate-how summary::after { content: ' ▾'; font-size: 10px; }
+.plate-how[open] summary::after { content: ' ▴'; }
+.plate-how p { margin-top: 4px; font-size: 12.5px; color: var(--text2); line-height: 1.5; }
 .plate-conf {
   display: inline-block;
   margin-right: 6px;
