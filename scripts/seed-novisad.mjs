@@ -36,7 +36,7 @@ const city = {
   flag: '🇷🇸',
   verified: true,
   verified_by: null,
-  last_updated: 'May 2026',
+  last_updated: 'July 2026',
   overview: 'Novi Sad uses a 4-zone street parking system managed by JKP Parking Servis. Zones are color-coded (Extra, Red, Blue, White) with different prices and time limits. Payment via the nSpark app, SMS, or electronic parking card (ePK). Charging applies Mon–Fri 07:00–21:00 and Sat 07:00–14:00 — Sundays are free.',
   fine: '6,000–9,000 RSD (towing)',
   official_url: 'https://parkingns.rs',

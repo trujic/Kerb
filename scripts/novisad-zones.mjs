@@ -35,7 +35,7 @@ export const zones = [
     name: 'Extra Zone',
     color: '#F97316',
     rules: 'Max 60 min. After expiry you must leave the zone — you cannot re-pay for the next 60 min.',
-    price: '80 RSD/h',
+    price: '100 RSD/h', // JKP Parking Servis notice, effective 2026-07-21 (was 80 RSD/h)
     sort_order: 1,
     sms_shortcode: '8210',
   },
@@ -110,7 +110,11 @@ export const streetZones = [
   { street: 'Antona Čehova', zone: 'Blue Zone' },
   { street: 'Arse Teodorovića', zone: 'Blue Zone' },
   { street: 'Arhimandrita Rajića', zone: 'Blue Zone' },
-  { street: 'Augusta Cesarca', zone: 'Blue Zone' },
+  // NOTE: 'Augusta Cesarca' removed 2026-07-21 — the lot at house #9 (code 811) is
+  // a closed, barrier-controlled lot at 100 RSD/h, 00-24h, NOT street Blue Zone
+  // parking. Tagging the whole street Blue (50 RSD/h, zone hours) would be wrong.
+  // Re-add once closed lots have their own data model (see JKP Parking Servis
+  // "Zatvorena i povremena parkirališta" — also covers the SNP lot, code 19).
   { street: 'Baranjska', zone: 'Blue Zone' },
   { street: 'Bačka', zone: 'Blue Zone' },
   { street: 'Beogradski kej', zone: 'Blue Zone' },
