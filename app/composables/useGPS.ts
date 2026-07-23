@@ -33,6 +33,18 @@ const CYR_LAT: Record<string, string> = {
 const transliterate = (s: string): string =>
   s.split('').map((c) => CYR_LAT[c] ?? c).join('')
 
+// Network calls after the GPS fix (reverse geocode, Supabase lookups) have no
+// timeout of their own — on a flaky mobile connection they can hang forever,
+// leaving the "detecting" screen stuck with no way out. This bounds the whole
+// post-fix flow so it always settles.
+const DETECT_TIMEOUT_MS = 12000
+
+const fetchWithTimeout = (url: string, opts: RequestInit, ms: number): Promise<Response> => {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), ms)
+  return fetch(url, { ...opts, signal: controller.signal }).finally(() => clearTimeout(timer))
+}
+
 export const useGPS = () => {
   const supabase = useSupabaseClient()
 
@@ -71,10 +83,29 @@ export const useGPS = () => {
       const { latitude, longitude, accuracy } = position.coords
       coords.value = { lat: latitude, lng: longitude, accuracy }
 
+      return await Promise.race([
+        detectCityAt(latitude, longitude),
+        new Promise<null>((_, reject) =>
+          setTimeout(() => reject(new Error('detect-timeout')), DETECT_TIMEOUT_MS)
+        ),
+      ])
+    } catch (e: any) {
+      if (e?.code === 1) { gpsError.value = 'Location access denied. Enable it in browser settings.'; gpsDenied.value = true }
+      else if (e?.code === 3 || e?.message === 'detect-timeout') gpsError.value = 'Location request timed out.'
+      else gpsError.value = 'Could not detect location.'
+      return null
+    } finally {
+      detecting.value = false
+    }
+  }
+
+  const detectCityAt = async (latitude: number, longitude: number) => {
+    try {
       // Reverse geocode with Nominatim (free, no API key)
-      const res = await fetch(
+      const res = await fetchWithTimeout(
         `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&accept-language=en`,
-        { headers: { 'User-Agent': 'Kerb/1.0 (parking guide app)' } }
+        { headers: { 'User-Agent': 'Kerb/1.0 (parking guide app)' } },
+        DETECT_TIMEOUT_MS
       )
       const geo = await res.json()
       const rawCity = geo.address?.city || geo.address?.town || geo.address?.village || null
@@ -130,12 +161,8 @@ export const useGPS = () => {
       unsupportedCity.value = transliterate(rawCity)
       return null
     } catch (e: any) {
-      if (e?.code === 1) { gpsError.value = 'Location access denied. Enable it in browser settings.'; gpsDenied.value = true }
-      else if (e?.code === 3) gpsError.value = 'Location request timed out.'
-      else gpsError.value = 'Could not detect location.'
+      gpsError.value = e?.name === 'AbortError' ? 'Location lookup timed out.' : 'Could not detect location.'
       return null
-    } finally {
-      detecting.value = false
     }
   }
 
