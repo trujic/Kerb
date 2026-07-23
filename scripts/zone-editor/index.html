@@ -2,7 +2,7 @@
 <html lang="sr">
 <head>
 <meta charset="utf-8">
-<title>Kerb · zone editor — Novi Sad</title>
+<title>Kerb · zone editor</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.17.0/dist/leaflet-geoman.css">
@@ -16,9 +16,9 @@
   section { margin-bottom:16px; }
   section > .t { display:block; font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:#5B6270; margin-bottom:6px; }
   .zones { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
-  .zbtn { padding:8px 6px; border:2px solid transparent; border-radius:8px; color:#fff; font-weight:700; cursor:pointer; font-size:12px; }
+  .zbtn { padding:8px 6px; border:2px solid transparent; border-radius:8px; color:#fff; font-weight:700; cursor:pointer; font-size:12px; line-height:1.25; }
   .zbtn.on { border-color:#1A1D23; box-shadow:0 0 0 2px #fff inset; }
-  button, input[type=text] { font:inherit; }
+  button, input[type=text], select { font:inherit; }
   .row { display:flex; gap:6px; align-items:center; margin-bottom:6px; }
   .btn { padding:7px 10px; background:#fff; border:1px solid #C9CDD6; border-radius:8px; cursor:pointer; width:100%; }
   .btn.primary { background:#FFD23F; border-color:#FFD23F; font-weight:700; }
@@ -26,7 +26,7 @@
   .btn.armed { background:#1A66D6; border-color:#1A66D6; color:#fff; }
   .btn:hover { filter:brightness(.97); }
   input[type=range] { width:100%; }
-  input[type=text] { width:100%; padding:7px 9px; border:1px solid #C9CDD6; border-radius:8px; }
+  input[type=text], select { width:100%; padding:7px 9px; border:1px solid #C9CDD6; border-radius:8px; background:#fff; }
   .gcp { background:#fff; border:1px solid #C9CDD6; border-radius:10px; padding:8px; margin-bottom:8px; }
   .gcp .st { font-size:11px; margin-top:4px; }
   .gcp .st.ok { color:#10673E; }
@@ -36,27 +36,38 @@
   .hint { font-size:11px; color:#5B6270; margin-top:4px; }
   #stats { font-size:12px; color:#40454F; }
   #toast { position:fixed; bottom:14px; left:300px; background:#1A1D23; color:#fff; padding:8px 14px; border-radius:8px; opacity:0; transition:opacity .2s; z-index:2000; pointer-events:none; }
+  .leaflet-tooltip.zone-label { font-size:11px; line-height:1.4; padding:4px 7px; border-radius:6px; box-shadow:0 1px 4px rgba(0,0,0,.15); }
+  #noimg { position:fixed; inset:0 0 0 280px; display:flex; align-items:center; justify-content:center; background:rgba(242,243,245,.85); z-index:900; pointer-events:none; }
+  #noimg .card { background:#fff; border:1px solid #C9CDD6; border-radius:12px; padding:18px 22px; max-width:320px; text-align:center; pointer-events:auto; box-shadow:0 4px 20px rgba(0,0,0,.08); }
 </style>
 </head>
 <body>
 <div id="side">
   <h1>Kerb · zone editor</h1>
-  <div class="sub">Novi Sad — crtaj preko zvanične karte</div>
+  <div class="sub">Crtaj preko zvanične karte grada</div>
+
+  <section>
+    <span class="t">Grad</span>
+    <select id="city"></select>
+  </section>
+
+  <section>
+    <span class="t">Zvanična karta (podloga)</span>
+    <div class="row"><button class="btn" id="loadimg">Učitaj sliku/PDF-snimak karte…</button></div>
+    <input type="file" id="imgfile" accept="image/*" style="display:none">
+    <div class="hint" id="imgstatus"></div>
+    <div class="row" style="margin-top:6px"><input type="range" id="op" min="0" max="100" value="65"></div>
+  </section>
 
   <section>
     <span class="t">Georeferenca — 3 tačke</span>
     <div class="hint" style="margin:0 0 8px">
       Za svaku tačku: nalepi koordinate iz Google mape (desni klik → kopiraj),
-      pa klikni <b>isto to mesto na PDF podlozi</b>. Tri tačke, što raširenije.
+      pa klikni <b>isto to mesto na podlozi</b>. Tri tačke, što raširenije.
     </div>
     <div id="gcps"></div>
-    <div class="row"><button class="btn primary" id="fit">Razvuci PDF po tačkama</button></div>
+    <div class="row"><button class="btn primary" id="fit">Razvuci kartu po tačkama</button></div>
     <div class="hint" id="fitmsg"></div>
-  </section>
-
-  <section>
-    <span class="t">Podloga</span>
-    <div class="row"><input type="range" id="op" min="0" max="100" value="65"></div>
   </section>
 
   <section>
@@ -72,65 +83,180 @@
   <section>
     <span class="t">Referenca</span>
     <label style="display:flex;gap:6px;align-items:center;font-size:12px">
-      <input type="checkbox" id="ref" checked> postojeće ulice iz aplikacije
+      <input type="checkbox" id="ref" checked> postojeći podaci iz aplikacije (ako postoje)
+    </label>
+  </section>
+
+  <section>
+    <span class="t">Označi ulice sa liste</span>
+    <div class="hint" style="margin:0 0 6px">
+      Nalepi tekst u ovom obliku (naslov podzone, pa ulice — brojevi kuća u
+      zagradi su opcioni). Ulice se traže u OSM-u i boje po podzoni, da vidiš
+      gde su pre nego što crtaš granicu preko njih.
+    </div>
+    <textarea id="streetlist" rows="6" style="width:100%;padding:7px 9px;border:1px solid #C9CDD6;border-radius:8px;font-family:monospace;font-size:11px" placeholder="Plava podzona 4.1&#10;Dozvoljeno zadržavanje neograničeno&#10;&#10;BULEVAR MIHAJLA PUPINA (16)&#10;PALMIRA TOLJATIJA (11)"></textarea>
+    <div class="row" style="margin-top:6px"><button class="btn primary" id="locate">Pronađi i obeleži</button></div>
+    <div class="hint" id="locatemsg"></div>
+    <label style="display:flex;gap:6px;align-items:center;font-size:12px;margin-top:4px">
+      <input type="checkbox" id="targets" checked> prikaži obeležene ulice
     </label>
   </section>
 
   <section>
     <span class="t">Fajl</span>
     <div class="row"><button class="btn" id="imp">Uvezi GeoJSON…</button></div>
-    <div class="row"><button class="btn primary" id="exp">Izvezi novi-sad.json</button></div>
+    <div class="row"><button class="btn primary" id="exp">Izvezi <span id="expname">grad.json</span></button></div>
     <div class="row">
       <button class="btn" id="bak">Backup stanja</button>
       <button class="btn" id="res">Vrati backup…</button>
     </div>
     <input type="file" id="file" accept=".json,.geojson" style="display:none">
     <input type="file" id="resfile" accept=".json" style="display:none">
-    <div class="hint">Autosave u browseru posle svake izmene. Backup čuva i kalibraciju i poligone u jedan fajl.</div>
+    <div class="hint">Autosave u browseru po gradu. Backup čuva kalibraciju + poligone (ne i podlogu — prevelika za localStorage).</div>
   </section>
 
   <section><span class="t">Stanje</span><div id="stats"></div></section>
 </div>
 <div id="map"></div>
+<div id="noimg" style="display:none">
+  <div class="card">
+    Nema podloge za ovaj grad još.<br>Klikni <b>"Učitaj sliku/PDF-snimak karte…"</b> da dodaš zvaničnu kartu.
+  </div>
+</div>
 <div id="toast"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet-imageoverlay-rotated@0.2.1/Leaflet.ImageOverlay.Rotated.js"></script>
 <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@2.17.0/dist/leaflet-geoman.min.js"></script>
 <script>
-const ZONES = {
-  'Extra Zone': '#F97316',
-  'Red Zone':   '#EF4444',
-  'Blue Zone':  '#3B82F6',
-  'White Zone': '#9CA3AF',
+// ── CITY REGISTRY ─────────────────────────────────────────────────────────────
+// One entry per city we serve. Zone name/color comes straight from that city's
+// seed script (scripts/seed-*.mjs) so the editor's palette never drifts from
+// what the app actually shows. Add a city here to start drawing its zones.
+const CITIES = {
+  'novi-sad': {
+    label: 'Novi Sad', center: [45.2551, 19.8451], zoom: 15,
+    zones: { 'Extra Zone':'#F97316', 'Red Zone':'#EF4444', 'Blue Zone':'#3B82F6', 'White Zone':'#9CA3AF' },
+    defaultImage: 'katastar-1.png', // official Parking Servis "Tehnička baza" sheet, already in this folder
+  },
+  'belgrade': {
+    label: 'Beograd', center: [44.8125, 20.4612], zoom: 13,
+    zones: { 'Zone A — Purple':'#7C3AED', 'Zone 1 — Red':'#DC2626', 'Zone B — White':'#6B7280', 'Zone 2 — Yellow':'#D97706', 'Zone 3 — Green':'#16A34A', 'Blue Zone — Unlimited':'#2563EB' },
+    // Official zone map from parking-servis.co.rs, dated 30.06.2026 — north-up
+    // (unlike Novi Sad's rotated sheet), so calibration should be the easy case.
+    // NOTE: carries Zemun + Novi Beograd as separate inset panels (top-right) —
+    // those need their own 3-point calibration pass; don't trace them off the
+    // main map's placement.
+    defaultImage: 'belgrade-official.jpg',
+  },
+  'nis': {
+    label: 'Niš', center: [43.3209, 21.8958], zoom: 14,
+    zones: { 'Extra Zone':'#E6A700', 'Red Zone':'#E25141', 'Green Zone':'#2FB36B' },
+  },
+  'kragujevac': {
+    label: 'Kragujevac', center: [44.0128, 20.9114], zoom: 14,
+    zones: { 'Zone 0 — Centre':'#F97316', 'Zone I':'#2563EB', 'Zone II':'#16A34A' },
+  },
+  'subotica': {
+    label: 'Subotica', center: [46.1008, 19.6650], zoom: 14,
+    zones: { 'Red Zone — I':'#DC2626', 'Yellow Zone — II':'#CA8A04', 'Green Zone — III':'#16A34A', 'Blue Zone — IV':'#2563EB' },
+  },
+  'cacak': {
+    label: 'Čačak', center: [43.8914, 20.3497], zoom: 14,
+    zones: { 'Extra Zone — Red':'#DC2626', 'Zone 1 — Yellow':'#CA8A04', 'Zone 2 — Green':'#16A34A', 'Zone 3 — Blue':'#2563EB' },
+  },
+  'vrsac': {
+    label: 'Vršac', center: [45.1197, 21.3036], zoom: 14,
+    zones: { 'Zone 1 — Red':'#DC2626', 'Zone 2 — Blue':'#2563EB' },
+  },
+  'smederevo': {
+    label: 'Smederevo', center: [44.6636, 20.9296], zoom: 14,
+    zones: { 'Zone I — Red':'#DC2626', 'Zone II — Yellow':'#CA8A04', 'Zone III — Green':'#16A34A' },
+  },
+  'uzice': {
+    label: 'Užice', center: [43.8586, 19.8425], zoom: 14,
+    zones: { 'Zone I':'#DC2626', 'Zone II':'#16A34A' },
+  },
+  'zajecar': {
+    label: 'Zaječar', center: [43.9038, 22.2778], zoom: 14,
+    zones: { 'Zone I — Red':'#DC2626', 'Zone II — Yellow':'#CA8A04', 'Zone III':'#16A34A' },
+  },
 }
-const STORE = 'kerb-zone-editor-novi-sad'
+
 const CRS = L.CRS.EPSG3857
 const P = (ll) => CRS.project(L.latLng(ll))
 const UNP = (pt) => CRS.unproject(pt)
+const params = new URLSearchParams(location.search)
+let cityId = params.get('city') || localStorage.getItem('kerb-zone-editor-last-city') || 'novi-sad'
+if (!CITIES[cityId]) cityId = 'novi-sad'
+let CITY = CITIES[cityId]
+const storeKey = (id) => `kerb-zone-editor-${id}`
+
+// ── city picker ──
+const citySel = document.getElementById('city')
+for (const [id, c] of Object.entries(CITIES)) {
+  const o = document.createElement('option')
+  o.value = id; o.textContent = c.label
+  citySel.appendChild(o)
+}
+citySel.value = cityId
+citySel.onchange = () => {
+  localStorage.setItem('kerb-zone-editor-last-city', citySel.value)
+  const u = new URL(location.href); u.searchParams.set('city', citySel.value)
+  location.href = u.toString()
+}
 
 // ── map ──
-const map = L.map('map', { zoomControl: true }).setView([45.2551, 19.8451], 15)
+const map = L.map('map', { zoomControl: true }).setView(CITY.center, CITY.zoom)
 L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
   maxZoom: 20, attribution: '© OpenStreetMap © CARTO',
 }).addTo(map)
 
-// ── state ──
+// ── state (per city) ──
+const STORE = storeKey(cityId)
 const saved = JSON.parse(localStorage.getItem(STORE) || 'null') || {}
-let activeZone = saved.activeZone || 'Blue Zone'
+let activeZone = saved.activeZone && CITY.zones[saved.activeZone] ? saved.activeZone : Object.keys(CITY.zones)[0]
 let selected = null
 
 // ── rotated sheet overlay ──────────────────────────────────────────────────────
-// The official sheet is ROTATED relative to true north, so an axis-aligned
-// overlay can never line up. Three corners (TL, TR, BL) define the placement;
-// they come from the 3-point georeference below and persist in localStorage.
-const defCorners = { tl: [45.2757, 19.79], tr: [45.2757, 19.92], bl: [45.2304, 19.79] }
+// The official sheet is usually ROTATED relative to true north, so an axis-
+// aligned overlay can never line up. Three corners (TL, TR, BL) define the
+// placement; they come from the 3-point georeference below and persist per city.
+// The image itself is NOT persisted (too large for localStorage) — re-upload
+// after a reload, or use the city's bundled defaultImage (Novi Sad only).
+const span = 0.02
+const defCorners = {
+  tl: [CITY.center[0] + span, CITY.center[1] - span],
+  tr: [CITY.center[0] + span, CITY.center[1] + span],
+  bl: [CITY.center[0] - span, CITY.center[1] - span],
+}
 let corners = saved.corners || defCorners
-const overlay = L.imageOverlay.rotated('katastar-1.png',
+let hasImage = !!CITY.defaultImage
+const overlay = L.imageOverlay.rotated(CITY.defaultImage || transparentPixel(),
   L.latLng(corners.tl), L.latLng(corners.tr), L.latLng(corners.bl),
   { opacity: (saved.opacity ?? 65) / 100 }).addTo(map)
+function transparentPixel() {
+  return 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBTAA7'
+}
 document.getElementById('op').value = saved.opacity ?? 65
 document.getElementById('op').oninput = (e) => { overlay.setOpacity(e.target.value / 100); persist() }
+document.getElementById('noimg').style.display = hasImage ? 'none' : 'flex'
+document.getElementById('imgstatus').textContent = hasImage
+  ? (CITY.defaultImage ? `Učitano: ${CITY.defaultImage}` : 'Slika učitana ovoj sesiji')
+  : 'Nema učitane slike'
+
+document.getElementById('loadimg').onclick = () => document.getElementById('imgfile').click()
+document.getElementById('imgfile').onchange = (e) => {
+  const f = e.target.files[0]
+  if (!f) return
+  const url = URL.createObjectURL(f)
+  overlay.setUrl(url)
+  hasImage = true
+  document.getElementById('noimg').style.display = 'none'
+  document.getElementById('imgstatus').textContent = `Učitano: ${f.name} (ne pamti se posle reload-a)`
+  e.target.value = ''
+  toast('Karta učitana — sad kalibriši 3 tačke')
+}
 
 // image fraction (fx right, fy down from TL) of a map point under the CURRENT placement
 function fracOf(latlng) {
@@ -140,9 +266,17 @@ function fracOf(latlng) {
   return { fx: (w.x * v.y - w.y * v.x) / det, fy: (u.x * w.y - u.y * w.x) / det }
 }
 
-// ── 3 ground-control points: Google coords ↔ a click on the sheet ─────────────
-const gcps = saved.gcps || [{}, {}, {}] // { lat, lng, fx, fy }
+// ── ground-control points: Google coords ↔ a click on the sheet ──────────────
+// Starts with 3 (the minimum an affine fit needs) but you can add more. With
+// >3 points the fit is least-squares, which spreads out any one bad click
+// instead of letting it dictate the whole placement — and the per-point
+// residual (in metres) tells you whether a mismatch is a bad click or the
+// source map itself being drawn schematically (locally off true scale, common
+// on illustrated zone maps — a technical cadastre sheet like Novi Sad's won't
+// do this, a stylised city-hall zone diagram might).
+let gcps = saved.gcps || [{}, {}, {}] // { lat, lng, fx, fy }
 let armed = -1 // which GCP awaits its sheet click
+let lastResiduals = []
 const gcpPins = []
 function renderGcps() {
   const box = document.getElementById('gcps')
@@ -151,15 +285,18 @@ function renderGcps() {
   gcps.forEach((g, i) => {
     const has = g.lat != null
     const hasPx = g.fx != null
+    const res = lastResiduals[i]
     const div = document.createElement('div')
     div.className = 'gcp'
     div.innerHTML = `
       <div class="row" style="margin:0">
         <input type="text" placeholder="npr. 45.25510, 19.84510" value="${has ? g.lat + ', ' + g.lng : ''}" data-i="${i}">
-        <button class="btn mini ${armed === i ? 'armed' : ''}" data-pick="${i}">${armed === i ? 'klikni…' : 'PDF'}</button>
+        <button class="btn mini ${armed === i ? 'armed' : ''}" data-pick="${i}">${armed === i ? 'klikni…' : 'karta'}</button>
+        ${gcps.length > 3 ? `<button class="btn mini" data-del="${i}" title="Ukloni tačku">✕</button>` : ''}
       </div>
       <div class="st ${has && hasPx ? 'ok' : 'todo'}">
-        ${has ? '📍 pin na mapi' : '— bez koordinata'} · ${hasPx ? 'PDF tačka ✓' : 'klikni PDF dugme pa tačku na podlozi'}
+        ${has ? '📍 pin na mapi' : '— bez koordinata'} · ${hasPx ? 'tačka na karti ✓' : 'klikni dugme pa tačku na podlozi'}
+        ${res != null ? `<br><span style="color:${res > 15 ? '#B45309' : '#10673E'}">odstupanje posle razvlačenja: ~${res.toFixed(1)} m</span>` : ''}
       </div>`
     box.appendChild(div)
     if (has) {
@@ -177,58 +314,252 @@ function renderGcps() {
     persist(); renderGcps()
   })
   box.querySelectorAll('[data-pick]').forEach(b => b.onclick = () => {
+    if (!hasImage) { toast('Prvo učitaj kartu'); return }
     armed = armed === +b.dataset.pick ? -1 : +b.dataset.pick
     renderGcps()
-    if (armed >= 0) toast('Klikni tačku ' + (armed + 1) + ' na PDF podlozi')
+    if (armed >= 0) toast('Klikni tačku ' + (armed + 1) + ' na podlozi')
   })
+  box.querySelectorAll('[data-del]').forEach(b => b.onclick = () => {
+    gcps.splice(+b.dataset.del, 1)
+    lastResiduals = []
+    persist(); renderGcps()
+  })
+}
+document.getElementById('addgcp')?.remove()
+{
+  const addBtn = document.createElement('button')
+  addBtn.className = 'btn'; addBtn.id = 'addgcp'; addBtn.textContent = '+ Dodaj tačku'
+  addBtn.onclick = () => { gcps.push({}); persist(); renderGcps() }
+  document.getElementById('gcps').insertAdjacentElement('afterend', addBtn)
+}
+
+// Tiny linear-algebra helpers for the least-squares affine fit below.
+function solve3x3(A, b) {
+  // Cramer's rule — the systems here are always 3×3 (design matrix is [fx,fy,1]).
+  const det3 = (m) => m[0][0]*(m[1][1]*m[2][2]-m[1][2]*m[2][1]) - m[0][1]*(m[1][0]*m[2][2]-m[1][2]*m[2][0]) + m[0][2]*(m[1][0]*m[2][1]-m[1][1]*m[2][0])
+  const D = det3(A)
+  if (Math.abs(D) < 1e-9) return null
+  const sub = (col) => A.map((row, i) => row.map((v, j) => j === col ? b[i] : v))
+  return [det3(sub(0)) / D, det3(sub(1)) / D, det3(sub(2)) / D]
+}
+function affineFit(points) {
+  // points: [{fx, fy, X, Y}, …], N ≥ 3. Fits X = a·fx + b·fy + c and Y = d·fx + e·fy + f
+  // by ordinary least squares (exact solve when N=3). Returns {a..f} or null.
+  const ATA = [[0,0,0],[0,0,0],[0,0,0]], ATx = [0,0,0], ATy = [0,0,0]
+  for (const p of points) {
+    const row = [p.fx, p.fy, 1]
+    for (let i = 0; i < 3; i++) {
+      for (let j = 0; j < 3; j++) ATA[i][j] += row[i] * row[j]
+      ATx[i] += row[i] * p.X
+      ATy[i] += row[i] * p.Y
+    }
+  }
+  const xCoef = solve3x3(ATA, ATx), yCoef = solve3x3(ATA, ATy)
+  if (!xCoef || !yCoef) return null
+  return { a: xCoef[0], b: xCoef[1], c: xCoef[2], d: yCoef[0], e: yCoef[1], f: yCoef[2] }
 }
 
 document.getElementById('fit').onclick = () => {
   const ready = gcps.filter(g => g.lat != null && g.fx != null)
-  if (ready.length < 3) { toast('Trebaju sve 3 tačke (koordinate + klik na PDF)'); return }
-  const [a, b, c] = gcps
-  const Pa = P([a.lat, a.lng]), Pb = P([b.lat, b.lng]), Pc = P([c.lat, c.lng])
-  // solve Pi = TL + fxi·u + fyi·v  →  2×2 for u,v, then TL
-  const d1x = b.fx - a.fx, d1y = b.fy - a.fy, d2x = c.fx - a.fx, d2y = c.fy - a.fy
-  const det = d1x * d2y - d1y * d2x
-  if (Math.abs(det) < 1e-4) { toast('Tačke su skoro na istoj liniji — raširi ih'); return }
-  const solve = (q1, q2) => ({ u: (q1 * d2y - q2 * d1y) / det, v: (d1x * q2 - d2x * q1) / det })
-  const sx = solve(Pb.x - Pa.x, Pc.x - Pa.x), sy = solve(Pb.y - Pa.y, Pc.y - Pa.y)
-  const u = L.point(sx.u, sy.u), v = L.point(sx.v, sy.v)
-  const tl = L.point(Pa.x - a.fx * u.x - a.fy * v.x, Pa.y - a.fx * u.y - a.fy * v.y)
+  if (ready.length < 3) { toast('Trebaju bar 3 tačke (koordinate + klik na karti)'); return }
+  const pts = ready.map(g => { const p = P([g.lat, g.lng]); return { fx: g.fx, fy: g.fy, X: p.x, Y: p.y } })
+  const fit = affineFit(pts)
+  if (!fit) { toast('Tačke su skoro na istoj liniji — raširi ih'); return }
+  const at = (fx, fy) => L.point(fit.a*fx + fit.b*fy + fit.c, fit.d*fx + fit.e*fy + fit.f)
+  const tl = at(0, 0), tr = at(1, 0), bl = at(0, 1)
   corners = {
     tl: [UNP(tl).lat, UNP(tl).lng],
-    tr: [UNP(tl.add(u)).lat, UNP(tl.add(u)).lng],
-    bl: [UNP(tl.add(v)).lat, UNP(tl.add(v)).lng],
+    tr: [UNP(tr).lat, UNP(tr).lng],
+    bl: [UNP(bl).lat, UNP(bl).lng],
   }
   overlay.reposition(L.latLng(corners.tl), L.latLng(corners.tr), L.latLng(corners.bl))
+  const u = tr.subtract(tl)
   const rot = (Math.atan2(u.y, u.x) * 180 / Math.PI).toFixed(1)
-  document.getElementById('fitmsg').textContent = `Razvučeno · rotacija ${rot}°`
+
+  // Residual per point: reproject each GCP's sheet click through the fit and
+  // compare to where it was actually pinned. Large + growing-with-distance
+  // residuals mean the source map itself isn't uniform scale — recalibrate
+  // with points close to whichever area you're drawing right now instead.
+  lastResiduals = ready.map(g => {
+    const proj = at(g.fx, g.fy)
+    const real = P([g.lat, g.lng])
+    return Math.hypot(proj.x - real.x, proj.y - real.y)
+  })
+  const rms = Math.sqrt(lastResiduals.reduce((s, r) => s + r * r, 0) / lastResiduals.length)
+  document.getElementById('fitmsg').textContent =
+    `Razvučeno · rotacija ${rot}° · RMS odstupanje ${rms.toFixed(1)} m preko ${ready.length} tačaka`
   persist()
-  toast('PDF razvučen po tvojim tačkama')
+  renderGcps()
+  toast(rms > 15
+    ? 'Veliko odstupanje — karta možda nije uniformne razmere (šematska), probaj tačke bliže mestu koje crtaš'
+    : 'Karta razvučena po tvojim tačkama')
 }
 
-// ── reference: current app street lines ──
+// ── reference: this city's existing app data, if any ──
 const refLayer = L.layerGroup().addTo(map)
-fetch('../../public/zones/novi-sad.json').then(r => r.json()).then(d => {
+fetch(`../../public/zones/${cityId}.json`).then(r => r.ok ? r.json() : null).then(d => {
+  if (!d) return
   for (const f of d.features) {
     const c = f.properties?.color || '#888'
     const g = f.geometry
+    if (g.type === 'Polygon') {
+      L.polygon(g.coordinates.map(ring => ring.map(([x, y]) => [y, x])), { color: c, weight: 1, opacity: 0.5, fillOpacity: 0, dashArray: '4 4', interactive: false }).addTo(refLayer)
+      continue
+    }
     const lines = g.type === 'LineString' ? [g.coordinates] : g.type === 'MultiLineString' ? g.coordinates : []
     for (const line of lines) L.polyline(line.map(([x, y]) => [y, x]), { color: c, weight: 2, opacity: 0.5, dashArray: '4 4', interactive: false }).addTo(refLayer)
   }
-}).catch(() => toast('Referenca nije učitana — pokreni server iz korena repo-a'))
+}).catch(() => {})
 document.getElementById('ref').onchange = (e) => e.target.checked ? refLayer.addTo(map) : map.removeLayer(refLayer)
+
+// ── "Označi ulice sa liste" — paste a podzone→street list, locate each street
+// in OSM, and render it as a colored/labelled layer to trace over. ──────────
+// Serbian Latin → Cyrillic, digraphs first (some cities' OSM data is tagged
+// in Cyrillic — Belgrade confirmed; Novi Sad uses Latin — so we search both
+// scripts rather than assume one).
+const SR_DIGRAPHS = [['Lj','Љ'],['LJ','Љ'],['lj','љ'],['Nj','Њ'],['NJ','Њ'],['nj','њ'],['Dž','Џ'],['DŽ','Џ'],['dž','џ'],['Dz','Џ'],['DZ','Џ'],['dz','џ']]
+const SR_CYR = { A:'А',B:'Б',V:'В',G:'Г',D:'Д',Đ:'Ђ',E:'Е',Ž:'Ж',Z:'З',I:'И',J:'Ј',K:'К',L:'Л',M:'М',N:'Н',O:'О',P:'П',R:'Р',S:'С',T:'Т',Ć:'Ћ',U:'У',F:'Ф',H:'Х',C:'Ц',Č:'Ч',Š:'Ш',a:'а',b:'б',v:'в',g:'г',d:'д',đ:'ђ',e:'е',ž:'ж',z:'з',i:'и',j:'ј',k:'к',l:'л',m:'м',n:'н',o:'о',p:'п',r:'р',s:'с',t:'т',ć:'ћ',u:'у',f:'ф',h:'х',c:'ц',č:'ч',š:'ш' }
+function toCyrillic(s) {
+  let out = s
+  for (const [lat, cyr] of SR_DIGRAPHS) out = out.split(lat).join(cyr)
+  return out.split('').map(ch => SR_CYR[ch] ?? ch).join('')
+}
+// Split "NAME (range)" / "NAME range" / "NAME" into { name, range }. No parens
+// and no digits → the whole line is the name (handles "Nova 6" style names
+// where a number IS part of the name, not a house range).
+function splitNameRange(line) {
+  const paren = line.indexOf('(')
+  if (paren >= 0) return { name: line.slice(0, paren).trim(), range: line.slice(paren).trim().replace(/^\(|\)$/g, '') }
+  if (/^nova\s+\d+$/i.test(line.trim())) return { name: line.trim(), range: '' }
+  const m = line.match(/^(.*?)\s+(\d.*)$/)
+  if (m) return { name: m[1].trim(), range: m[2].trim() }
+  return { name: line.trim(), range: '' }
+}
+function parseStreetList(text) {
+  const groups = []
+  let current = null
+  for (const raw of text.split('\n')) {
+    const line = raw.trim()
+    if (!line) continue
+    const header = line.match(/zon\w*\s+([\d.]+)/i)
+    if (header) { current = { podzone: header[1], label: line, streets: [] }; groups.push(current); continue }
+    if (/^dozvoljeno/i.test(line)) continue
+    if (!current) continue
+    current.streets.push(splitNameRange(line))
+  }
+  return groups
+}
+// Generic street-type prefixes OSM sometimes omits from the `name` tag even
+// when the official name includes one (confirmed on "Bulevar Zorana Đinđića"
+// → tagged just "Zorana Đinđića"). Match the core name as a substring instead
+// of requiring an exact/anchored equality.
+const coreName = (s) => s.replace(/^(bulevar|bul\.?|ulica|ul\.?|trg)\s+/i, '')
+const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+const targetLayer = L.layerGroup().addTo(map)
+document.getElementById('targets').onchange = (e) => e.target.checked ? targetLayer.addTo(map) : map.removeLayer(targetLayer)
+const PODZONE_PALETTE = ['#DC2626','#2563EB','#16A34A','#D97706','#7C3AED','#0891B2','#DB2777','#65A30D']
+document.getElementById('locate').onclick = async () => {
+  const text = document.getElementById('streetlist').value
+  const groups = parseStreetList(text)
+  const msgEl = document.getElementById('locatemsg')
+  if (!groups.length) { msgEl.textContent = 'Nisam prepoznao nijednu podzonu — proveri format (naslov sa "zona X.X" pa ulice).'; return }
+
+  const podzoneColor = {}
+  groups.forEach((g, i) => { podzoneColor[g.podzone] = PODZONE_PALETTE[i % PODZONE_PALETTE.length] })
+  const byStreet = new Map() // core-lowercased name → { display, podzones:Set, ranges:[] }
+  for (const g of groups) {
+    for (const s of g.streets) {
+      const key = coreName(s.name).toLowerCase()
+      if (!byStreet.has(key)) byStreet.set(key, { display: s.name, podzones: new Set(), ranges: [] })
+      const rec = byStreet.get(key)
+      rec.podzones.add(g.podzone)
+      if (s.range) rec.ranges.push(`${g.podzone}: ${s.range}`)
+    }
+  }
+
+  msgEl.textContent = `Tražim ${byStreet.size} ulica…`
+  const bbox = [
+    (CITY.center[0] - 0.12).toFixed(4), (CITY.center[1] - 0.15).toFixed(4),
+    (CITY.center[0] + 0.12).toFixed(4), (CITY.center[1] + 0.15).toFixed(4),
+  ].join(',')
+  const filters = [...byStreet.values()].map(rec => {
+    const c = coreName(rec.display)
+    return `way["highway"]["name"~"${escRe(c)}|${escRe(toCyrillic(c))}",i](${bbox});`
+  }).join('\n  ')
+  const query = `[out:json][timeout:60];\n(\n  ${filters}\n);\nout geom;`
+
+  let data
+  try {
+    const res = await fetch('https://maps.mail.ru/osm/tools/overpass/api/interpreter', {
+      method: 'POST', body: 'data=' + encodeURIComponent(query),
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    })
+    data = await res.json()
+  } catch {
+    msgEl.textContent = 'Overpass upit nije uspeo — proveri konekciju i probaj ponovo.'
+    return
+  }
+
+  targetLayer.clearLayers()
+  const matchedKeys = new Set()
+  const byWayName = new Map() // OSM name → [elements]
+  for (const el of data.elements || []) {
+    const n = el.tags?.name
+    if (!n || !el.geometry) continue
+    if (!byWayName.has(n)) byWayName.set(n, [])
+    byWayName.get(n).push(el)
+  }
+  // match each OSM name back to the street(s) we searched for
+  const labelCarrier = new Map() // our key → the longest way (for the one permanent label)
+  const lenOf = (el) => {
+    let len = 0
+    for (let i = 0; i + 1 < el.geometry.length; i++) {
+      len += Math.hypot(el.geometry[i+1].lon - el.geometry[i].lon, el.geometry[i+1].lat - el.geometry[i].lat)
+    }
+    return len
+  }
+  for (const [osmName, els] of byWayName) {
+    const osmLower = osmName.toLowerCase()
+    let hitKey = null
+    for (const [key, rec] of byStreet) {
+      const latN = coreName(rec.display).toLowerCase()
+      const cyrN = toCyrillic(coreName(rec.display)).toLowerCase()
+      if (osmLower.includes(latN) || osmLower.includes(cyrN)) { hitKey = key; break }
+    }
+    if (!hitKey) continue
+    matchedKeys.add(hitKey)
+    const rec = byStreet.get(hitKey)
+    const color = [...rec.podzones].map(p => podzoneColor[p])[0] || '#6B7280'
+    let best = labelCarrier.get(hitKey)
+    for (const el of els) {
+      const latlngs = el.geometry.map(pt => [pt.lat, pt.lon])
+      const line = L.polyline(latlngs, { color, weight: 4, opacity: 0.85, interactive: false }).addTo(targetLayer)
+      if (!best || lenOf(el) > best.len) best = { line, len: lenOf(el) }
+    }
+    labelCarrier.set(hitKey, best)
+  }
+  for (const [key, best] of labelCarrier) {
+    const rec = byStreet.get(key)
+    const podz = [...rec.podzones].join(', ')
+    const rangeText = rec.ranges.length ? `<br>${rec.ranges.join(' · ')}` : ''
+    best.line.bindTooltip(`<b>${rec.display}</b> · ${podz}${rangeText}`, { permanent: true, direction: 'center', className: 'zone-label' })
+  }
+
+  const missing = [...byStreet.entries()].filter(([key]) => !matchedKeys.has(key)).map(([, rec]) => rec.display)
+  msgEl.innerHTML = `Obeleženo ${matchedKeys.size} od ${byStreet.size} ulica.` +
+    (missing.length ? `<br>Nije nađeno (nema ih u OSM-u pod tim imenom, ili traži ručno): ${missing.join(', ')}` : '')
+}
 
 // ── drawn features ──
 const drawn = L.featureGroup().addTo(map)
 
 function styleFor(zone) {
-  const c = ZONES[zone] || '#6E7583'
+  const c = CITY.zones[zone] || '#6E7583'
   return { color: c, fillColor: c, fillOpacity: 0.25, weight: 2 }
 }
 function attach(layer, props) {
-  layer.feature = { type: 'Feature', properties: { name: props.name || '', zone: props.zone || null, color: ZONES[props.zone] || null } }
+  layer.feature = { type: 'Feature', properties: { name: props.name || '', zone: props.zone || null, color: CITY.zones[props.zone] || null } }
   layer.setStyle(styleFor(props.zone))
   layer.on('click', (e) => {
     L.DomEvent.stop(e)
@@ -254,18 +585,18 @@ function renderSel() {
     <div class="zones" id="selzones"></div>
     <div class="row" style="margin-top:6px"><button class="btn" id="deldup">Obriši poligon</button></div>`
   zoneButtons(document.getElementById('selzones'), p.zone, (z) => {
-    p.zone = z; p.color = ZONES[z]; selected.setStyle({ ...styleFor(z), weight: 4, fillOpacity: 0.4 }); persist()
+    p.zone = z; p.color = CITY.zones[z]; selected.setStyle({ ...styleFor(z), weight: 4, fillOpacity: 0.4 }); persist()
   })
   document.getElementById('selname').oninput = (e) => { p.name = e.target.value; persist() }
   document.getElementById('deldup').onclick = () => { drawn.removeLayer(selected); selected = null; renderSel(); persist() }
 }
 function zoneButtons(el, current, onPick) {
   el.innerHTML = ''
-  for (const [z, c] of Object.entries(ZONES)) {
+  for (const [z, c] of Object.entries(CITY.zones)) {
     const b = document.createElement('button')
     b.className = 'zbtn' + (z === current ? ' on' : '')
     b.style.background = c
-    b.textContent = z.replace(' Zone', '')
+    b.textContent = z
     b.onclick = () => { onPick(z); zoneButtons(el, z, onPick) }
     el.appendChild(b)
   }
@@ -283,7 +614,7 @@ function sheetClick(latlng) {
   gcps[armed].fx = f.fx; gcps[armed].fy = f.fy
   armed = -1
   persist(); renderGcps()
-  toast('PDF tačka upisana')
+  toast('Tačka na karti upisana')
 }
 map.on('click', (e) => {
   if (armed >= 0) { sheetClick(e.latlng); return }
@@ -292,19 +623,10 @@ map.on('click', (e) => {
 
 // ── zone inference for messy imported properties ──
 function inferZone(props) {
-  if (ZONES[props?.zone]) return props.zone
-  const vals = Object.values(props || {}).concat(Object.keys(props || {}))
-  for (const v of vals.reverse()) {
-    const m = String(v).toLowerCase().match(/extra|red|blue|white|ekstra|crven|plav|bel/)
-    if (m) {
-      const k = m[0]
-      if (k.startsWith('e')) return 'Extra Zone'
-      if (k === 'red' || k.startsWith('crven')) return 'Red Zone'
-      if (k === 'blue' || k.startsWith('plav')) return 'Blue Zone'
-      return 'White Zone'
-    }
-  }
-  return null
+  if (CITY.zones[props?.zone]) return props.zone
+  const name = (props?.zone || props?.name || '').toLowerCase()
+  const names = Object.keys(CITY.zones)
+  return names.find(z => name.includes(z.toLowerCase())) || null
 }
 function importFC(fc, silent) {
   let n = 0
@@ -339,17 +661,18 @@ function toFC() {
       .filter(r => r.length >= 3)
       .map(r => (r[0][0] !== r.at(-1)[0] || r[0][1] !== r.at(-1)[1]) ? [...r, [...r[0]]] : r)
     if (!rings.length) return
-    features.push({ type: 'Feature', properties: { name: p.name || '', zone: p.zone, color: ZONES[p.zone] || null }, geometry: { type: 'Polygon', coordinates: rings } })
+    features.push({ type: 'Feature', properties: { name: p.name || '', zone: p.zone, color: CITY.zones[p.zone] || null }, geometry: { type: 'Polygon', coordinates: rings } })
   })
   return { type: 'FeatureCollection', features }
 }
+document.getElementById('expname').textContent = `${cityId}.json`
 document.getElementById('exp').onclick = () => {
   const fc = toFC()
   const missing = fc.features.filter(f => !f.properties.zone).length
   if (missing) toast(`Pažnja: ${missing} poligona bez zone`)
   const a = document.createElement('a')
   a.href = URL.createObjectURL(new Blob([JSON.stringify(fc)], { type: 'application/json' }))
-  a.download = 'novi-sad.json'
+  a.download = `${cityId}.json`
   a.click()
 }
 
@@ -358,7 +681,7 @@ document.getElementById('bak').onclick = () => {
   persist()
   const a = document.createElement('a')
   a.href = URL.createObjectURL(new Blob([localStorage.getItem(STORE)], { type: 'application/json' }))
-  a.download = 'kerb-editor-backup.json'
+  a.download = `kerb-editor-backup-${cityId}.json`
   a.click()
 }
 document.getElementById('res').onclick = () => document.getElementById('resfile').click()
@@ -389,7 +712,7 @@ function stats() {
   const per = {}
   fc.features.forEach(f => { per[f.properties.zone || '—'] = (per[f.properties.zone || '—'] || 0) + 1 })
   document.getElementById('stats').textContent =
-    `${fc.features.length} poligona · ` + Object.entries(per).map(([z, n]) => `${z.replace(' Zone', '')}: ${n}`).join(' · ')
+    `${fc.features.length} poligona · ` + Object.entries(per).map(([z, n]) => `${z}: ${n}`).join(' · ')
 }
 function toast(msg) {
   const t = document.getElementById('toast')
@@ -398,7 +721,7 @@ function toast(msg) {
 }
 
 // test hook — lets automation read placement without reaching into scope
-window.__ed = { get corners() { return corners }, get gcps() { return gcps }, fracOf }
+window.__ed = { get corners() { return corners }, get gcps() { return gcps }, get cityId() { return cityId }, fracOf }
 
 renderGcps()
 if (saved.fc) importFC(saved.fc, true)
