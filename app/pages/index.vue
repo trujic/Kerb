@@ -304,8 +304,29 @@
               </div>
             </div>
 
+            <!-- ── Already running here — the card above owns this zone ── -->
+            <div v-if="coveredHere && selectedZone" class="pay-step">
+              <div class="covered">
+                <Icon name="check" :size="15" />
+                <div>
+                  <p class="covered-title">{{ t("alreadyRunning") }}</p>
+                  <p class="covered-sub">{{ t("alreadyRunningSub") }}</p>
+                  <!-- The one action Kerb can't infer: their SMS may never have
+                       landed, and only they can tell. Quiet on purpose — it must
+                       not read as a second way to pay. -->
+                  <button
+                    type="button"
+                    class="covered-resend"
+                    @click="resend(selectedZone)"
+                  >
+                    {{ t("resendSms") }}
+                  </button>
+                </div>
+              </div>
+            </div>
+
             <!-- ── Pay — consequence first, then the gesture ── -->
-            <div v-if="selectedZone?.sms_shortcode" class="pay-step">
+            <div v-else-if="selectedZone?.sms_shortcode" class="pay-step">
               <!-- Covered-until + the plate chip (accounts only — guests type the
                plate in the open above). At night the free-surface tip already
                explained the carry-over, so no consequence line repeats it here. -->
@@ -1245,6 +1266,16 @@ const selectedZone = computed(
   () =>
     allZones.value.find((z: any) => z.name === selectedZoneName.value) ?? null
 );
+
+// A session already running in the zone on screen. Paying again here is not a
+// new parking — it is the same "one more hour" the session card's Extend sends,
+// only mislabelled as a fresh payment. With skip-confirm on it is a single tap,
+// and Kerb cannot see whether the SMS landed, so the only thing standing between
+// the user and a second billed message is not offering the button twice.
+const coveredHere = computed(
+  () => !!displaySession.value && displaySession.value.zone_name === selectedZone.value?.name
+);
+
 // Once the user explicitly taps/scans/AI-picks a zone, stop auto-following the
 // likely guess. Before that, the selection must track likelyZoneName — otherwise
 // the early fallback (first zone, while GPS is still resolving) sticks and the
@@ -1420,6 +1451,14 @@ const pay = (zone: any, opts: { armed?: boolean } = {}) => {
     armSentPrompt();
   }
   if (import.meta.client && zone.sms_shortcode) openSms(smsLink(zone));
+};
+
+// Re-open the composer for a zone already running, for the one case Kerb can't
+// see: the first SMS never landed. Deliberately does NOT touch the session — if
+// the original did go through this buys a real second hour we can't detect, and
+// under-reporting that is safer than a record claiming time nobody paid for.
+const resend = (zone: any) => {
+  if (import.meta.client && zone?.sms_shortcode) openSms(smsLink(zone));
 };
 
 const onSentYes = () => {
@@ -2782,6 +2821,49 @@ h2 {
 }
 
 /* No paid parking at the user's spot — the calm answer + what to do instead */
+/* Already-running notice — states the fact and stays out of the way. Deliberately
+   not a button: the session card above owns every action for this zone. */
+.covered {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 13px 14px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  color: var(--green);
+}
+.covered svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.covered-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 3px;
+}
+.covered-sub {
+  font-size: 12.5px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.covered-resend {
+  margin-top: 7px;
+  padding: 0;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--blue);
+  background: none;
+  border: none;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.covered-resend:hover {
+  color: var(--blue-hover);
+}
+
 .gps-noparking {
   padding: 16px;
   margin-bottom: 20px;

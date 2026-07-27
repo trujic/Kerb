@@ -46,6 +46,18 @@ const dict = {
     sr: 'GPS te stavlja blizu granice — plati ovu zonu samo ako na tabli piše',
     en: 'GPS puts you near a boundary — only pay this zone if the sign says',
   },
+  alreadyRunning: {
+    sr: 'Parking u ovoj zoni ti već teče',
+    en: 'Parking is already running in this zone',
+  },
+  alreadyRunningSub: {
+    sr: 'Produži ga ili završi u kartici iznad.',
+    en: 'Extend or end it in the card above.',
+  },
+  resendSms: {
+    sr: 'SMS nije prošao? Pošalji ponovo',
+    en: "SMS didn't go through? Send it again",
+  },
   noParkingTitle: { sr: 'Nema naplate tu gde stojiš', en: "No paid zone where you're standing" },
   noParkingSub: { sr: 'Parkiranje ovde je verovatno besplatno. Najbliža naplata je', en: 'Parking here is likely free. Nearest paid parking is' },
   awayOn: { sr: 'odavde —', en: 'away —' },
