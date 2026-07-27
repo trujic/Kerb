@@ -1103,12 +1103,31 @@ onMounted(() => {
 onUnmounted(() => {
   if (tickTimer) clearInterval(tickTimer);
 });
-const coveredUntil = computed(() =>
-  new Date(nowTick.value + 3_600_000).toLocaleTimeString(undefined, {
+// What this SMS actually buys. 60 minutes OF CHARGING — so paying at 20:47 covers
+// you to 07:47 tomorrow, not 21:47 tonight. When that lands on another day the
+// clock alone would be ambiguous, so the day is spelled out.
+const coveredUntil = computed(() => {
+  const sched = getSchedule(detectedCity.value?.id);
+  const limit = parseLimitMin(selectedZone.value?.rules);
+  const until = paidExpiry(nowTick.value, limit ? Math.min(60, limit) : 60, sched);
+  const tz = sched?.timezone;
+  const clock = new Date(until).toLocaleTimeString(undefined, {
     hour: "2-digit",
     minute: "2-digit",
-  })
-);
+    timeZone: tz,
+  });
+  const dayOf = (ms: number) =>
+    new Date(ms).toLocaleDateString("en-CA", { timeZone: tz });
+  if (dayOf(until) === dayOf(nowTick.value)) return clock;
+  if (dayOf(until) === dayOf(nowTick.value + 86_400_000))
+    return `${clock} ${t("tomorrow")}`;
+  // Further out (Sat afternoon banks into Monday) — name the day, in city time.
+  const wd = new Date(until).toLocaleDateString("en-US", {
+    weekday: "short",
+    timeZone: tz,
+  });
+  return `${clock} ${dayWord(wd)}`;
+});
 
 // ── Plate chip picker — all saved plates, switchable without leaving the flow ──
 const profilePlates = computed<any[]>(() => userProfile.value?.plates ?? []);
@@ -1357,18 +1376,6 @@ const onPay = (zone: any) => {
   startOrExtend(sessionPayload(zone));
 };
 
-// The ms epoch a night pre-pay's paid window opens (city time ≈ the user's, in-city).
-const nextStartMs = () => {
-  const nw = nextWindow.value;
-  if (!nw) return Date.now();
-  const [h, m] = nw.start.split(":").map(Number);
-  const d = new Date();
-  d.setHours(h, m, 0, 0);
-  if (nw.dayLabel === "tomorrow" || d.getTime() <= Date.now())
-    d.setDate(d.getDate() + 1);
-  return d.getTime();
-};
-
 const guestPayload = (zone: any, armed: boolean) => ({
   cityId: detectedCity.value!.id,
   zone: {
@@ -1382,7 +1389,6 @@ const guestPayload = (zone: any, armed: boolean) => ({
   lng: coords.value?.lng ?? null,
   plate: defaultPlate.value,
   armed,
-  startsAt: armed ? nextStartMs() : undefined,
 });
 
 // ── SMS handoff ────────────────────────────────────────────────────────────────

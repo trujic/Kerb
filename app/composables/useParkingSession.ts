@@ -3,8 +3,11 @@
 // active-session tracker (live countdown, zone-limit warning, find-my-car) and is
 // the geotagged dataset the community layer will build on.
 //
-// Expiry model (per the SMS reality): 1 payment = +1 hour, capped by the zone's
-// hard limit (Extra 60 min, Red 120 min; Blue/White unlimited → keep extending).
+// Expiry model (per the SMS reality): 1 payment = +60 minutes OF CHARGING, capped
+// by the zone's hard limit in the same currency (Extra 60 min, Red 120 min;
+// Blue/White unlimited → keep extending). Free stretches — nights, Sundays — are
+// skipped rather than spent, so a ticket bought at 20:47 runs to 07:47 next day.
+// See paidExpiry() in useParkingHours.
 
 export interface ParkingSession {
   id: string
@@ -29,14 +32,6 @@ export interface PayPayload {
   lat?: number | null
   lng?: number | null
   plate?: string | null
-}
-
-const HOUR_MS = 3_600_000
-
-// Pull the hard time limit out of a zone's rules text ("Max 60 min" → 60).
-const parseLimitMin = (rules?: string | null): number | null => {
-  const m = rules?.match(/max\s+(\d+)\s*min/i)
-  return m ? Number(m[1]) : null
 }
 
 export const useParkingSession = () => {
@@ -106,15 +101,17 @@ export const useParkingSession = () => {
   const startOrExtend = async (p: PayPayload) => {
     if (!userId.value) return
     const limit = parseLimitMin(p.zone.rules)
+    const sched = getSchedule(p.cityId)
     const a = active.value
 
     try {
       if (a && a.zone_name === p.zone.name && !a.ended_at) {
-        // Extend: +1h, clamped to the zone's hard cap from the original start
+        // Extend: +60 chargeable minutes, clamped to the zone's hard cap — which
+        // is also chargeable minutes, counted from the original start.
         const base = a.expires_at ? new Date(a.expires_at).getTime() : now.value
-        let next = base + HOUR_MS
+        let next = paidExpiry(base, 60, sched)
         if (a.max_limit_min) {
-          const cap = new Date(a.started_at).getTime() + a.max_limit_min * 60_000
+          const cap = paidExpiry(new Date(a.started_at).getTime(), a.max_limit_min, sched)
           next = Math.min(next, cap)
         }
         await supabase
@@ -124,9 +121,10 @@ export const useParkingSession = () => {
           .eq('id', a.id)
       } else {
         if (a && !a.ended_at) await endSession(a.id)
-        const startedAt = Date.now()
-        let expires = startedAt + HOUR_MS
-        if (limit) expires = Math.min(expires, startedAt + limit * 60_000)
+        const minutes = limit ? Math.min(60, limit) : 60
+        const paidAt = Date.now()
+        const startedAt = firstChargeableAt(paidAt, sched)
+        const expires = paidExpiry(paidAt, minutes, sched)
         await supabase.from('parking_sessions').insert({
           user_id: userId.value,
           city_id: p.cityId,
@@ -156,11 +154,12 @@ export const useParkingSession = () => {
   })
   const isExpired = computed(() => remainingMs.value !== null && remainingMs.value <= 0)
 
-  // True once the session has been paid up to the zone's hard limit.
+  // True once the session has been paid up to the zone's hard limit. The limit is
+  // chargeable minutes, so a ticket that runs overnight has not spent them all.
   const atZoneLimit = computed(() => {
     const a = active.value
     if (!a?.max_limit_min || !a.expires_at) return false
-    const cap = new Date(a.started_at).getTime() + a.max_limit_min * 60_000
+    const cap = paidExpiry(new Date(a.started_at).getTime(), a.max_limit_min, getSchedule(a.city_id))
     return new Date(a.expires_at).getTime() >= cap - 1_000
   })
 

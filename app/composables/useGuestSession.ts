@@ -39,16 +39,9 @@ export interface GuestPayload {
   lng?: number | null
   plate?: string | null
   armed?: boolean
-  startsAt?: number   // ms epoch for an armed (pre-pay) session's start
 }
 
 const KEY = 'kerbo_guest_sessions'
-const HOUR_MS = 3_600_000
-
-const parseLimitMin = (rules?: string | null): number | null => {
-  const m = rules?.match(/max\s+(\d+)\s*min/i)
-  return m ? Number(m[1]) : null
-}
 
 export const useGuestSession = () => {
   const all = ref<GuestSession[]>([])
@@ -83,9 +76,16 @@ export const useGuestSession = () => {
 
   const create = (p: GuestPayload, confirmation: ConfirmationLevel = 'self_reported'): GuestSession => {
     const limit = parseLimitMin(p.zone.rules)
-    const startedAt = p.armed && p.startsAt ? p.startsAt : Date.now()
-    let expires = startedAt + HOUR_MS
-    if (limit) expires = Math.min(expires, startedAt + limit * 60_000)
+    const sched = getSchedule(p.cityId)
+    // An SMS buys 60 minutes of CHARGING. Pay near closing time and the unspent
+    // remainder banks until charging resumes, so the ticket outlives the night.
+    const minutes = limit ? Math.min(60, limit) : 60
+    const paidAt = Date.now()
+    // Pre-pay during a free stretch starts when charging next opens; inside a
+    // window this is simply now. Same rule covers both, so 'armed' only decides
+    // how the card looks, never the arithmetic.
+    const startedAt = firstChargeableAt(paidAt, sched)
+    const expires = paidExpiry(paidAt, minutes, sched)
 
     // End any previous active session before opening a new one.
     for (const s of all.value) if (!s.ended_at) s.ended_at = new Date().toISOString()
@@ -125,7 +125,9 @@ export const useGuestSession = () => {
   const atZoneLimit = computed(() => {
     const a = active.value
     if (!a?.max_limit_min || !a.expires_at) return false
-    const cap = new Date(a.started_at).getTime() + a.max_limit_min * 60_000
+    // The cap is chargeable minutes too — a ticket bought at 20:47 has barely
+    // touched a 120-minute limit by closing time, however far its expiry sits.
+    const cap = paidExpiry(new Date(a.started_at).getTime(), a.max_limit_min, getSchedule(a.city_id))
     return new Date(a.expires_at).getTime() >= cap - 1_000
   })
   const canExtend = computed(() => !!active.value && !atZoneLimit.value && active.value!.type === 'live')
