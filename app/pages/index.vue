@@ -122,6 +122,7 @@
           :can-extend="displayCanExtend"
           @extend="onExtend"
           @locate="onLocateCar"
+          @dismiss="onEndSession"
         />
 
         <!-- ═══ FREE-NOW SURFACE — when no payment is needed, the screen IS the answer ═══ -->
@@ -1271,8 +1272,14 @@ const selectedZone = computed(
 // only mislabelled as a fresh payment. With skip-confirm on it is a single tap,
 // and Kerb cannot see whether the SMS landed, so the only thing standing between
 // the user and a second billed message is not offering the button twice.
+// Expired does not count as covered: that is precisely the moment the driver
+// needs the pay button back, so an hour that has run out must not go on
+// suppressing it.
 const coveredHere = computed(
-  () => !!displaySession.value && displaySession.value.zone_name === selectedZone.value?.name
+  () =>
+    !!displaySession.value &&
+    displaySession.value.zone_name === selectedZone.value?.name &&
+    (displayRemaining.value == null || displayRemaining.value > 0)
 );
 
 // Once the user explicitly taps/scans/AI-picks a zone, stop auto-following the

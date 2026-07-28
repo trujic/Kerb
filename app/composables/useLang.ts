@@ -119,6 +119,7 @@ const dict = {
   extend1h: { sr: '+ Produži 1h', en: '+ Extend 1h' },
   findMyCar: { sr: 'Nađi moj auto', en: 'Find my car' },
   end: { sr: 'Završi', en: 'End' },
+  dismissSession: { sr: 'Ukloni istekli parking', en: 'Dismiss expired parking' },
 
   // Plate input
   plateHow: { sr: 'Vidi kako', en: 'See how' },

@@ -63,6 +63,7 @@
           :can-extend="canExtend"
           @extend="onExtend"
           @locate="onLocateCar"
+          @dismiss="onDismiss"
         />
       </section>
 
@@ -171,6 +172,9 @@ const onExtend = async () => {
     window.location.href = `sms:${zone.sms_shortcode}${body}`
   }
 }
+
+// An expired session is over; clearing it just tidies the finished record away.
+const onDismiss = () => { if (active.value) endSession(active.value.id) }
 
 // No in-app map here — open the saved spot in the user's maps app to navigate back.
 const onLocateCar = () => {

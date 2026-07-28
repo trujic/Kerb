@@ -5,7 +5,18 @@
         <span class="session-dot" :style="{ background: session.zone_color || 'var(--text2)' }" />
         {{ session.zone_name }}
       </span>
-      <span class="session-label">{{ t('activeParking') }}</span>
+      <!-- Once it has run out there is nothing to end and nothing to refund, so
+           clearing it is just tidying a finished record away — unlike a running
+           hour, where a "stop" button would promise money back that never comes. -->
+      <button
+        v-if="expired"
+        type="button"
+        class="se-x"
+        :aria-label="t('dismissSession')"
+        :title="t('dismissSession')"
+        @click="$emit('dismiss')"
+      >✕</button>
+      <span v-else class="session-label">{{ t('activeParking') }}</span>
     </div>
 
     <p v-if="session.street_name" class="session-street"><Icon name="pin" :size="12" /> {{ session.street_name }}</p>
@@ -55,7 +66,7 @@ const props = defineProps<{
   canExtend: boolean
 }>()
 
-defineEmits<{ extend: []; locate: [] }>()
+defineEmits<{ extend: []; locate: []; dismiss: [] }>()
 
 const { t } = useLang()
 
@@ -146,4 +157,24 @@ const agoText = computed(() => (props.remainingMs ? fmt(-props.remainingMs) : ''
 .se-btn:hover { background: var(--bg); border-color: var(--border2); }
 .se-extend { color: var(--bg); font-weight: 600; background: var(--green); border-color: var(--green); }
 .se-extend:hover { filter: brightness(0.95); background: var(--green); }
+
+/* Dismiss — only ever shown on an expired card, so it stays quiet */
+.se-x {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  line-height: 1;
+  color: var(--muted);
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: color 150ms, border-color 150ms;
+}
+.se-x:hover { color: var(--text); border-color: var(--border2); }
+.se-x:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 </style>
