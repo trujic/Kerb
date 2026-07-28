@@ -137,21 +137,22 @@ export const firstChargeableAt = (ms: number, s: CitySchedule | null): number =>
 export const paidExpiry = (startMs: number, paidMinutes: number, s: CitySchedule | null): number => {
   if (!s || paidMinutes <= 0) return startMs
   const tz = s.timezone
-  let remaining = paidMinutes
+  // Milliseconds, not minutes: paying at 11:40:57 must expire at 12:40:57, and
+  // rounding the walk to whole minutes silently shaved off the seconds — up to a
+  // minute gone the instant the session opened.
+  let remaining = paidMinutes * 60_000
   let cursor = firstChargeableAt(startMs, s)
 
   for (let hop = 0; hop < 16 && remaining > 0; hop++) {
     const p = cityPartsAt(cursor, tz)
     const win = s.days[p.day]
     if (!win) break // firstChargeableAt guarantees a window; belt and braces
-    const close = toMinutes(win.end)
-    const available = close - p.minutes
-    if (available >= remaining) {
-      return epochAt(p.year, p.month, p.date, p.minutes + remaining, tz)
-    }
+    const closeAt = epochAt(p.year, p.month, p.date, toMinutes(win.end), tz)
+    const available = closeAt - cursor
+    if (available >= remaining) return cursor + remaining
     remaining -= available
     // Land exactly on closing time, then hop to the next window that opens.
-    cursor = firstChargeableAt(epochAt(p.year, p.month, p.date, close, tz), s)
+    cursor = firstChargeableAt(closeAt, s)
   }
   return cursor
 }

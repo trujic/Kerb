@@ -38,7 +38,9 @@
         class="se-btn"
         @click="$emit('locate')"
       ><Icon name="car" :size="14" /> {{ t('findMyCar') }}</button>
-      <button type="button" class="se-btn se-end" @click="$emit('end')">{{ t('end') }}</button>
+      <!-- No "end" here on purpose: an SMS buys a whole hour and nothing gives it
+           back, so a button offering to stop early would promise a refund that
+           does not exist. The session simply runs out. -->
     </div>
   </div>
 </template>
@@ -53,7 +55,7 @@ const props = defineProps<{
   canExtend: boolean
 }>()
 
-defineEmits<{ extend: []; end: []; locate: [] }>()
+defineEmits<{ extend: []; locate: [] }>()
 
 const { t } = useLang()
 
@@ -144,5 +146,4 @@ const agoText = computed(() => (props.remainingMs ? fmt(-props.remainingMs) : ''
 .se-btn:hover { background: var(--bg); border-color: var(--border2); }
 .se-extend { color: var(--bg); font-weight: 600; background: var(--green); border-color: var(--green); }
 .se-extend:hover { filter: brightness(0.95); background: var(--green); }
-.se-end { flex: 0 0 auto; min-width: 0; color: var(--muted); }
 </style>

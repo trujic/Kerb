@@ -121,7 +121,6 @@
           :at-zone-limit="displayAtLimit"
           :can-extend="displayCanExtend"
           @extend="onExtend"
-          @end="onEndSession"
           @locate="onLocateCar"
         />
 

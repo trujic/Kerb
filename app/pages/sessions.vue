@@ -62,7 +62,6 @@
           :at-zone-limit="atZoneLimit"
           :can-extend="canExtend"
           @extend="onExtend"
-          @end="onEndSession"
           @locate="onLocateCar"
         />
       </section>
@@ -172,8 +171,6 @@ const onExtend = async () => {
     window.location.href = `sms:${zone.sms_shortcode}${body}`
   }
 }
-
-const onEndSession = () => { if (active.value) endSession(active.value.id) }
 
 // No in-app map here — open the saved spot in the user's maps app to navigate back.
 const onLocateCar = () => {

@@ -51,8 +51,8 @@ const dict = {
     en: 'Parking is already running in this zone',
   },
   alreadyRunningSub: {
-    sr: 'Produži ga ili završi u kartici iznad.',
-    en: 'Extend or end it in the card above.',
+    sr: 'Produži ga u kartici iznad.',
+    en: 'Extend it in the card above.',
   },
   resendSms: {
     sr: 'SMS nije prošao? Pošalji ponovo',
