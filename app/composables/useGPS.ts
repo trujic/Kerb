@@ -108,21 +108,49 @@ export const useGPS = () => {
         DETECT_TIMEOUT_MS
       )
       const geo = await res.json()
-      const rawCity = geo.address?.city || geo.address?.town || geo.address?.village || null
-      const rawStreet = geo.address?.road || geo.address?.pedestrian || geo.address?.footway || null
+      const addr = geo.address ?? {}
+      const rawStreet = addr.road || addr.pedestrian || addr.footway || null
       detectedStreet.value = rawStreet ? transliterate(rawStreet) : null
 
-      if (!rawCity) {
+      // Nominatim answers with the smallest administrative unit it knows, which
+      // across Serbia is usually NOT the city we file parking under: Vračar comes
+      // back as "Vracar Urban Municipality" with Belgrade only in `county`, Crveni
+      // Krst has Niš in `municipality`, and Petrovaradin reads as its own town with
+      // "City of Novi Sad" one level up. Matching `city` alone therefore told
+      // drivers standing on a mapped zone that their city was unsupported. So walk
+      // outward from the most specific name and take the first that we cover.
+      const candidates = [addr.city, addr.town, addr.village, addr.municipality, addr.county]
+        .filter(Boolean) as string[]
+
+      if (!candidates.length) {
         gpsError.value = 'Could not determine your city.'
         return null
       }
 
-      // Match against our database (case-insensitive)
-      const { data } = await supabase
+      // Strip the administrative wrapper words so "City of Novi Sad" can meet
+      // "Novi Sad", and compare transliterated + unaccented so Cyrillic answers
+      // and "Niš"/"Nis" all land on the same key.
+      const bare = (s: string) =>
+        transliterate(s)
+          .replace(/^(city of|grad|opstina|gradska opstina)\s+/i, '')
+          .replace(/\s+(urban municipality|municipality|administrative district|district|city)$/i, '')
+          .trim()
+      const key = (s: string) =>
+        bare(s).toLowerCase()
+          .replace(/[čć]/g, 'c').replace(/š/g, 's').replace(/ž/g, 'z').replace(/đ/g, 'dj')
+          .replace(/\s+/g, ' ')
+
+      // Ten rows — one fetch beats a query per candidate.
+      const { data: cities } = await supabase
         .from('cities')
         .select('id, name, country, flag')
-        .ilike('name', rawCity)
-        .single()
+
+      let data: any = null
+      for (const c of candidates) {
+        data = (cities ?? []).find((row: any) => key(row.name) === key(c)) ?? null
+        if (data) break
+      }
+      const rawCity = transliterate(candidates[0]!)
 
       if (data) {
         detectedCity.value = data
