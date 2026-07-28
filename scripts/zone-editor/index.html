@@ -801,6 +801,16 @@ map.on('pm:create', (e) => {
   select(e.layer)
   persist()
 })
+// Geoman's eraser calls layer.remove(), which drops the polygon off the map but
+// leaves it in the feature group — so it kept coming back on reload and kept
+// turning up in the export, stacked under whatever was redrawn over it.
+map.on('pm:remove', (e) => {
+  drawn.removeLayer(e.layer)
+  if (selected === e.layer) { selected = null; renderSel() }
+  persist(); stats()
+})
+// Dragging a whole polygon does not always surface as pm:edit.
+map.on('pm:dragend', persist)
 function sheetClick(latlng) {
   const f = fracOf(latlng)
   gcps[armed].fx = f.fx; gcps[armed].fy = f.fy
