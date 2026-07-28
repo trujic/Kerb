@@ -155,6 +155,16 @@ const CITIES = {
     label: 'Novi Sad', center: [45.2551, 19.8451], zoom: 15,
     zones: { 'Extra Zone':'#F97316', 'Red Zone':'#EF4444', 'Blue Zone':'#3B82F6', 'White Zone':'#9CA3AF' },
     defaultImage: 'katastar-1.png', // official Parking Servis "Tehnička baza" sheet, already in this folder
+    // A per-LOT extra, not a zone of its own: the daily ticket is sold at only a
+    // fraction of Blue Zone lots and you can tell only from a sign at the spot.
+    // So it rides as a flag on the polygon, leaving `zone` matching the DB.
+    // (White Zone sells it across the whole zone, so it needs no marking.)
+    perLotFlag: {
+      key: 'daily',
+      zones: ['Blue Zone'],
+      label: 'Ima dnevnu kartu (95 RSD → 8215)',
+      short: 'dnevna',
+    },
   },
   'belgrade': {
     label: 'Beograd', center: [44.8125, 20.4612], zoom: 13,
@@ -634,13 +644,23 @@ document.getElementById('locate').onclick = async () => {
 // ── drawn features ──
 const drawn = L.featureGroup().addTo(map)
 
-function styleFor(zone) {
+const FLAG = CITY.perLotFlag || null
+const flagApplies = (zone) => !!FLAG && FLAG.zones.includes(zone)
+
+function styleFor(zone, flagged) {
   const c = CITY.zones[zone] || '#6E7583'
-  return { color: c, fillColor: c, fillOpacity: 0.25, weight: 2 }
+  // Flagged lots keep the zone's colour but get a dashed, heavier edge, so a
+  // glance over the sheet tells you which ones you have already marked.
+  return flagged
+    ? { color: c, fillColor: c, fillOpacity: 0.25, weight: 3, dashArray: '6 4' }
+    : { color: c, fillColor: c, fillOpacity: 0.25, weight: 2, dashArray: null }
 }
 function attach(layer, props) {
-  layer.feature = { type: 'Feature', properties: { name: props.name || '', zone: props.zone || null, color: CITY.zones[props.zone] || null } }
-  layer.setStyle(styleFor(props.zone))
+  layer.feature = { type: 'Feature', properties: {
+    name: props.name || '', zone: props.zone || null, color: CITY.zones[props.zone] || null,
+    ...(FLAG && props[FLAG.key] ? { [FLAG.key]: true } : {}),
+  } }
+  layer.setStyle(styleFor(props.zone, FLAG && props[FLAG.key]))
   layer.on('click', (e) => {
     L.DomEvent.stop(e)
     if (armed >= 0) { sheetClick(e.latlng); return }
@@ -650,9 +670,9 @@ function attach(layer, props) {
   drawn.addLayer(layer)
 }
 function select(layer) {
-  if (selected) selected.setStyle(styleFor(selected.feature.properties.zone))
+  if (selected) selected.setStyle(styleFor(selected.feature.properties.zone, FLAG && selected.feature.properties[FLAG.key]))
   selected = layer
-  layer.setStyle({ ...styleFor(layer.feature.properties.zone), weight: 4, fillOpacity: 0.4 })
+  layer.setStyle({ ...styleFor(layer.feature.properties.zone, FLAG && layer.feature.properties[FLAG.key]), weight: 4, fillOpacity: 0.4 })
   renderSel()
 }
 function renderSel() {
@@ -660,14 +680,33 @@ function renderSel() {
   if (!selected) { box.className = 'empty'; box.textContent = 'Klikni poligon na mapi.'; return }
   const p = selected.feature.properties
   box.className = ''
+  // The flag only shows on zones that can actually carry it — no dead checkbox
+  // on a Red lot, and none at all in cities without such an option.
+  const flagRow = flagApplies(p.zone)
+    ? `<label style="display:flex;gap:7px;align-items:flex-start;font-size:12px;margin:8px 0 2px;line-height:1.35">
+         <input type="checkbox" id="selflag" ${p[FLAG.key] ? 'checked' : ''} style="margin-top:2px">
+         <span>${FLAG.label}</span>
+       </label>`
+    : ''
   box.innerHTML = `
     <div class="row"><input type="text" id="selname" placeholder="ime ulice / parkirališta" value="${(p.name || '').replace(/"/g, '&quot;')}"></div>
     <div class="zones" id="selzones"></div>
+    ${flagRow}
     <div class="row" style="margin-top:6px"><button class="btn" id="deldup">Obriši poligon</button></div>`
   zoneButtons(document.getElementById('selzones'), p.zone, (z) => {
-    p.zone = z; p.color = CITY.zones[z]; selected.setStyle({ ...styleFor(z), weight: 4, fillOpacity: 0.4 }); persist()
+    p.zone = z; p.color = CITY.zones[z]
+    // Moving a lot to a zone that has no such option drops the mark with it —
+    // otherwise a Red lot could quietly keep a Blue-only daily-ticket flag.
+    if (FLAG && p[FLAG.key] && !flagApplies(z)) delete p[FLAG.key]
+    selected.setStyle({ ...styleFor(z, FLAG && p[FLAG.key]), weight: 4, fillOpacity: 0.4 })
+    persist(); renderSel()
   })
   document.getElementById('selname').oninput = (e) => { p.name = e.target.value; persist() }
+  document.getElementById('selflag')?.addEventListener('change', (e) => {
+    if (e.target.checked) p[FLAG.key] = true; else delete p[FLAG.key]
+    selected.setStyle({ ...styleFor(p.zone, p[FLAG.key]), weight: 4, fillOpacity: 0.4 })
+    persist(); stats()
+  })
   document.getElementById('deldup').onclick = () => { drawn.removeLayer(selected); selected = null; renderSel(); persist() }
 }
 function zoneButtons(el, current, onPick) {
@@ -698,7 +737,7 @@ function sheetClick(latlng) {
 }
 map.on('click', (e) => {
   if (armed >= 0) { sheetClick(e.latlng); return }
-  if (selected) { selected.setStyle(styleFor(selected.feature.properties.zone)); selected = null; renderSel() }
+  if (selected) { selected.setStyle(styleFor(selected.feature.properties.zone, FLAG && selected.feature.properties[FLAG.key])); selected = null; renderSel() }
 })
 
 // ── zone inference for messy imported properties ──
@@ -714,7 +753,8 @@ function importFC(fc, silent) {
     if (f.geometry?.type !== 'Polygon') continue
     // all rings: [outer, ...holes] — holes are real (city blocks inside street networks)
     const layer = L.polygon(f.geometry.coordinates.map(ring => ring.map(([x, y]) => [y, x])))
-    attach(layer, { name: f.properties?.name || '', zone: inferZone(f.properties) })
+    const z = inferZone(f.properties)
+    attach(layer, { name: f.properties?.name || '', zone: z, ...(FLAG && f.properties?.[FLAG.key] && flagApplies(z) ? { [FLAG.key]: true } : {}) })
     n++
   }
   if (!silent) { toast(`Uvezeno ${n} poligona`); persist() }
@@ -741,7 +781,9 @@ function toFC() {
       .filter(r => r.length >= 3)
       .map(r => (r[0][0] !== r.at(-1)[0] || r[0][1] !== r.at(-1)[1]) ? [...r, [...r[0]]] : r)
     if (!rings.length) return
-    features.push({ type: 'Feature', properties: { name: p.name || '', zone: p.zone, color: CITY.zones[p.zone] || null }, geometry: { type: 'Polygon', coordinates: rings } })
+    const props = { name: p.name || '', zone: p.zone, color: CITY.zones[p.zone] || null }
+    if (FLAG && p[FLAG.key]) props[FLAG.key] = true
+    features.push({ type: 'Feature', properties: props, geometry: { type: 'Polygon', coordinates: rings } })
   })
   return { type: 'FeatureCollection', features }
 }
@@ -791,8 +833,10 @@ function stats() {
   const fc = toFC()
   const per = {}
   fc.features.forEach(f => { per[f.properties.zone || '—'] = (per[f.properties.zone || '—'] || 0) + 1 })
+  const flagged = FLAG ? fc.features.filter(f => f.properties[FLAG.key]).length : 0
   document.getElementById('stats').textContent =
     `${fc.features.length} poligona · ` + Object.entries(per).map(([z, n]) => `${z}: ${n}`).join(' · ')
+    + (FLAG ? ` · ${FLAG.short}: ${flagged}` : '')
 }
 function toast(msg) {
   const t = document.getElementById('toast')
