@@ -27,6 +27,13 @@
   .btn:hover { filter:brightness(.97); }
   input[type=range] { width:100%; }
   input[type=text], select { width:100%; padding:7px 9px; border:1px solid #C9CDD6; border-radius:8px; background:#fff; }
+  .qrow { display:block; width:100%; text-align:left; padding:7px 9px; background:#fff; border:1px solid #C9CDD6; border-top:0; cursor:pointer; font-size:12px; line-height:1.35; }
+  .qrow:first-child { border-top:1px solid #C9CDD6; border-radius:8px 8px 0 0; }
+  .qrow:last-child { border-radius:0 0 8px 8px; }
+  .qrow:only-child { border-radius:8px; }
+  .qrow:hover { background:#EAECEF; }
+  .qrow b { display:block; font-weight:600; }
+  .qrow span { color:#5B6270; font-size:11px; }
   .gcp { background:#fff; border:1px solid #C9CDD6; border-radius:10px; padding:8px; margin-bottom:8px; }
   .gcp .st { font-size:11px; margin-top:4px; }
   .gcp .st.ok { color:#10673E; }
@@ -56,7 +63,17 @@
     <div class="row"><button class="btn" id="loadimg">Učitaj sliku/PDF-snimak karte…</button></div>
     <input type="file" id="imgfile" accept="image/*" style="display:none">
     <div class="hint" id="imgstatus"></div>
+    <div class="row" style="margin-top:4px"><button class="btn mini" id="dropimg" style="display:none">Zaboravi zapamćenu podlogu</button></div>
     <div class="row" style="margin-top:6px"><input type="range" id="op" min="0" max="100" value="65"></div>
+  </section>
+
+  <section>
+    <span class="t">Pretraga ulice</span>
+    <div class="row">
+      <input type="text" id="q" placeholder="npr. Zmaj Jovina" autocomplete="off">
+    </div>
+    <div id="qres"></div>
+    <div class="hint" id="qmsg">Enter za pretragu. Traži se samo u ovom gradu.</div>
   </section>
 
   <section>
@@ -112,7 +129,7 @@
     </div>
     <input type="file" id="file" accept=".json,.geojson" style="display:none">
     <input type="file" id="resfile" accept=".json" style="display:none">
-    <div class="hint">Autosave u browseru po gradu. Backup čuva kalibraciju + poligone (ne i podlogu — prevelika za localStorage).</div>
+    <div class="hint">Autosave u browseru po gradu. Backup čuva kalibraciju + poligone; podloga se pamti odvojeno (IndexedDB) i ne ide u backup fajl.</div>
   </section>
 
   <section><span class="t">Stanje</span><div id="stats"></div></section>
@@ -183,6 +200,46 @@ const CITIES = {
   },
 }
 
+// ── sheet storage ──────────────────────────────────────────────────────────────
+// The uploaded sheet is megabytes, so localStorage (~5 MB, strings only) can't
+// hold it — which is why calibration used to survive a reload but the image
+// under it did not. IndexedDB takes blobs, so the overlay now persists per city
+// exactly like the corners do, and a city with no bundled sheet behaves like
+// Novi Sad's: set it once, keep it.
+const IDB_NAME = 'kerb-zone-editor'
+const IDB_STORE = 'sheets'
+const idb = () => new Promise((res, rej) => {
+  const r = indexedDB.open(IDB_NAME, 1)
+  r.onupgradeneeded = () => r.result.createObjectStore(IDB_STORE)
+  r.onsuccess = () => res(r.result)
+  r.onerror = () => rej(r.error)
+})
+const sheetPut = async (id, blob) => {
+  const db = await idb()
+  await new Promise((res, rej) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite')
+    tx.objectStore(IDB_STORE).put(blob, id)
+    tx.oncomplete = res; tx.onerror = () => rej(tx.error)
+  })
+}
+const sheetGet = async (id) => {
+  const db = await idb()
+  return new Promise((res, rej) => {
+    const tx = db.transaction(IDB_STORE, 'readonly')
+    const q = tx.objectStore(IDB_STORE).get(id)
+    q.onsuccess = () => res(q.result || null)
+    q.onerror = () => rej(q.error)
+  })
+}
+const sheetDel = async (id) => {
+  const db = await idb()
+  await new Promise((res) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite')
+    tx.objectStore(IDB_STORE).delete(id)
+    tx.oncomplete = res
+  })
+}
+
 const CRS = L.CRS.EPSG3857
 const P = (ll) => CRS.project(L.latLng(ll))
 const UNP = (pt) => CRS.unproject(pt)
@@ -246,16 +303,39 @@ document.getElementById('imgstatus').textContent = hasImage
   : 'Nema učitane slike'
 
 document.getElementById('loadimg').onclick = () => document.getElementById('imgfile').click()
-document.getElementById('imgfile').onchange = (e) => {
+document.getElementById('imgfile').onchange = async (e) => {
   const f = e.target.files[0]
   if (!f) return
-  const url = URL.createObjectURL(f)
-  overlay.setUrl(url)
+  overlay.setUrl(URL.createObjectURL(f))
   hasImage = true
   document.getElementById('noimg').style.display = 'none'
-  document.getElementById('imgstatus').textContent = `Učitano: ${f.name} (ne pamti se posle reload-a)`
   e.target.value = ''
-  toast('Karta učitana — sad kalibriši 3 tačke')
+  try {
+    await sheetPut(cityId, f)
+    document.getElementById('imgstatus').textContent = `Učitano: ${f.name} · zapamćeno`
+    toast('Karta učitana i zapamćena — sad kalibriši 3 tačke')
+  } catch {
+    document.getElementById('imgstatus').textContent = `Učitano: ${f.name} (ne pamti se posle reload-a)`
+    toast('Karta učitana, ali je nisam uspeo zapamtiti')
+  }
+}
+
+// A sheet stored on an earlier visit wins over the bundled default: it is the
+// one this city was actually calibrated against.
+sheetGet(cityId).then(blob => {
+  if (!blob) return
+  overlay.setUrl(URL.createObjectURL(blob))
+  hasImage = true
+  document.getElementById('noimg').style.display = 'none'
+  document.getElementById('imgstatus').textContent =
+    `Zapamćena podloga (${(blob.size / 1048576).toFixed(1)} MB) · ${blob.name || 'bez imena'}`
+  document.getElementById('dropimg').style.display = ''
+}).catch(() => {})
+
+document.getElementById('dropimg').onclick = async () => {
+  await sheetDel(cityId)
+  document.getElementById('dropimg').style.display = 'none'
+  toast('Zapamćena podloga obrisana — osveži stranicu')
 }
 
 // image fraction (fx right, fy down from TL) of a map point under the CURRENT placement
@@ -719,6 +799,70 @@ function toast(msg) {
   t.textContent = msg; t.style.opacity = 1
   setTimeout(() => (t.style.opacity = 0), 2600)
 }
+
+// ── street search ──────────────────────────────────────────────────────────────
+// Jump to a street by name, bounded to this city so "Nikole Tesle" doesn't land
+// you in another town. Nominatim indexes Serbian roads in Cyrillic, so a Latin
+// query is retried transliterated before giving up.
+const qInput = document.getElementById('q')
+const qRes = document.getElementById('qres')
+const qMsg = document.getElementById('qmsg')
+let qMarker = null
+const D = 0.09 // ~10 km box around the city centre
+
+async function nominatim(text) {
+  const [lat, lng] = CITY.center
+  const url = 'https://nominatim.openstreetmap.org/search'
+    + `?q=${encodeURIComponent(text)}&format=json&limit=6&addressdetails=1`
+    + `&viewbox=${lng - D},${lat + D},${lng + D},${lat - D}&bounded=1`
+  const r = await fetch(url, { headers: { 'Accept-Language': 'sr,en' } })
+  return r.ok ? r.json() : []
+}
+
+async function runSearch() {
+  const text = qInput.value.trim()
+  qRes.innerHTML = ''
+  if (text.length < 2) { qMsg.textContent = 'Upiši bar dva znaka.'; return }
+  qMsg.textContent = 'Tražim…'
+  try {
+    let hits = await nominatim(text)
+    if (!hits.length) {
+      const cyr = toCyrillic(text)
+      if (cyr !== text) hits = await nominatim(cyr)
+    }
+    if (!hits.length) { qMsg.textContent = `Nema pogotka za „${text}" u ovom gradu.`; return }
+    qMsg.textContent = `${hits.length} pogodaka — klikni da skočiš.`
+    for (const h of hits) {
+      const a = h.address || {}
+      const main = a.road || a.pedestrian || a.suburb || h.name || h.display_name.split(',')[0]
+      const rest = [a.suburb, a.city || a.town || a.village].filter(Boolean).join(' · ')
+      const b = document.createElement('button')
+      b.className = 'qrow'
+      b.innerHTML = `<b></b><span></span>`
+      b.querySelector('b').textContent = main
+      b.querySelector('span').textContent = rest || h.type || ''
+      b.onclick = () => {
+        const ll = [+h.lat, +h.lon]
+        // A street's bounding box beats its centroid — long roads zoom sensibly.
+        if (h.boundingbox) {
+          const [s, n, w, e] = h.boundingbox.map(Number)
+          map.fitBounds([[s, w], [n, e]], { maxZoom: 18, padding: [40, 40] })
+        } else {
+          map.setView(ll, 18)
+        }
+        if (qMarker) map.removeLayer(qMarker)
+        qMarker = L.circleMarker(ll, { radius: 8, color: '#1A66D6', weight: 3, fillOpacity: 0.15 })
+          .addTo(map).bindTooltip(main, { permanent: false })
+        toast(main)
+      }
+      qRes.appendChild(b)
+    }
+  } catch {
+    qMsg.textContent = 'Pretraga nije uspela — proveri vezu.'
+  }
+}
+qInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); runSearch() } })
+qInput.addEventListener('input', () => { if (!qInput.value.trim()) { qRes.innerHTML = ''; qMsg.textContent = 'Enter za pretragu. Traži se samo u ovom gradu.' } })
 
 // test hook — lets automation read placement without reaching into scope
 window.__ed = { get corners() { return corners }, get gcps() { return gcps }, get cityId() { return cityId }, fracOf }
