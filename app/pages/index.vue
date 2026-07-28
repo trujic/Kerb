@@ -248,7 +248,10 @@
             <div v-if="selectedZone" class="pay-step">
               <div
                 class="zone-hero"
-                :class="{ 'zone-hero--free': freeNow }"
+                :class="{
+                  'zone-hero--free': freeNow,
+                  'zone-hero--unsure': parkingState === 'near',
+                }"
                 :style="{ borderColor: selectedZone.color }"
               >
                 <div
@@ -260,8 +263,13 @@
                 >
                   <span class="zone-hero-id">
                     <span class="zone-hero-name">{{ selectedZone.name }}</span>
+                    <!-- Off the edge it is not "likely yours" — the badge would
+                         be arguing with the warning right underneath it. -->
                     <span
-                      v-if="selectedZone.name === likelyZoneName"
+                      v-if="
+                        selectedZone.name === likelyZoneName &&
+                        parkingState !== 'near'
+                      "
                       class="zone-hero-tag"
                     >
                       <Icon name="pin" :size="10" /> {{ t("likelyYours") }}
@@ -281,13 +289,28 @@
                   </span>
                 </div>
                 <div class="zone-hero-body">
+                  <!-- Standing off the mapped edge, the guess is weak enough that
+                       it leads rather than trails: a line under the price was too
+                       easy to scroll past on the way to the slider. -->
+                  <div v-if="parkingState === 'near'" class="zone-unsure">
+                    <Icon name="alert" :size="17" />
+                    <div>
+                      <p class="zone-unsure-title">
+                        {{
+                          t("boundaryTitle", {
+                            dist: formatDist(nearest!.distanceM),
+                          })
+                        }}
+                      </p>
+                      <p class="zone-unsure-sub">
+                        {{ t("boundarySub") }}
+                        <strong>{{ selectedZone.name }}</strong
+                        >.
+                      </p>
+                    </div>
+                  </div>
                   <p class="zone-hero-check">
                     <Icon name="sign" :size="14" /> {{ t("heroCheckSign") }}
-                  </p>
-                  <p v-if="parkingState === 'near'" class="zone-act-caution">
-                    <Icon name="alert" :size="13" /> {{ t("boundaryCaution") }}
-                    <strong>{{ selectedZone.name }}</strong
-                    >.
                   </p>
                   <p v-if="mapApprox" class="zone-pick-approx">
                     <Icon name="alert" :size="13" />
@@ -2667,12 +2690,44 @@ h2 {
   color: var(--text2);
   line-height: 1.5;
 }
-.zone-hero-check + .zone-act-caution,
 .zone-hero-body .zone-pick-approx {
   margin-top: 10px;
 }
-.zone-hero-body .zone-act-caution {
-  margin: 10px 0 0;
+
+/* Off the mapped edge: calm the card so its confidence matches the evidence,
+   and let the warning lead the body instead of trailing the price. */
+.zone-hero--unsure {
+  filter: saturate(0.72);
+}
+.zone-unsure {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 11px 12px;
+  background: var(--amber-bg);
+  border: 1.5px solid var(--amber-border);
+  border-radius: var(--r-md);
+  color: var(--amber);
+}
+.zone-unsure svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.zone-unsure-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  line-height: 1.35;
+  margin-bottom: 3px;
+}
+.zone-unsure-sub {
+  font-size: 12.5px;
+  color: var(--text2);
+  line-height: 1.5;
+}
+.zone-unsure-sub strong {
+  color: var(--text);
+  font-weight: 700;
 }
 
 /* The one escape hatch — wrong zone opens every alternative + the tools */
@@ -3244,15 +3299,6 @@ h2 {
   color: var(--muted);
   text-align: center;
   line-height: 1.4;
-}
-.zone-act-caution {
-  font-size: 12px;
-  color: var(--amber);
-  line-height: 1.45;
-  margin: 0 0 13px;
-}
-.zone-act-caution strong {
-  font-weight: 700;
 }
 .zone-act-btn {
   display: flex;

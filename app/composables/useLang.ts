@@ -42,9 +42,13 @@ const dict = {
   },
   likelyYours: { sr: 'verovatno tvoja', en: 'likely yours' },
   noLimit: { sr: 'Bez limita', en: 'No limit' },
-  boundaryCaution: {
-    sr: 'GPS te stavlja blizu granice — plati ovu zonu samo ako na tabli piše',
-    en: 'GPS puts you near a boundary — only pay this zone if the sign says',
+  boundaryTitle: {
+    sr: 'Nisi na zoni — {dist} od najbliže',
+    en: "You're not on the zone — {dist} from the nearest",
+  },
+  boundarySub: {
+    sr: 'GPS ne može da potvrdi koja je tvoja. Plati ovu samo ako na tabli piše',
+    en: "GPS can't tell which one is yours. Only pay this one if the sign says",
   },
   alreadyRunning: {
     sr: 'Parking u ovoj zoni ti već teče',
