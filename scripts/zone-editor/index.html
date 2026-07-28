@@ -117,6 +117,7 @@
     <label style="display:flex;gap:6px;align-items:center;font-size:12px;margin-top:4px">
       <input type="checkbox" id="targets" checked> prikaži obeležene ulice
     </label>
+    <div id="convbox"></div>
   </section>
 
   <section>
@@ -579,19 +580,37 @@ document.getElementById('locate').onclick = async () => {
   }).join('\n  ')
   const query = `[out:json][timeout:60];\n(\n  ${filters}\n);\nout geom;`
 
-  let data
-  try {
-    const res = await fetch('https://maps.mail.ru/osm/tools/overpass/api/interpreter', {
-      method: 'POST', body: 'data=' + encodeURIComponent(query),
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    })
-    data = await res.json()
-  } catch {
-    msgEl.textContent = 'Overpass upit nije uspeo — proveri konekciju i probaj ponovo.'
+  // Overpass mirrors go down or rate-limit often enough that one hardcoded
+  // endpoint means the tool is simply broken that afternoon. Try them in turn.
+  const MIRRORS = [
+    'https://overpass-api.de/api/interpreter',
+    'https://overpass.kumi.systems/api/interpreter',
+    'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+  ]
+  let data = null
+  const failures = []
+  for (const url of MIRRORS) {
+    msgEl.textContent = `Pitam OSM (${new URL(url).hostname})…`
+    try {
+      const res = await fetch(url, {
+        method: 'POST', body: 'data=' + encodeURIComponent(query),
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      })
+      if (!res.ok) { failures.push(`${new URL(url).hostname}: ${res.status}`); continue }
+      data = await res.json()
+      break
+    } catch (e) {
+      failures.push(`${new URL(url).hostname}: ${e.message || 'greška'}`)
+    }
+  }
+  if (!data) {
+    msgEl.innerHTML = 'Nijedan OSM server nije odgovorio — probaj ponovo za koji minut.'
+      + `<br><span style="opacity:.75">${failures.join(' · ')}</span>`
     return
   }
 
   targetLayer.clearLayers()
+  lastLocated = []
   const matchedKeys = new Set()
   const byWayName = new Map() // OSM name → [elements]
   for (const el of data.elements || []) {
@@ -625,6 +644,9 @@ document.getElementById('locate').onclick = async () => {
     for (const el of els) {
       const latlngs = el.geometry.map(pt => [pt.lat, pt.lon])
       const line = L.polyline(latlngs, { color, weight: 4, opacity: 0.85, interactive: false }).addTo(targetLayer)
+      // Keep the real OSM centreline — this is the geometry worth exporting,
+      // far more precise than anything traced off the sheet's thick symbol.
+      lastLocated.push({ podzone: [...rec.podzones][0], label: rec.display, latlngs })
       if (!best || lenOf(el) > best.len) best = { line, len: lenOf(el) }
     }
     labelCarrier.set(hitKey, best)
@@ -639,6 +661,58 @@ document.getElementById('locate').onclick = async () => {
   const missing = [...byStreet.entries()].filter(([key]) => !matchedKeys.has(key)).map(([, rec]) => rec.display)
   msgEl.innerHTML = `Obeleženo ${matchedKeys.size} od ${byStreet.size} ulica.` +
     (missing.length ? `<br>Nije nađeno (nema ih u OSM-u pod tim imenom, ili traži ručno): ${missing.join(', ')}` : '')
+  renderConvert(groups)
+}
+
+// ── located streets → real zone geometry ───────────────────────────────────────
+// The sheet's authority is WHICH zone a street belongs to; OSM knows WHERE the
+// street is, to a metre. Tracing the sheet's stroke throws the second away and
+// substitutes hand-eye error plus a symbol width. So take each from what it is
+// good for: the pasted list assigns the zone, OSM supplies the centreline.
+let lastLocated = []
+const SR_COLOR = [
+  [/crven/i, 'red'], [/plav/i, 'blue'], [/bel|bijel/i, 'white'], [/zelen/i, 'green'],
+  [/žut|zut/i, 'yellow'], [/ekstra|extra/i, 'extra'], [/ljubi[čc]ast/i, 'purple'],
+]
+function zoneFromLabel(label) {
+  const names = Object.keys(CITY.zones)
+  const direct = names.find(z => label.toLowerCase().includes(z.toLowerCase()))
+  if (direct) return direct
+  for (const [re, word] of SR_COLOR) {
+    if (!re.test(label)) continue
+    const hit = names.find(z => z.toLowerCase().includes(word))
+    if (hit) return hit
+  }
+  return names[0]
+}
+function renderConvert(groups) {
+  const box = document.getElementById('convbox')
+  if (!lastLocated.length) { box.innerHTML = ''; return }
+  const counts = {}
+  for (const w of lastLocated) counts[w.podzone] = (counts[w.podzone] || 0) + 1
+  const rows = groups.filter(g => counts[g.podzone]).map(g => `
+    <div class="row" style="gap:5px">
+      <select data-pz="${g.podzone}" style="flex:1">
+        ${Object.keys(CITY.zones).map(z => `<option ${z === zoneFromLabel(g.label) ? 'selected' : ''}>${z}</option>`).join('')}
+      </select>
+      <span style="font-size:11px;color:#5B6270;white-space:nowrap">${counts[g.podzone]} deo(ova)</span>
+    </div>`).join('')
+  box.innerHTML = `<div class="hint" style="margin:8px 0 6px">Svaka podzona → zona u aplikaciji. Geometrija je OSM osa ulice, ne precrtano sa podloge.</div>
+    ${rows}
+    <div class="row"><button class="btn primary" id="conv">Pretvori u zone</button></div>`
+  document.getElementById('conv').onclick = () => {
+    const pick = {}
+    box.querySelectorAll('select[data-pz]').forEach(sel => { pick[sel.dataset.pz] = sel.value })
+    let n = 0
+    for (const w of lastLocated) {
+      const zone = pick[w.podzone]
+      if (!zone) continue
+      attach(L.polyline(w.latlngs), { zone, name: w.label })
+      n++
+    }
+    persist(); stats()
+    toast(`Dodato ${n} ulica kao geometrija zona`)
+  }
 }
 
 // ── drawn features ──
@@ -750,14 +824,25 @@ function inferZone(props) {
 function importFC(fc, silent) {
   let n = 0
   for (const f of fc.features || []) {
-    if (f.geometry?.type !== 'Polygon') continue
+    const gt = f.geometry?.type
+    if (gt === 'LineString' || gt === 'MultiLineString') {
+      const parts = gt === 'LineString' ? [f.geometry.coordinates] : f.geometry.coordinates
+      for (const part of parts) {
+        const z2 = inferZone(f.properties)
+        attach(L.polyline(part.map(([x, y]) => [y, x])), { name: f.properties?.name || '', zone: z2,
+          ...(FLAG && f.properties?.[FLAG.key] && flagApplies(z2) ? { [FLAG.key]: true } : {}) })
+        n++
+      }
+      continue
+    }
+    if (gt !== 'Polygon') continue
     // all rings: [outer, ...holes] — holes are real (city blocks inside street networks)
     const layer = L.polygon(f.geometry.coordinates.map(ring => ring.map(([x, y]) => [y, x])))
     const z = inferZone(f.properties)
     attach(layer, { name: f.properties?.name || '', zone: z, ...(FLAG && f.properties?.[FLAG.key] && flagApplies(z) ? { [FLAG.key]: true } : {}) })
     n++
   }
-  if (!silent) { toast(`Uvezeno ${n} poligona`); persist() }
+  if (!silent) { toast(`Uvezeno ${n} delova`); persist() }
   stats()
 }
 document.getElementById('imp').onclick = () => document.getElementById('file').click()
@@ -773,6 +858,15 @@ function toFC() {
   const features = []
   drawn.eachLayer(l => {
     const p = l.feature.properties
+    // Polygon extends Polyline in Leaflet, so test the narrower type first.
+    if (!(l instanceof L.Polygon)) {
+      const coords = l.getLatLngs().map(ll => [+ll.lng.toFixed(6), +ll.lat.toFixed(6)])
+      if (coords.length < 2) return
+      const props = { name: p.name || '', zone: p.zone, color: CITY.zones[p.zone] || null }
+      if (FLAG && p[FLAG.key]) props[FLAG.key] = true
+      features.push({ type: 'Feature', properties: props, geometry: { type: 'LineString', coordinates: coords } })
+      return
+    }
     // getLatLngs() nests: simple polygon → [[outer]], with holes → [[outer],[hole]…]
     let raw = l.getLatLngs()
     if (raw.length && !Array.isArray(raw[0])) raw = [raw]
@@ -791,7 +885,7 @@ document.getElementById('expname').textContent = `${cityId}.json`
 document.getElementById('exp').onclick = () => {
   const fc = toFC()
   const missing = fc.features.filter(f => !f.properties.zone).length
-  if (missing) toast(`Pažnja: ${missing} poligona bez zone`)
+  if (missing) toast(`Pažnja: ${missing} delova bez zone`)
   const a = document.createElement('a')
   a.href = URL.createObjectURL(new Blob([JSON.stringify(fc)], { type: 'application/json' }))
   a.download = `${cityId}.json`
@@ -835,7 +929,7 @@ function stats() {
   fc.features.forEach(f => { per[f.properties.zone || '—'] = (per[f.properties.zone || '—'] || 0) + 1 })
   const flagged = FLAG ? fc.features.filter(f => f.properties[FLAG.key]).length : 0
   document.getElementById('stats').textContent =
-    `${fc.features.length} poligona · ` + Object.entries(per).map(([z, n]) => `${z}: ${n}`).join(' · ')
+    `${fc.features.length} delova · ` + Object.entries(per).map(([z, n]) => `${z}: ${n}`).join(' · ')
     + (FLAG ? ` · ${FLAG.short}: ${flagged}` : '')
 }
 function toast(msg) {
