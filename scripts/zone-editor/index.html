@@ -156,13 +156,12 @@ const CITIES = {
     label: 'Novi Sad', center: [45.2551, 19.8451], zoom: 15,
     zones: { 'Extra Zone':'#F97316', 'Red Zone':'#EF4444', 'Blue Zone':'#3B82F6', 'White Zone':'#9CA3AF' },
     defaultImage: 'katastar-1.png', // official Parking Servis "Tehnička baza" sheet, already in this folder
-    // A per-LOT extra, not a zone of its own: the daily ticket is sold at only a
-    // fraction of Blue Zone lots and you can tell only from a sign at the spot.
-    // So it rides as a flag on the polygon, leaving `zone` matching the DB.
-    // (White Zone sells it across the whole zone, so it needs no marking.)
+    // A per-LOT extra, not a zone of its own: the daily ticket is sold at only
+    // some lots and you can tell only from a sign at the spot. So it rides as a
+    // flag on the polygon, leaving `zone` matching the DB.
     perLotFlag: {
       key: 'daily',
-      zones: ['Blue Zone'],
+      zones: ['Blue Zone', 'White Zone'],
       label: 'Ima dnevnu kartu (95 RSD → 8215)',
       short: 'dnevna',
     },
