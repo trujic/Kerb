@@ -59,8 +59,11 @@
   </section>
 
   <section>
-    <span class="t">Zvanična karta (podloga)</span>
-    <div class="row"><button class="btn" id="loadimg">Učitaj sliku/PDF-snimak karte…</button></div>
+    <span class="t">Zvanične karte (podloge)</span>
+    <div id="sheets"></div>
+    <div class="row"><button class="btn" id="addsheet">+ Dodaj novu podlogu</button></div>
+    <div class="hint" style="margin:0 0 8px">Svaka podloga pamti svoju kalibraciju. Poligoni su zajednički za grad.</div>
+    <div class="row"><button class="btn" id="loadimg">Zameni sliku ove podloge…</button></div>
     <input type="file" id="imgfile" accept="image/*" style="display:none">
     <div class="hint" id="imgstatus"></div>
     <div class="row" style="margin-top:4px"><button class="btn mini" id="dropimg" style="display:none">Zaboravi zapamćenu podlogu</button></div>
@@ -290,6 +293,38 @@ const saved = JSON.parse(localStorage.getItem(STORE) || 'null') || {}
 let activeZone = saved.activeZone && CITY.zones[saved.activeZone] ? saved.activeZone : Object.keys(CITY.zones)[0]
 let selected = null
 
+// ── sheets ────────────────────────────────────────────────────────────────────
+// A city rarely comes as one image. Belgrade's official map carries Zemun and
+// Novi Beograd as separate inset panels at their own scale, and a large city
+// arrives as several sheets — each needing its own stretch. So a sheet is a
+// record with its own calibration, and the city keeps a library of them: only
+// one draws at a time, the rest stay put with their placement intact.
+//
+// Polygons stay city-level. They are the output; which sheet you traced them
+// off does not matter once they exist.
+const newSheetId = () => 's' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
+let sheets = Array.isArray(saved.sheets) ? saved.sheets : null
+let activeSheet = saved.activeSheet || null
+
+// One-time migration from the single-sheet shape, so nobody loses a stretch
+// they already spent an evening on.
+if (!sheets) {
+  if (saved.corners || saved.gcps) {
+    const id = 'legacy'
+    sheets = [{ id, name: 'Podloga 1', corners: saved.corners || null, gcps: saved.gcps || null, opacity: saved.opacity ?? 65 }]
+    activeSheet = id
+  } else {
+    sheets = []
+  }
+}
+if (!sheets.length) {
+  sheets = [{ id: newSheetId(), name: 'Podloga 1', corners: null, gcps: null, opacity: 65 }]
+  activeSheet = sheets[0].id
+}
+if (!sheets.some(s => s.id === activeSheet)) activeSheet = sheets[0].id
+const sheetOf = () => sheets.find(s => s.id === activeSheet) || sheets[0]
+const blobKey = (sid) => `${cityId}:${sid}`
+
 // ── rotated sheet overlay ──────────────────────────────────────────────────────
 // The official sheet is usually ROTATED relative to true north, so an axis-
 // aligned overlay can never line up. Three corners (TL, TR, BL) define the
@@ -302,15 +337,15 @@ const defCorners = {
   tr: [CITY.center[0] + span, CITY.center[1] + span],
   bl: [CITY.center[0] - span, CITY.center[1] - span],
 }
-let corners = saved.corners || defCorners
+let corners = sheetOf().corners || defCorners
 let hasImage = !!CITY.defaultImage
 const overlay = L.imageOverlay.rotated(CITY.defaultImage || transparentPixel(),
   L.latLng(corners.tl), L.latLng(corners.tr), L.latLng(corners.bl),
-  { opacity: (saved.opacity ?? 65) / 100 }).addTo(map)
+  { opacity: (sheetOf().opacity ?? 65) / 100 }).addTo(map)
 function transparentPixel() {
   return 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBTAA7'
 }
-document.getElementById('op').value = saved.opacity ?? 65
+document.getElementById('op').value = sheetOf().opacity ?? 65
 document.getElementById('op').oninput = (e) => { overlay.setOpacity(e.target.value / 100); persist() }
 document.getElementById('noimg').style.display = hasImage ? 'none' : 'flex'
 document.getElementById('imgstatus').textContent = hasImage
@@ -326,7 +361,10 @@ document.getElementById('imgfile').onchange = async (e) => {
   document.getElementById('noimg').style.display = 'none'
   e.target.value = ''
   try {
-    await sheetPut(cityId, f)
+    await sheetPut(blobKey(activeSheet), f)
+    const sh = sheetOf()
+    if (/^Podloga \d+$/.test(sh.name)) sh.name = f.name.replace(/\.[a-z0-9]+$/i, '').slice(0, 28)
+    persist(); renderSheets()
     document.getElementById('imgstatus').textContent = `Učitano: ${f.name} · zapamćeno`
     toast('Karta učitana i zapamćena — sad kalibriši 3 tačke')
   } catch {
@@ -337,20 +375,112 @@ document.getElementById('imgfile').onchange = async (e) => {
 
 // A sheet stored on an earlier visit wins over the bundled default: it is the
 // one this city was actually calibrated against.
-sheetGet(cityId).then(blob => {
-  if (!blob) return
-  overlay.setUrl(URL.createObjectURL(blob))
-  hasImage = true
-  document.getElementById('noimg').style.display = 'none'
-  document.getElementById('imgstatus').textContent =
-    `Zapamćena podloga (${(blob.size / 1048576).toFixed(1)} MB) · ${blob.name || 'bez imena'}`
-  document.getElementById('dropimg').style.display = ''
-}).catch(() => {})
+// Load whichever sheet is active; a legacy blob still sits under the bare city id.
+async function loadActiveImage() {
+  let blob = await sheetGet(blobKey(activeSheet)).catch(() => null)
+  if (!blob && activeSheet === 'legacy') {
+    blob = await sheetGet(cityId).catch(() => null)
+    if (blob) await sheetPut(blobKey(activeSheet), blob).catch(() => {})
+  }
+  const st = document.getElementById('imgstatus')
+  if (!blob) {
+    hasImage = !!CITY.defaultImage
+    overlay.setUrl(CITY.defaultImage || transparentPixel())
+    st.textContent = CITY.defaultImage ? `Učitano: ${CITY.defaultImage}` : 'Nema učitane slike'
+    document.getElementById('dropimg').style.display = 'none'
+  } else {
+    overlay.setUrl(URL.createObjectURL(blob))
+    hasImage = true
+    st.textContent = `Zapamćena podloga (${(blob.size / 1048576).toFixed(1)} MB)`
+    document.getElementById('dropimg').style.display = ''
+  }
+  document.getElementById('noimg').style.display = hasImage ? 'none' : 'flex'
+}
+loadActiveImage()
 
 document.getElementById('dropimg').onclick = async () => {
-  await sheetDel(cityId)
+  await sheetDel(blobKey(activeSheet))
   document.getElementById('dropimg').style.display = 'none'
-  toast('Zapamćena podloga obrisana — osveži stranicu')
+  await loadActiveImage()
+  toast('Zapamćena podloga obrisana')
+}
+
+// ── switching sheets ──────────────────────────────────────────────────────────
+// Each carries its own placement, so swapping one in means swapping the corners
+// and the control points with it — otherwise the new sheet inherits the old
+// one's stretch and lands nowhere near where it belongs.
+async function useSheet(id) {
+  if (id === activeSheet) return
+  saveLocal()
+  activeSheet = id
+  const sh = sheetOf()
+  corners = sh.corners || defCorners
+  gcps = sh.gcps || [{}, {}, {}]
+  armed = -1
+  lastResiduals = []
+  overlay.reposition(L.latLng(corners.tl), L.latLng(corners.tr), L.latLng(corners.bl))
+  document.getElementById('op').value = sh.opacity ?? 65
+  overlay.setOpacity((sh.opacity ?? 65) / 100)
+  await loadActiveImage()
+  renderGcps(); renderSheets(); saveLocal()
+  toast(`Podloga: ${sh.name}`)
+}
+
+function renderSheets() {
+  const box = document.getElementById('sheets')
+  box.innerHTML = ''
+  for (const sh of sheets) {
+    const row = document.createElement('div')
+    row.className = 'row'
+    const b = document.createElement('button')
+    b.className = 'btn' + (sh.id === activeSheet ? ' primary' : '')
+    b.style.textAlign = 'left'
+    const fitted = (sh.gcps || []).filter(g => g && g.lat != null && g.fx != null).length >= 3
+    const cal = fitted ? '' : ' · nekalibrisana'
+    b.textContent = sh.name + cal
+    b.onclick = () => useSheet(sh.id)
+    row.appendChild(b)
+    const ren = document.createElement('button')
+    ren.className = 'btn mini'; ren.textContent = '✎'; ren.title = 'Preimenuj'
+    ren.onclick = () => {
+      const n = prompt('Naziv podloge', sh.name)
+      if (n && n.trim()) { sh.name = n.trim().slice(0, 28); saveLocal(); renderSheets() }
+    }
+    row.appendChild(ren)
+    if (sheets.length > 1) {
+      const del = document.createElement('button')
+      del.className = 'btn mini'; del.textContent = '✕'; del.title = 'Ukloni podlogu'
+      del.onclick = async () => {
+        if (!confirm(`Ukloniti podlogu "${sh.name}"? Poligoni ostaju.`)) return
+        await sheetDel(blobKey(sh.id)).catch(() => {})
+        sheets = sheets.filter(x => x.id !== sh.id)
+        if (activeSheet === sh.id) {
+          activeSheet = sheets[0].id
+          const n = sheetOf()
+          corners = n.corners || defCorners
+          gcps = n.gcps || [{}, {}, {}]
+          overlay.reposition(L.latLng(corners.tl), L.latLng(corners.tr), L.latLng(corners.bl))
+          await loadActiveImage(); renderGcps()
+        }
+        saveLocal(); renderSheets()
+      }
+      row.appendChild(del)
+    }
+    box.appendChild(row)
+  }
+}
+document.getElementById('addsheet').onclick = async () => {
+  saveLocal()
+  const sh = { id: newSheetId(), name: `Podloga ${sheets.length + 1}`, corners: null, gcps: null, opacity: 65 }
+  sheets.push(sh)
+  activeSheet = sh.id
+  corners = defCorners
+  gcps = [{}, {}, {}]
+  armed = -1
+  overlay.reposition(L.latLng(corners.tl), L.latLng(corners.tr), L.latLng(corners.bl))
+  await loadActiveImage()
+  renderGcps(); renderSheets(); saveLocal()
+  document.getElementById('imgfile').click()
 }
 
 // image fraction (fx right, fy down from TL) of a map point under the CURRENT placement
@@ -369,7 +499,7 @@ function fracOf(latlng) {
 // source map itself being drawn schematically (locally off true scale, common
 // on illustrated zone maps — a technical cadastre sheet like Novi Sad's won't
 // do this, a stylised city-hall zone diagram might).
-let gcps = saved.gcps || [{}, {}, {}] // { lat, lng, fx, fy }
+let gcps = sheetOf().gcps || [{}, {}, {}] // { lat, lng, fx, fy }
 let armed = -1 // which GCP awaits its sheet click
 let lastResiduals = []
 const gcpPins = []
@@ -931,13 +1061,11 @@ document.getElementById('resfile').onchange = (e) => {
 
 // ── persistence ──
 function saveLocal() {
-  localStorage.setItem(STORE, JSON.stringify({
-    activeZone,
-    opacity: +document.getElementById('op').value,
-    corners,
-    gcps,
-    fc: toFC(),
-  }))
+  const sh = sheetOf()
+  sh.corners = corners
+  sh.gcps = gcps
+  sh.opacity = +document.getElementById('op').value
+  localStorage.setItem(STORE, JSON.stringify({ activeZone, sheets, activeSheet, fc: toFC() }))
   stats()
 }
 function persist() {
@@ -1138,9 +1266,13 @@ qInput.addEventListener('input', () => { if (!qInput.value.trim()) { qRes.innerH
 window.__ed = { get corners() { return corners }, get gcps() { return gcps }, get cityId() { return cityId }, fracOf }
 
 renderGcps()
+renderSheets()
 if (saved.fc) importFC(saved.fc, true)
 stats()
 pushHistory() // the state you opened with is the floor undo stops at
+// Write the migrated shape straight away: a visit that changes nothing should
+// still leave the sheet library on disk rather than migrating again next time.
+if (!Array.isArray(saved.sheets)) saveLocal()
 </script>
 </body>
 </html>
