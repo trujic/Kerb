@@ -1607,6 +1607,19 @@ watch(detectedCity, async (city) => {
   }
 });
 
+// Dev only: the zone editor broadcasts each save, so a trace can be checked
+// against the real resolver as it is drawn instead of export → copy → reload.
+if (import.meta.dev && import.meta.client && "BroadcastChannel" in window) {
+  const live = new BroadcastChannel("kerb-zones");
+  live.onmessage = (e) => {
+    const { city, fc } = e.data ?? {};
+    if (!city || city !== detectedCity.value?.id || !fc?.features) return;
+    zoneBoundaries.value = fc;
+    geoResolved.value = true;
+  };
+  onUnmounted(() => live.close());
+}
+
 // A new confirmed scan: pin it immediately and make it the selected pay zone.
 const onSignSubmitted = (report: any) => {
   signReports.value = [report, ...signReports.value];

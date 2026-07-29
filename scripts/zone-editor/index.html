@@ -124,6 +124,11 @@
     <span class="t">Fajl</span>
     <div class="row"><button class="btn" id="imp">Uvezi GeoJSON…</button></div>
     <div class="row"><button class="btn primary" id="exp">Izvezi <span id="expname">grad.json</span></button></div>
+    <div class="row"><button class="btn" id="save">Sačuvaj u aplikaciju</button></div>
+    <label style="display:flex;gap:6px;align-items:center;font-size:12px;margin:2px 0 6px">
+      <input type="checkbox" id="autosave"> čuvaj automatski dok crtam
+    </label>
+    <div class="hint" id="savemsg"></div>
     <div class="row">
       <button class="btn" id="bak">Backup stanja</button>
       <button class="btn" id="res">Vrati backup…</button>
@@ -487,7 +492,10 @@ document.getElementById('fit').onclick = () => {
 
 // ── reference: this city's existing app data, if any ──
 const refLayer = L.layerGroup().addTo(map)
-fetch(`../../public/zones/${cityId}.json`).then(r => r.ok ? r.json() : null).then(d => {
+// Served by Nuxt the file sits at /zones/…; standalone it is two levels up.
+const zonesUrl = (id) => location.pathname.startsWith('/zone-editor')
+  ? `/zones/${id}.json` : `../../public/zones/${id}.json`
+fetch(zonesUrl(cityId)).then(r => r.ok ? r.json() : null).then(d => {
   if (!d) return
   for (const f of d.features) {
     const c = f.properties?.color || '#888'
@@ -935,6 +943,10 @@ function saveLocal() {
 function persist() {
   saveLocal()
   pushHistory()
+  if (typeof autoEl !== 'undefined' && autoEl?.checked && servedByApp) {
+    clearTimeout(saveTimer)
+    saveTimer = setTimeout(() => saveToApp(true), 800)
+  }
 }
 
 // ── undo / redo ────────────────────────────────────────────────────────────────
@@ -984,6 +996,52 @@ function redo() {
   hIndex++
   restoreSnapshot(history[hIndex])
   toast('Vraćeno')
+}
+
+// ── save straight into the running app (dev) ───────────────────────────────────
+// Only reachable when Nuxt is serving this page; standalone there is no endpoint
+// to write to, so the controls say so rather than failing on click.
+const servedByApp = location.pathname.startsWith('/zone-editor')
+const live = 'BroadcastChannel' in window ? new BroadcastChannel('kerb-zones') : null
+const saveMsg = document.getElementById('savemsg')
+let saveTimer
+
+async function saveToApp(quiet) {
+  if (!servedByApp) { saveMsg.textContent = 'Dostupno samo kad Nuxt servira editor (/zone-editor/).'; return }
+  const fc = toFC()
+  try {
+    const res = await fetch('/api/dev-zones', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ city: cityId, fc }),
+    })
+    if (!res.ok) {
+      const msg = (await res.json().catch(() => null))?.statusMessage || res.status
+      saveMsg.textContent = `Nije sačuvano: ${msg}`
+      return
+    }
+    // Nudge any open tab of the app to swap its geometry without a reload.
+    live?.postMessage({ city: cityId, fc })
+    const t = new Date().toLocaleTimeString('sr-RS', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    saveMsg.textContent = `Sačuvano u aplikaciju · ${fc.features.length} delova · ${t}`
+    if (!quiet) toast('Sačuvano — aplikacija je osvežena')
+  } catch (e) {
+    saveMsg.textContent = 'Nije sačuvano: ' + (e.message || 'greška')
+  }
+}
+document.getElementById('save').onclick = () => saveToApp(false)
+
+const autoEl = document.getElementById('autosave')
+autoEl.checked = localStorage.getItem('kerb-zone-editor-autosave') === '1'
+autoEl.onchange = () => {
+  localStorage.setItem('kerb-zone-editor-autosave', autoEl.checked ? '1' : '0')
+  if (autoEl.checked) saveToApp(true)
+}
+if (!servedByApp) {
+  document.getElementById('save').disabled = true
+  autoEl.disabled = true
+  saveMsg.textContent = 'Otvori preko /zone-editor/ da bi ovo radilo.'
+} else if (autoEl.checked) {
+  saveMsg.textContent = 'Automatsko čuvanje uključeno.'
 }
 
 document.addEventListener('keydown', (e) => {
