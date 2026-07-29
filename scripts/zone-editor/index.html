@@ -130,7 +130,7 @@
     </div>
     <input type="file" id="file" accept=".json,.geojson" style="display:none">
     <input type="file" id="resfile" accept=".json" style="display:none">
-    <div class="hint">Autosave u browseru po gradu. Backup čuva kalibraciju + poligone; podloga se pamti odvojeno (IndexedDB) i ne ide u backup fajl.</div>
+    <div class="hint">Autosave u browseru po gradu. Backup čuva kalibraciju + poligone; podloga se pamti odvojeno (IndexedDB) i ne ide u backup fajl.<br><b>Ctrl+Z</b> poništava, <b>Ctrl+Shift+Z</b> vraća (do 40 koraka, u okviru ove sesije).</div>
   </section>
 
   <section><span class="t">Stanje</span><div id="stats"></div></section>
@@ -922,7 +922,7 @@ document.getElementById('resfile').onchange = (e) => {
 }
 
 // ── persistence ──
-function persist() {
+function saveLocal() {
   localStorage.setItem(STORE, JSON.stringify({
     activeZone,
     opacity: +document.getElementById('op').value,
@@ -932,6 +932,71 @@ function persist() {
   }))
   stats()
 }
+function persist() {
+  saveLocal()
+  pushHistory()
+}
+
+// ── undo / redo ────────────────────────────────────────────────────────────────
+// Snapshots rather than an operation log: every mutation already funnels through
+// persist(), so one hook covers drawing, erasing, vertex edits, zone switches,
+// the daily-ticket flag and the bulk OSM conversion — including the last of
+// those, which adds dozens of shapes at once and is exactly what you want back
+// in one keystroke.
+const HISTORY_MAX = 40
+let history = []
+let hIndex = -1
+let restoring = false
+
+function pushHistory() {
+  if (restoring) return
+  const snap = JSON.stringify(toFC())
+  if (history[hIndex] === snap) return // nothing actually changed
+  history = history.slice(0, hIndex + 1)
+  history.push(snap)
+  if (history.length > HISTORY_MAX) history.shift()
+  hIndex = history.length - 1
+}
+
+function restoreSnapshot(snap) {
+  // Geoman holds references to the layers it is editing; rebuilding them from
+  // under an active mode leaves it pointing at shapes that no longer exist.
+  map.pm.disableGlobalEditMode?.()
+  map.pm.disableGlobalRemovalMode?.()
+  map.pm.disableGlobalDragMode?.()
+  restoring = true
+  drawn.clearLayers()
+  selected = null
+  importFC(JSON.parse(snap), true)
+  renderSel()
+  restoring = false
+  saveLocal()
+}
+
+function undo() {
+  if (hIndex <= 0) { toast('Nema šta da se poništi'); return }
+  hIndex--
+  restoreSnapshot(history[hIndex])
+  toast(`Poništeno · ${hIndex} korak(a) unazad`)
+}
+function redo() {
+  if (hIndex >= history.length - 1) { toast('Nema šta da se ponovi'); return }
+  hIndex++
+  restoreSnapshot(history[hIndex])
+  toast('Vraćeno')
+}
+
+document.addEventListener('keydown', (e) => {
+  if (!(e.ctrlKey || e.metaKey)) return
+  const el = e.target
+  const tag = (el?.tagName || '').toLowerCase()
+  // Leave the browser's own undo alone while typing a plate, a street list or a
+  // pair of coordinates.
+  if (tag === 'input' || tag === 'textarea' || tag === 'select' || el?.isContentEditable) return
+  const k = e.key.toLowerCase()
+  if (k === 'z' && !e.shiftKey) { e.preventDefault(); undo() }
+  else if (k === 'y' || (k === 'z' && e.shiftKey)) { e.preventDefault(); redo() }
+})
 function stats() {
   const fc = toFC()
   const per = {}
@@ -1017,6 +1082,7 @@ window.__ed = { get corners() { return corners }, get gcps() { return gcps }, ge
 renderGcps()
 if (saved.fc) importFC(saved.fc, true)
 stats()
+pushHistory() // the state you opened with is the floor undo stops at
 </script>
 </body>
 </html>
