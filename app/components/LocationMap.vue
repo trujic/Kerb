@@ -28,6 +28,10 @@ const props = defineProps<{
   interactive?: boolean // enable pan/zoom (fullscreen mode)
   fill?: boolean        // fill parent height instead of fixed px
   highlight?: { lat: number; lng: number } | null // nearest-parking point to point at
+  // A searched place. Unlike `highlight` this is somewhere the driver is NOT —
+  // possibly another city — so the map travels to it and no connector is drawn
+  // back to the blue dot.
+  pin?: { lat: number; lng: number; label?: string } | null
   signs?: {
     lat: number; lng: number
     zone_color?: string | null; zone_name?: string; price?: string | null
@@ -227,6 +231,38 @@ watchEffect((onCleanup) => {
   })
 })
 
+// ── Searched place — a red pin, and the map goes there ───────────────────────
+watchEffect((onCleanup) => {
+  const pin = props.pin
+  const map = mapRef.value
+  const L = LRef.value
+  if (!L || !map || !pin) return
+
+  // divIcon rather than L.marker's default: no image assets to ship, and the
+  // shape stays crisp at any density. Anchored at the tip, not the centre.
+  const icon = L.divIcon({
+    className: 'lm-pin',
+    html:
+      '<svg width="26" height="34" viewBox="0 0 26 34" fill="none">' +
+      '<path d="M13 33C13 33 24 21.5 24 13A11 11 0 1 0 2 13c0 8.5 11 20 11 20Z" ' +
+      'fill="#C4382A" stroke="#fff" stroke-width="2.5" stroke-linejoin="round"/>' +
+      '<circle cx="13" cy="12.5" r="4" fill="#fff"/></svg>',
+    iconSize: [26, 34],
+    iconAnchor: [13, 33],
+  })
+  const marker = L.marker([pin.lat, pin.lng], { icon, interactive: !!pin.label }).addTo(map)
+  if (pin.label) marker.bindTooltip(pin.label, { direction: 'top', offset: [0, -30] })
+
+  // Follow-GPS would otherwise drag the view straight back off the pin.
+  follow.value = false
+  const far = Math.abs(pin.lat - props.lat) > 0.05 || Math.abs(pin.lng - props.lng) > 0.05
+  // Another city is a jump, not a journey — animating 80 km is just a long blur.
+  if (far) map.setView([pin.lat, pin.lng], 17)
+  else map.flyTo([pin.lat, pin.lng], 17, { duration: 0.7 })
+
+  onCleanup(() => { try { map.removeLayer(marker) } catch {} })
+})
+
 // Relative "last confirmed" age, e.g. "today", "yesterday", "5 days ago".
 const relAge = (iso?: string): string => {
   if (!iso) return ''
@@ -291,7 +327,12 @@ onMounted(async () => {
   LRef.value = L
 
   const i = props.interactive ?? false
+  // Canvas, not SVG. Thessaloniki's map is 1,957 individual parking spaces, and
+  // as SVG that is 1,957 DOM paths — enough to starve the main thread so the base
+  // tiles never finish loading and the map sits there grey. Canvas draws the same
+  // shapes in one element and does not care how many there are.
   const map = L.map(mapEl.value, {
+    preferCanvas: true,
     center: [props.lat, props.lng],
     zoom: 17,
     zoomControl: i,
@@ -471,6 +512,9 @@ onMounted(async () => {
 </style>
 
 <style scoped>
+/* Leaflet's divIcon wrapper carries a default background; the pin is the SVG */
+:deep(.lm-pin) { background: none; border: none; }
+
 .location-map-root {
   position: relative;
   width: 100%;

@@ -14,6 +14,7 @@
               :height="130"
               :zones="displayZones"
               :highlight="highlightPoint"
+              :pin="searchPin"
               :signs="signReports"
               :compass-prompt="compassPrompt"
               labels
@@ -41,9 +42,18 @@
               aria-label="Zone map"
             >
               <div class="map-fs-bar">
+                <!-- Naming the detected city over a searched address in another
+                     one is a small lie with a real cost: it reads as though these
+                     are the zones where you are standing. -->
                 <span class="map-fs-title">
-                  {{ detectedCity!.flag }} {{ detectedCity!.name }} ·
-                  {{ t("parkingZones") }}
+                  <template v-if="searchPin">
+                    {{ searchPin.label }}
+                    <template v-if="searchCityName"> · {{ searchCityName }}</template>
+                  </template>
+                  <template v-else>
+                    {{ detectedCity!.flag }} {{ detectedCity!.name }} ·
+                    {{ t("parkingZones") }}
+                  </template>
                 </span>
                 <button
                   class="map-fs-close"
@@ -60,8 +70,9 @@
                   :lng="coords!.lng"
                   :accuracy="coords!.accuracy"
                   :heading="heading"
-                  :zones="displayZones"
-                  :highlight="highlightPoint"
+                  :zones="searchZones ?? displayZones"
+                  :highlight="searchPin ? null : highlightPoint"
+                  :pin="searchPin"
                   :signs="signReports"
                   :compass-prompt="compassPrompt"
                   fill
@@ -1147,6 +1158,9 @@ watch(mapExpanded, (open) => {
   if (!open) {
     locateCar.value = false; // reset find-my-car when the map closes
     leadSignPoint.value = null; // and the lead-to-sign pointer
+    searchPin.value = null; // and any searched address
+    searchZones.value = null;
+    searchCityName.value = null;
   }
 });
 // Escape closes whatever is on top: SMS-sent sheet → map.
@@ -1578,8 +1592,20 @@ const onEndSession = () => {
 // A searched address drops a pin on the expanded map, the same way a scanned
 // sign or a parked car does — nothing about the pay flow changes, since the
 // driver is not standing there.
+const searchPin = ref<{ lat: number; lng: number; label?: string } | null>(null);
+// The searched city's own map, so flying to Belgrade does not land on Novi Sad's
+// geometry — which would show a pin over blank ground and quietly imply there is
+// no paid parking there.
+const searchZones = ref<any>(null);
+const searchCityName = ref<string | null>(null);
 const onLocateAddress = (hit: any) => {
-  leadSignPoint.value = { lat: hit.lat, lng: hit.lng };
+  // A searched address is not "nearest parking from here" — it can be in another
+  // city entirely, so it gets its own pin and the map travels to it, rather than
+  // a dashed connector back to a blue dot 80 km away.
+  searchPin.value = { lat: hit.lat, lng: hit.lng, label: hit.label };
+  searchZones.value = hit.geojson?.features?.length ? hit.geojson : null;
+  searchCityName.value = hit.detail?.split(' · ').pop() || null;
+  leadSignPoint.value = null;
   mapExpanded.value = true;
 };
 

@@ -74,7 +74,11 @@
             : t('addressNoZone') }}
       </p>
 
-      <button type="button" class="azs-map" @click="$emit('locate', picked)">
+      <button
+        type="button"
+        class="azs-map"
+        @click="$emit('locate', { ...picked, geojson: activeGeo, zones: activeZones })"
+      >
         <Icon name="expand" :size="14" /> {{ t('showOnMap') }}
       </button>
     </div>
@@ -88,6 +92,7 @@ const props = defineProps<{
   geojson?: any
 }>()
 defineEmits<{ locate: [hit: any] }>()
+// The map needs the target city's zones too, or a pin lands on an empty map.
 
 const { t } = useLang()
 const { results, pending, error, search, clear } = useAddressSearch()
