@@ -67,6 +67,35 @@ const dict = {
   awayOn: { sr: 'odavde —', en: 'away —' },
   scanContribute: { sr: 'Vidiš tablu? Skeniraj je', en: 'See a sign? Scan it' },
 
+  // Address search — "which zone parks at this address", for a place you are
+  // not standing at yet.
+  addressTitle: { sr: 'Proveri adresu', en: 'Check an address' },
+  addressSub: {
+    sr: 'Koja zona je na nekoj adresi — pre nego što kreneš.',
+    en: 'Which zone parks at an address — before you set off.',
+  },
+  addressPlaceholder: { sr: 'npr. Koste Stojanovića 15', en: 'e.g. Koste Stojanovića 15' },
+  searching: { sr: 'Tražim…', en: 'Searching…' },
+  noAddressHit: { sr: 'Nema pogotka — probaj samo ime ulice.', en: 'No match — try just the street name.' },
+  addressSearchFailed: { sr: 'Pretraga nije uspela. Proveri vezu.', en: 'Search failed. Check your connection.' },
+  unknownArea: { sr: 'nepoznat deo grada', en: 'unknown area' },
+  searchAgain: { sr: 'Traži ponovo', en: 'Search again' },
+  clear: { sr: 'Obriši', en: 'Clear' },
+  showOnMap: { sr: 'Prikaži na mapi', en: 'Show on map' },
+  addressCheckSign: {
+    sr: 'Ovo je sa naše mape — tabla na licu mesta je zvanična.',
+    en: 'This is from our map — the sign at the spot is official.',
+  },
+  houseNumberCaveat: {
+    sr: 'U Beogradu se zona ume menjati po kućnom broju. Broj je našao mesto, ali ne i cenu — proveri tablu.',
+    en: 'In Belgrade the zone can change by house number. The number found the place, not the price — check the sign.',
+  },
+  addressNoZoneNear: {
+    sr: 'Na toj adresi nema naplate. Najbliža je ~{dist} odatle.',
+    en: 'No paid parking at that address. The nearest is ~{dist} away.',
+  },
+  addressNoZone: { sr: 'Na toj adresi nema naplate parkinga.', en: 'No paid parking at that address.' },
+
   // Pay card
   plateHint: { sr: 'Sačuvano na uređaju · spremno za plaćanje', en: 'Saved on this device · prefilled for payment' },
   plateSync: { sr: 'Napravi nalog za sinhronizaciju.', en: 'Create an account to sync it.' },

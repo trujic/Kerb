@@ -526,6 +526,17 @@
 
           <!-- ═══ BELOW THE FOLD — the sign tools, one scroll past the pay job ═══ -->
           <div class="below-section">
+            <p class="section-label">{{ t("addressTitle") }}</p>
+            <p class="addr-sub">{{ t("addressSub") }}</p>
+            <AddressZoneSearch
+              :city-id="detectedCity?.id ?? expectCityId"
+              :zones="allZones"
+              :geojson="zoneBoundaries"
+              @locate="onLocateAddress"
+            />
+          </div>
+
+          <div class="below-section">
             <p class="section-label">{{ t("findLabel") }}</p>
 
             <!-- Scan the sign — the sign is ground truth: read it, confirm, pin it, pay -->
@@ -1547,6 +1558,14 @@ const onEndSession = () => {
   if (!s) return;
   user.value ? endSession(s.id) : guest.end(s.id);
 };
+// A searched address drops a pin on the expanded map, the same way a scanned
+// sign or a parked car does — nothing about the pay flow changes, since the
+// driver is not standing there.
+const onLocateAddress = (hit: any) => {
+  leadSignPoint.value = { lat: hit.lat, lng: hit.lng };
+  mapExpanded.value = true;
+};
+
 const onLocateCar = () => {
   locateCar.value = true;
   mapExpanded.value = true;
@@ -2986,6 +3005,13 @@ h2 {
 }
 
 /* No paid parking at the user's spot — the calm answer + what to do instead */
+.addr-sub {
+  font-size: 12.5px;
+  color: var(--muted);
+  line-height: 1.5;
+  margin: -4px 0 10px;
+}
+
 /* No payment route from here — an honest dead end, not a broken button */
 .nopay {
   display: flex;
