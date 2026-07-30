@@ -96,6 +96,17 @@ const dict = {
   },
   addressNoZone: { sr: 'Na toj adresi nema naplate parkinga.', en: 'No paid parking at that address.' },
   notCovered: { sr: 'nemamo mapu', en: 'not covered' },
+
+  // Offline / stale data. The age is not decoration — zones get corrected, and a
+  // driver looking at an old map has to know that is what they are looking at.
+  staleTitleOffline: { sr: 'Nema veze sa internetom', en: "You're offline" },
+  staleTitleOnline: { sr: 'Prikazana je sačuvana kopija', en: 'Showing a saved copy' },
+  staleAge: { sr: 'Podaci su preuzeti {age}.', en: 'This data was taken {age}.' },
+  staleAgeUnknown: { sr: 'Ne znamo kad su podaci preuzeti.', en: "We don't know when this data was taken." },
+  staleCheckSign: {
+    sr: 'Zone su se u međuvremenu mogle promeniti — tabla pored auta je zvanična.',
+    en: 'Zones may have changed since — the sign next to your car is official.',
+  },
   addressCityNotCovered: {
     sr: 'Taj grad još nemamo mapiran — ne znamo koja je zona, ne znači da je besplatno.',
     en: "We haven't mapped that city yet — we don't know the zone, which is not the same as free.",

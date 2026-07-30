@@ -195,9 +195,27 @@ export const useGPS = () => {
       unsupportedCity.value = transliterate(rawCity)
       return null
     } catch (e: any) {
+      // Reverse geocoding needs the network, and offline is exactly when a driver
+      // is standing somewhere without one. The GPS fix itself still works, so fall
+      // back to placing the coordinate in a city we have already cached — that is
+      // enough to name the zone from the stored map.
+      const offlineCity = await cityFromCache(latitude, longitude)
+      if (offlineCity) {
+        detectedCity.value = offlineCity
+        return offlineCity
+      }
       gpsError.value = e?.name === 'AbortError' ? 'Location lookup timed out.' : 'Could not detect location.'
       return null
     }
+  }
+
+  /** Place a coordinate in a covered city without the network, using what we kept. */
+  const cityFromCache = async (lat: number, lng: number) => {
+    const id = cityIdAt(lat, lng)
+    if (!id) return null
+    const cached = await loadCity(id)
+    if (!cached?.geojson?.features?.length) return null
+    return cached.city ?? { id, name: id, country: '', flag: '' }
   }
 
   let _watchId: number | null = null

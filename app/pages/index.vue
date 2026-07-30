@@ -87,6 +87,23 @@
           }}</NuxtLink>
         </div>
 
+        <!-- Working from a stored copy. The date is the whole point: zones do get
+             corrected, and someone looking at last week's map must know it is
+             last week's — otherwise offline quietly turns into wrong. -->
+        <div v-if="zonesFromCache" class="stale">
+          <Icon name="alert" :size="15" />
+          <div>
+            <p class="stale-title">
+              {{ online ? t("staleTitleOnline") : t("staleTitleOffline") }}
+            </p>
+            <p class="stale-sub">
+              {{ zonesAsOf ? t("staleAge", { age: relTime(new Date(zonesAsOf).toISOString()) })
+                           : t("staleAgeUnknown") }}
+              {{ t("staleCheckSign") }}
+            </p>
+          </div>
+        </div>
+
         <!-- Armed night pre-pay — scheduled for the next paid window, not live yet -->
         <div
           v-if="displaySession && displaySession.type === 'armed'"
@@ -1657,6 +1674,12 @@ watch(detectedCity, async (city) => {
   loadingCityDetail.value = true;
   try {
     cityDetail.value = await getCity(city.id);
+  } catch {
+    // Offline this throws after Supabase exhausts its retries. Without a catch the
+    // whole handler aborted here and the geometry below never loaded — so the app
+    // knew the city from cache and still showed its marketing page. The cached
+    // zones are picked up by loadZoneGeometry instead.
+    cityDetail.value = null;
   } finally {
     loadingCityDetail.value = false;
   }
@@ -1681,20 +1704,67 @@ const db = useSupabaseClient<any>();
 // A corrected boundary has to reach drivers without waiting for a deploy, so the
 // database holds the live copy. The file stays the fallback: an empty table, an
 // unreachable database or a bad write must never leave someone with no map.
+// Offline state, so a stale answer is dated rather than passed off as current.
+const { online } = useOnlineState();
+const zonesFromCache = ref(false);
+const zonesAsOf = ref<number | null>(null);
+
 const loadZoneGeometry = async (cityId: string) => {
+  let geojson: any = null;
+  let updatedAt: string | null = null;
   try {
     const { data } = await db
       .from("city_zones")
-      .select("geojson")
+      .select("geojson, updated_at")
       .eq("city_id", cityId)
       .maybeSingle();
-    if (data?.geojson?.features?.length) return data.geojson;
+    if (data?.geojson?.features?.length) {
+      geojson = data.geojson;
+      updatedAt = data.updated_at ?? null;
+    }
   } catch {
-    // table not migrated yet, or offline — fall through to the file
+    // not migrated yet, or offline — fall through
   }
-  return fetch(`/zones/${cityId}.json`)
-    .then((r) => (r.ok ? r.json() : null))
-    .catch(() => null);
+  if (!geojson) {
+    // The service worker answers this from its own copy when the network is
+    // down, so a successful fetch is NOT proof of being online.
+    geojson = await fetch(`/zones/${cityId}.json`)
+      .then((r) => (r.ok ? r.json() : null))
+      .catch(() => null);
+  }
+
+  const reallyOnline = !import.meta.client || navigator.onLine;
+  if (geojson?.features?.length && reallyOnline) {
+    zonesFromCache.value = false;
+    zonesAsOf.value = Date.now();
+    saveCity({
+      cityId, geojson, zones: cityDetail.value?.zones ?? [],
+      city: detectedCity.value, fetchedAt: Date.now(), updatedAt,
+    });
+    return geojson;
+  }
+
+  // Offline: use what we kept, and remember when we took it.
+  const cached = await loadCity(cityId);
+  if (cached?.geojson?.features?.length) {
+    zonesFromCache.value = true;
+    zonesAsOf.value = cached.fetchedAt;
+    // Prices and shortcodes come from Supabase too, so they are cached with it —
+    // a zone name with no price is a worse answer than a dated one.
+    if (!cityDetail.value?.zones?.length && cached.zones?.length) {
+      // Prices, rules and shortcodes live in Supabase, so they are cached beside
+      // the geometry — a zone name with no price is a worse answer than a dated one.
+      cityDetail.value = {
+        ...(cached.city ?? {}), ...(cityDetail.value ?? {}), zones: cached.zones,
+      } as any;
+    }
+    return cached.geojson;
+  }
+  if (geojson?.features?.length) {
+    zonesFromCache.value = true;
+    zonesAsOf.value = null; // came from the SW copy, which we never dated
+  }
+  return geojson;
 };
 
 // An open tab swaps geometry the moment the row changes, so a fix lands on the
@@ -1887,6 +1957,9 @@ onMounted(() => {
     if (!expectCityId.value)
       document.documentElement.classList.remove("gps-expected");
   }
+  // Offline needs the shell cached, which needs the worker registered for
+  // everyone — not only for people who turned notifications on.
+  ensureServiceWorker();
   detectCity();
 
   const obs = new IntersectionObserver(
@@ -3011,6 +3084,22 @@ h2 {
   line-height: 1.5;
   margin: -4px 0 10px;
 }
+
+/* Offline / stale-data banner — sits above everything the data feeds */
+.stale {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 11px 13px;
+  background: var(--amber-bg);
+  border: 1px solid var(--amber-border);
+  border-radius: var(--r-md);
+  color: var(--amber);
+}
+.stale svg { flex-shrink: 0; margin-top: 1px; }
+.stale-title { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 2px; }
+.stale-sub { font-size: 12px; color: var(--muted); line-height: 1.5; }
 
 /* No payment route from here — an honest dead end, not a broken button */
 .nopay {
