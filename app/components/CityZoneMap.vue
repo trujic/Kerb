@@ -24,6 +24,9 @@
             hide-user
           />
         </div>
+        <div v-else-if="mapError" class="czm-loading">
+          Couldn't load the zone map for {{ cityName }}. The zone list below still applies.
+        </div>
         <div v-else class="czm-loading">Loading zone map…</div>
       </ClientOnly>
 
@@ -124,19 +127,26 @@ const provenance = computed(() => {
 // ── cadastre map geometry ──
 const geo = ref<any>(null)
 const center = ref<{ lat: number; lng: number } | null>(null)
+// "Loading" that never ends is a lie the user cannot act on; a failure they can.
+const mapError = ref(false)
 onMounted(async () => {
   if ((props.tier !== 'cadastre' && props.tier !== 'cadastre_approx') || !import.meta.client) return
   try {
     const res = await fetch(`/zones/${props.cityId}.json`)
-    if (!res.ok) return
+    if (!res.ok) { mapError.value = true; return }
     const data = await res.json()
     geo.value = data
     let minLat = 90, minLng = 180, maxLat = -90, maxLng = -180, seen = false
     for (const f of data.features ?? []) {
       const g = f.geometry
+      // MultiPolygon was missing here too — Thessaloniki is 1,957 of them, so
+      // `seen` stayed false, `center` never resolved, and the panel sat on
+      // "Loading zone map…" forever with no error to explain it.
       const lines = g?.type === 'LineString' ? [g.coordinates]
         : g?.type === 'MultiLineString' ? g.coordinates
-        : g?.type === 'Polygon' ? [g.coordinates[0]] : []
+        : g?.type === 'Polygon' ? [g.coordinates[0]]
+        : g?.type === 'MultiPolygon' ? g.coordinates.map((poly: any) => poly[0])
+        : []
       for (const line of lines) for (const c of line) {
         seen = true
         minLng = Math.min(minLng, c[0]); maxLng = Math.max(maxLng, c[0])
@@ -144,7 +154,10 @@ onMounted(async () => {
       }
     }
     if (seen) center.value = { lat: (minLat + maxLat) / 2, lng: (minLng + maxLng) / 2 }
-  } catch { /* no geometry */ }
+    else mapError.value = true
+  } catch {
+    mapError.value = true
+  }
 })
 
 // ── registry search ──
