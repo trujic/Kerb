@@ -135,7 +135,12 @@ export const firstChargeableAt = (ms: number, s: CitySchedule | null): number =>
  * skipping over every free stretch (nights, Sundays) without spending it.
  */
 export const paidExpiry = (startMs: number, paidMinutes: number, s: CitySchedule | null): number => {
-  if (!s || paidMinutes <= 0) return startMs
+  if (paidMinutes <= 0) return startMs
+  // A city we have not charted the hours for yet must still sell an hour that
+  // lasts an hour. Returning the start instant made the session expire the
+  // moment it was written — the worst possible answer, since the driver is told
+  // their paid parking is already over.
+  if (!s) return startMs + paidMinutes * 60_000
   const tz = s.timezone
   // Milliseconds, not minutes: paying at 11:40:57 must expire at 12:40:57, and
   // rounding the walk to whole minutes silently shaved off the seconds — up to a
