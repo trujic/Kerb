@@ -46,16 +46,29 @@ export const formatMoney = (amount: number, currency: string | null, locale = 's
 }
 
 /**
- * What `minutes` of parking costs, or null when it cannot be known.
+ * What `minutes` of parking costs, or null when it cannot be known — including
+ * when it cannot be bought at all.
  *
- * Returns null rather than a guess for progressive tariffs and for zones with no
- * published amount — a confident wrong total is worse than an honest blank,
- * since this is the number someone decides to park on.
+ * The cap matters as much as the rate. Belgrade's Zone A sells 30 minutes for 120
+ * and that is the whole offer: you may not stay an hour at any price. Multiplying
+ * the rate out gave "3h = 720 RSD" for parking that does not exist, which is
+ * exactly the kind of confident wrong number someone plans a morning around.
+ *
+ * Also refuses progressive tariffs (Niš Red doubles into the second hour) and
+ * zones with no published amount. An honest blank beats an invented total.
  */
-export const costFor = (t: Tariff, minutes: number): number | null => {
+export const costFor = (t: Tariff, minutes: number, maxMinutes?: number | null): number | null => {
   if (t.amount == null || !t.minutes || t.progressive) return null
+  if (maxMinutes != null && minutes > maxMinutes) return null
   return (t.amount / t.minutes) * minutes
 }
+
+/**
+ * The longest stay this zone allows, in minutes — null when unlimited.
+ * Reads the structured cap, falling back to the limit written into the rules.
+ */
+export const maxStayFor = (zone: any): number | null =>
+  zone?.max_minutes != null ? Number(zone.max_minutes) : parseLimitMin(zone?.rules)
 
 /** The zone's headline rate, e.g. "60 RSD/h" — the human string when there is one. */
 export const rateLabel = (t: Tariff, locale = 'sr-RS'): string | null => {

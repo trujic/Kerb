@@ -101,7 +101,7 @@ export const useParkingSession = () => {
   const startOrExtend = async (p: PayPayload) => {
     if (!userId.value) return
     const limit = parseLimitMin(p.zone.rules)
-    const sched = getSchedule(p.cityId)
+    const sched = getSchedule(p.cityId, p.zone.name)
     const a = active.value
 
     try {
@@ -159,7 +159,7 @@ export const useParkingSession = () => {
   const atZoneLimit = computed(() => {
     const a = active.value
     if (!a?.max_limit_min || !a.expires_at) return false
-    const cap = paidExpiry(new Date(a.started_at).getTime(), a.max_limit_min, getSchedule(a.city_id))
+    const cap = paidExpiry(new Date(a.started_at).getTime(), a.max_limit_min, getSchedule(a.city_id, a.zone_name))
     return new Date(a.expires_at).getTime() >= cap - 1_000
   })
 

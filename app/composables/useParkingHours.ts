@@ -1,8 +1,14 @@
 // ── PARKING HOURS ─────────────────────────────────────────────────────────────
-// City-wide charging schedule + a live "free now / paid now" status.
-// Hours are the same across all zones in a city, so they live here rather than
-// being duplicated into each zone's rules text. (Could move to a DB column once
-// more cities need their own schedules.)
+// Charging schedule + a live "free now / paid now" status.
+//
+// This used to assume the hours were the same across a whole city. Belgrade says
+// otherwise: purple, red and white charge Mon–Sat 07–22 AND on Sunday 07–14,
+// while yellow and green stop at 21:00 and are free all Sunday. Getting that
+// wrong is not cosmetic — it tells someone parked in the purple zone on a Sunday
+// morning that parking is free, and it is not.
+//
+// So a city carries a default schedule plus optional per-zone overrides, and
+// every caller passes the zone it is asking about.
 //
 // Day index: 0 = Sunday … 6 = Saturday. A null day means parking is free all day.
 
@@ -10,6 +16,8 @@ export interface DayWindow { start: string; end: string } // 'HH:MM'
 export interface CitySchedule {
   timezone: string
   days: Record<number, DayWindow | null>
+  /** Zones whose hours differ from the city default, keyed by exact zone name. */
+  zones?: Record<string, Record<number, DayWindow | null>>
 }
 
 const SCHEDULES: Record<string, CitySchedule> = {
@@ -23,6 +31,43 @@ const SCHEDULES: Record<string, CitySchedule> = {
       5: { start: '07:00', end: '21:00' }, // Fri
       6: { start: '07:00', end: '14:00' }, // Sat
       0: null,                             // Sun — free
+    },
+  },
+  // Belgrade — two schedules in one city (parking-servis.co.rs). The default is
+  // the yellow/green one; purple, red and white run later and charge on Sunday
+  // mornings. Not modelled: streets around Klinički centar Srbije are free after
+  // 17:00, which is a street-level exception a weekly schedule cannot express —
+  // it will read as paid when it is free, which is the safe direction to be wrong.
+  'belgrade': {
+    timezone: 'Europe/Belgrade',
+    days: {
+      1: { start: '07:00', end: '21:00' },
+      2: { start: '07:00', end: '21:00' },
+      3: { start: '07:00', end: '21:00' },
+      4: { start: '07:00', end: '21:00' },
+      5: { start: '07:00', end: '21:00' },
+      6: { start: '07:00', end: '14:00' },
+      0: null,
+    },
+    zones: {
+      'Zone A — Purple': {
+        1: { start: '07:00', end: '22:00' }, 2: { start: '07:00', end: '22:00' },
+        3: { start: '07:00', end: '22:00' }, 4: { start: '07:00', end: '22:00' },
+        5: { start: '07:00', end: '22:00' }, 6: { start: '07:00', end: '22:00' },
+        0: { start: '07:00', end: '14:00' },
+      },
+      'Zone 1 — Red': {
+        1: { start: '07:00', end: '22:00' }, 2: { start: '07:00', end: '22:00' },
+        3: { start: '07:00', end: '22:00' }, 4: { start: '07:00', end: '22:00' },
+        5: { start: '07:00', end: '22:00' }, 6: { start: '07:00', end: '22:00' },
+        0: { start: '07:00', end: '14:00' },
+      },
+      'Zone B — White': {
+        1: { start: '07:00', end: '22:00' }, 2: { start: '07:00', end: '22:00' },
+        3: { start: '07:00', end: '22:00' }, 4: { start: '07:00', end: '22:00' },
+        5: { start: '07:00', end: '22:00' }, 6: { start: '07:00', end: '22:00' },
+        0: { start: '07:00', end: '14:00' },
+      },
     },
   },
   // Zrenjanin — Mon–Fri 07–21, Sat 07–15, Sun free (pijaceiparkinzizr.rs).
@@ -180,9 +225,20 @@ export const paidExpiry = (startMs: number, paidMinutes: number, s: CitySchedule
   return cursor
 }
 
-/** The schedule for a city, for callers outside the composable (session math). */
-export const getSchedule = (cityId: string | null | undefined): CitySchedule | null =>
-  SCHEDULES[cityId ?? ''] ?? null
+/**
+ * The schedule that applies to a zone. Falls back to the city default when the
+ * zone has no override — and when the zone is unknown, which keeps every existing
+ * single-schedule city working unchanged.
+ */
+export const getSchedule = (
+  cityId: string | null | undefined,
+  zoneName?: string | null,
+): CitySchedule | null => {
+  const city = SCHEDULES[cityId ?? '']
+  if (!city) return null
+  const override = zoneName ? city.zones?.[zoneName] : null
+  return override ? { timezone: city.timezone, days: override } : city
+}
 
 /**
  * A zone's hard cap in chargeable minutes, read off its rules text
@@ -204,12 +260,17 @@ export interface ParkingStatus {
 
 export interface ScheduleRow { label: string; value: string; free: boolean }
 
-export const useParkingHours = (cityId: MaybeRefOrGetter<string | null | undefined>) => {
+export const useParkingHours = (
+  cityId: MaybeRefOrGetter<string | null | undefined>,
+  zoneName?: MaybeRefOrGetter<string | null | undefined>,
+) => {
   const { lang, t } = useLang()
   const dayAbbr = (d: number) => (lang.value === 'sr' ? DAY_ABBR_SR[d] : DAY_ABBR[d])
 
+  // Zone-aware: in Belgrade "free now" is a different answer in the purple zone
+  // than in the green one, and on Sunday the two disagree completely.
   const schedule = computed<CitySchedule | null>(
-    () => SCHEDULES[toValue(cityId) ?? ''] ?? null,
+    () => getSchedule(toValue(cityId), toValue(zoneName)),
   )
 
   // Live clock — only ticks on the client; SSR renders a single snapshot.

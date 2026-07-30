@@ -76,7 +76,7 @@ export const useGuestSession = () => {
 
   const create = (p: GuestPayload, confirmation: ConfirmationLevel = 'self_reported'): GuestSession => {
     const limit = parseLimitMin(p.zone.rules)
-    const sched = getSchedule(p.cityId)
+    const sched = getSchedule(p.cityId, p.zone.name)
     // An SMS buys 60 minutes of CHARGING. Pay near closing time and the unspent
     // remainder banks until charging resumes, so the ticket outlives the night.
     const minutes = limit ? Math.min(60, limit) : 60
@@ -127,7 +127,7 @@ export const useGuestSession = () => {
     if (!a?.max_limit_min || !a.expires_at) return false
     // The cap is chargeable minutes too — a ticket bought at 20:47 has barely
     // touched a 120-minute limit by closing time, however far its expiry sits.
-    const cap = paidExpiry(new Date(a.started_at).getTime(), a.max_limit_min, getSchedule(a.city_id))
+    const cap = paidExpiry(new Date(a.started_at).getTime(), a.max_limit_min, getSchedule(a.city_id, a.zone_name))
     return new Date(a.expires_at).getTime() >= cap - 1_000
   })
   const canExtend = computed(() => !!active.value && !atZoneLimit.value && active.value!.type === 'live')

@@ -1066,7 +1066,10 @@ const {
   paidNow,
   nextWindow,
   status: hoursStatus,
-} = useParkingHours(() => detectedCity.value?.id ?? expectCityId.value);
+} = useParkingHours(
+  () => detectedCity.value?.id ?? expectCityId.value,
+  () => selectedZone.value?.name
+);
 const freeNow = computed(() => paidNow.value === false);
 const nightPrepay = computed(() => freeNow.value && !!nextWindow.value);
 
@@ -1171,7 +1174,7 @@ onUnmounted(() => {
 // you to 07:47 tomorrow, not 21:47 tonight. When that lands on another day the
 // clock alone would be ambiguous, so the day is spelled out.
 const coveredUntil = computed(() => {
-  const sched = getSchedule(detectedCity.value?.id);
+  const sched = getSchedule(detectedCity.value?.id, selectedZone.value?.name);
   const limit = parseLimitMin(selectedZone.value?.rules);
   const until = paidExpiry(nowTick.value, limit ? Math.min(60, limit) : 60, sched);
   const tz = sched?.timezone;
