@@ -36,7 +36,9 @@ export const useCity = () => {
       .from('cities')
       .select(`
         *,
-        zones        ( id, name, color, rules, price, sort_order, sms_shortcode ),
+        zones        ( id, name, color, rules, price, sort_order, sms_shortcode,
+                       price_amount, price_currency, price_minutes,
+                       pay_method, pay_target, pay_label, daily_amount, daily_target ),
         payment_methods ( id, label, sort_order ),
         tips         ( id, icon, text, sort_order ),
         tags         ( id, label )
