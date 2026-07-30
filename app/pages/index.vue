@@ -349,7 +349,7 @@
             </div>
 
             <!-- ── Pay — consequence first, then the gesture ── -->
-            <div v-else-if="selectedZone?.sms_shortcode" class="pay-step">
+            <div v-else-if="payAction?.actionable" class="pay-step">
               <!-- Covered-until + the plate chip (accounts only — guests type the
                plate in the open above). At night the free-surface tip already
                explained the carry-over, so no consequence line repeats it here. -->
@@ -402,13 +402,13 @@
               <div v-if="nightPrepay" class="prepay">
                 <SlideToConfirm
                   :key="'pp-' + selectedZone.name"
-                  :label="t('sendSms', { code: selectedZone.sms_shortcode })"
-                  :done-label="t('openingSms')"
+                  :label="payLabel"
+                  :done-label="payDoneLabel"
                   :color="selectedZone.color"
                   @confirm="pay(selectedZone, { armed: true })"
                 />
                 <p class="pay-note">
-                  {{ t("slideConfirms") }} {{ t("smsToOperator") }}
+                  {{ t("slideConfirms") }} {{ payNote }}
                 </p>
               </div>
 
@@ -417,13 +417,13 @@
                 <template v-if="!skipConfirm">
                   <SlideToConfirm
                     :key="selectedZone.name"
-                    :label="t('sendSms', { code: selectedZone.sms_shortcode })"
-                    :done-label="t('openingSms')"
+                    :label="payLabel"
+                    :done-label="payDoneLabel"
                     :color="selectedZone.color"
                     @confirm="pay(selectedZone)"
                   />
                   <p class="pay-note">
-                    {{ t("slideConfirms") }} {{ t("smsToOperator") }}
+                    {{ t("slideConfirms") }} {{ payNote }}
                   </p>
                 </template>
                 <!-- Responsibility mode: fast tap, no per-pay confirm -->
@@ -444,11 +444,31 @@
                   <span v-else>{{
                     t("payZone", { zone: selectedZone.name })
                   }}</span>
-                  <span class="zone-act-arrow"
-                    >→ {{ selectedZone.sms_shortcode }}</span
+                  <span v-if="payAction?.label" class="zone-act-arrow"
+                    >→ {{ payAction.label }}</span
                   >
                 </button>
               </template>
+            </div>
+
+            <!-- Zone identified, but nothing here can take the payment. Say which
+                 it is — a machine at the kerb is a different answer from a gap in
+                 our data, and a driver can act on the first. -->
+            <div
+              v-else-if="selectedZone && payAction && !payAction.actionable"
+              class="pay-step"
+            >
+              <div class="nopay">
+                <Icon name="alert" :size="16" />
+                <div>
+                  <p class="nopay-title">
+                    {{ payAction.reason === "kiosk" ? t("payKioskTitle") : t("payUnknownTitle") }}
+                  </p>
+                  <p class="nopay-sub">
+                    {{ payAction.reason === "kiosk" ? t("payKioskSub") : t("payUnknownSub") }}
+                  </p>
+                </div>
+              </div>
             </div>
 
             <!-- The one escape hatch, after the primary action: every other zone + tools -->
@@ -1479,7 +1499,10 @@ const pay = (zone: any, opts: { armed?: boolean } = {}) => {
     pendingPay.value = { zone, armed: !!opts.armed }; // guest: confirm the send first
     armSentPrompt();
   }
-  if (import.meta.client && zone.sms_shortcode) openSms(smsLink(zone));
+  if (import.meta.client) {
+    const a = payActionFor(zone, { plate: defaultPlate.value });
+    if (a.actionable) openPayAction(a);
+  }
 };
 
 // Re-open the composer for a zone already running, for the one case Kerb can't
@@ -1487,7 +1510,9 @@ const pay = (zone: any, opts: { armed?: boolean } = {}) => {
 // the original did go through this buys a real second hour we can't detect, and
 // under-reporting that is safer than a record claiming time nobody paid for.
 const resend = (zone: any) => {
-  if (import.meta.client && zone?.sms_shortcode) openSms(smsLink(zone));
+  if (!import.meta.client || !zone) return;
+  const a = payActionFor(zone, { plate: defaultPlate.value });
+  if (a.actionable) openPayAction(a);
 };
 
 const onSentYes = () => {
@@ -1580,6 +1605,29 @@ const clockOf = (iso: string | null) =>
     : "";
 
 const smsLink = (zone: any) => smsHref(zone.sms_shortcode, defaultPlate.value);
+
+// ── how this zone is paid ─────────────────────────────────────────────────────
+// Asked, not assumed. The surface used to key off sms_shortcode, which quietly
+// meant "Serbia only" — and left Belgrade, which has zones and prices but no
+// shortcode, with a screen that identified the zone and then offered nothing.
+const payAction = computed(() =>
+  selectedZone.value
+    ? payActionFor(selectedZone.value, { plate: defaultPlate.value })
+    : null
+);
+const payLabel = computed(() => {
+  const a = payAction.value;
+  if (!a) return "";
+  return a.kind === "app"
+    ? t("openApp", { app: a.label ?? t("theApp") })
+    : t("sendSms", { code: a.label ?? "" });
+});
+const payDoneLabel = computed(() =>
+  payAction.value?.kind === "app" ? t("openingApp") : t("openingSms")
+);
+const payNote = computed(() =>
+  payAction.value?.kind === "app" ? t("appToOperator") : t("smsToOperator")
+);
 
 watch(detectedCity, async (city) => {
   if (!city) return;
@@ -2935,6 +2983,21 @@ h2 {
 }
 
 /* No paid parking at the user's spot — the calm answer + what to do instead */
+/* No payment route from here — an honest dead end, not a broken button */
+.nopay {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 13px 14px;
+  background: var(--amber-bg);
+  border: 1px solid var(--amber-border);
+  border-radius: var(--r-md);
+  color: var(--amber);
+}
+.nopay svg { flex-shrink: 0; margin-top: 1px; }
+.nopay-title { font-size: 13.5px; font-weight: 700; color: var(--text); margin-bottom: 3px; }
+.nopay-sub { font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+
 /* Already-running notice — states the fact and stays out of the way. Deliberately
    not a button: the session card above owns every action for this zone. */
 .covered {

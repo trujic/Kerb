@@ -76,6 +76,21 @@ const dict = {
   payZone: { sr: 'Plati {zone}', en: 'Pay {zone}' },
   addPlate: { sr: 'Dodaj tablice za SMS jednim dodirom', en: 'Add a plate for one-tap SMS' },
   smsToOperator: { sr: 'Tvoj telefon šalje SMS operateru parkinga.', en: 'Your phone sends the SMS to the parking operator.' },
+  // Cities outside the SMS world: an app hand-off, or no in-app payment at all.
+  openApp: { sr: 'Prevuci da otvoriš {app}', en: 'Slide to open {app}' },
+  openingApp: { sr: 'Otvaram aplikaciju…', en: 'Opening the app…' },
+  theApp: { sr: 'aplikaciju', en: 'the app' },
+  appToOperator: { sr: 'Plaćanje se završava u aplikaciji operatera.', en: 'Payment finishes in the operator\'s app.' },
+  payKioskTitle: { sr: 'Ovde se plaća na automatu', en: 'This zone pays at a machine' },
+  payKioskSub: {
+    sr: 'Nema plaćanja iz aplikacije — potraži automat na parkingu i sačuvaj kartu.',
+    en: 'There is no in-app payment here — find the machine on the lot and keep the ticket.',
+  },
+  payUnknownTitle: { sr: 'Ne znamo kako se ovde plaća', en: "We don't know how to pay here yet" },
+  payUnknownSub: {
+    sr: 'Zonu prepoznajemo, ali način plaćanja još nemamo. Proveri tablu pored auta.',
+    en: 'We can name the zone but not how to pay it. Check the sign next to your car.',
+  },
   ruleDetails: { sr: 'Detalji pravila', en: 'Rule details' },
 
   // SMS handoff sheet
