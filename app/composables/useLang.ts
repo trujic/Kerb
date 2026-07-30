@@ -95,6 +95,11 @@ const dict = {
     en: 'No paid parking at that address. The nearest is ~{dist} away.',
   },
   addressNoZone: { sr: 'Na toj adresi nema naplate parkinga.', en: 'No paid parking at that address.' },
+  notCovered: { sr: 'nemamo mapu', en: 'not covered' },
+  addressCityNotCovered: {
+    sr: 'Taj grad još nemamo mapiran — ne znamo koja je zona, ne znači da je besplatno.',
+    en: "We haven't mapped that city yet — we don't know the zone, which is not the same as free.",
+  },
 
   // Pay card
   plateHint: { sr: 'Sačuvano na uređaju · spremno za plaćanje', en: 'Saved on this device · prefilled for payment' },

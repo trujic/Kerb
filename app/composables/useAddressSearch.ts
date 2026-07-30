@@ -45,7 +45,14 @@ export const useAddressSearch = () => {
   const error = ref<string | null>(null)
   let seq = 0
 
-  const search = async (raw: string, cityId?: string | null) => {
+  /**
+   * `nearCity` ranks results, it does not restrict them. Checking an address is
+   * mostly something you do BEFORE setting off — sitting in Novi Sad, planning a
+   * morning in Belgrade — so binding the search to wherever the phone happens to
+   * be defeats the point. Hits in the current city come first; the rest follow,
+   * each labelled with its own city.
+   */
+  const search = async (raw: string, nearCity?: string | null) => {
     const q = raw.trim()
     results.value = []
     error.value = null
@@ -54,23 +61,20 @@ export const useAddressSearch = () => {
     const mine = ++seq
     pending.value = true
     try {
-      const box = cityId ? CITY_BOX[cityId] : null
       const params = new URLSearchParams({
-        q, format: 'json', limit: '6', addressdetails: '1',
-        'accept-language': 'sr,en',
+        q, format: 'json', limit: '8', addressdetails: '1',
+        countrycodes: 'rs', 'accept-language': 'sr,en',
       })
+      const box = nearCity ? CITY_BOX[nearCity] : null
       if (box) {
-        // viewbox is left,top,right,bottom
+        // viewbox alone biases ranking; without bounded=1 it never excludes.
         params.set('viewbox', `${box[1]},${box[2]},${box[3]},${box[0]}`)
-        params.set('bounded', '1')
-      } else {
-        params.set('countrycodes', 'rs')
       }
       const res = await fetch(`https://nominatim.openstreetmap.org/search?${params}`)
       const raw2 = res.ok ? await res.json() : []
       if (mine !== seq) return // a newer keystroke already won
 
-      results.value = (raw2 as any[]).map((h) => {
+      const hits = (raw2 as any[]).map((h) => {
         const a = h.address ?? {}
         const road = a.road || a.pedestrian || a.footway || a.suburb || h.name
         const label = toLatin([road, a.house_number].filter(Boolean).join(' ') || h.display_name.split(',')[0])
@@ -79,11 +83,12 @@ export const useAddressSearch = () => {
         )
         const lat = Number(h.lat)
         const lng = Number(h.lon)
-        return {
-          label, detail, lat, lng,
-          cityId: cityId ?? cityIdAt(lat, lng),
-        }
+        return { label, detail, lat, lng, cityId: cityIdAt(lat, lng) }
       })
+      // Covered cities first (we can actually answer for those), then the city
+      // you are in, then everything else in the order Nominatim ranked it.
+      const rank = (h: AddressHit) => (h.cityId ? (h.cityId === nearCity ? 0 : 1) : 2)
+      results.value = hits.sort((a, b) => rank(a) - rank(b))
       if (!results.value.length) error.value = 'noAddressHit'
     } catch {
       if (mine === seq) error.value = 'addressSearchFailed'

@@ -29,7 +29,10 @@
         @click="pick(h)"
       >
         <b>{{ h.label }}</b>
-        <span>{{ h.detail || t('unknownArea') }}</span>
+        <span>
+          {{ h.detail || t('unknownArea') }}
+          <em v-if="!h.cityId">· {{ t('notCovered') }}</em>
+        </span>
       </button>
     </div>
 
@@ -58,6 +61,12 @@
           </p>
         </div>
       </template>
+      <p v-else-if="loading" class="azs-msg">{{ t('searching') }}</p>
+      <!-- No map for that city is not the same as no parking there. -->
+      <p v-else-if="!picked.cityId" class="azs-unknown">
+        <Icon name="alert" :size="15" />
+        {{ t('addressCityNotCovered') }}
+      </p>
       <p v-else class="azs-none">
         <Icon name="parking" :size="15" />
         {{ verdict.distM < 400
@@ -94,15 +103,49 @@ const onType = () => {
   // Nominatim asks for at most one call a second; typing must not outpace that.
   debounce = setTimeout(run, 600)
 }
-const reset = () => { q.value = ''; picked.value = null; clear() }
-const pick = (h: any) => { picked.value = h; clear() }
+const reset = () => { q.value = ''; picked.value = null; target.value = null; clear() }
+const pick = async (h: any) => {
+  picked.value = h
+  clear()
+  target.value = null
+  // Only cities we cover have a map to check against.
+  if (h.cityId && h.cityId !== props.cityId) await loadCity(h.cityId)
+}
 
+// Answering about another city means loading that city's map, not measuring its
+// address against the one we happen to be standing in — which would have found
+// no zone at all and quietly reported "no paid parking here".
+const target = ref<{ geojson: any; zones: any[] } | null>(null)
+const loading = ref(false)
+const db = useSupabaseClient<any>()
+const { getCity } = useCity()
+
+const loadCity = async (id: string) => {
+  loading.value = true
+  try {
+    const [geo, city] = await Promise.all([
+      db.from('city_zones').select('geojson').eq('city_id', id).maybeSingle()
+        .then((r: any) => r.data?.geojson)
+        .catch(() => null)
+        .then((g: any) => g ?? fetch(`/zones/${id}.json`).then((r) => (r.ok ? r.json() : null)).catch(() => null)),
+      getCity(id).catch(() => null),
+    ])
+    target.value = { geojson: geo, zones: (city as any)?.zones ?? [] }
+  } finally {
+    loading.value = false
+  }
+}
+
+const activeGeo = computed(() => target.value?.geojson ?? props.geojson)
+const activeZones = computed(() =>
+  target.value?.zones?.length ? target.value.zones : props.zones ?? [],
+)
 const verdict = computed(() =>
-  picked.value
-    ? zoneAtPoint(picked.value.lat, picked.value.lng, props.geojson)
+  picked.value && !loading.value
+    ? zoneAtPoint(picked.value.lat, picked.value.lng, activeGeo.value)
     : { zone: null, distM: Infinity, street: null },
 )
-const zoneOf = (name: string) => props.zones?.find((z) => z.name === name) ?? null
+const zoneOf = (name: string) => activeZones.value.find((z: any) => z.name === name) ?? null
 const zoneColor = (name: string) => zoneOf(name)?.color ?? 'var(--text2)'
 // Key off what was ASKED, not what came back: Nominatim often resolves
 // "Koste Stojanovića 15" to the street alone, and the caveat has to fire on the
@@ -188,6 +231,15 @@ const fmtDist = (m: number) =>
   border: 1px solid var(--green-border); border-radius: var(--r-md);
 }
 .azs-none svg { flex-shrink: 0; margin-top: 1px; }
+
+.azs-unknown {
+  display: flex; align-items: flex-start; gap: 9px;
+  padding: 11px 12px; font-size: 12.5px; line-height: 1.5;
+  color: var(--amber); background: var(--amber-bg);
+  border: 1px solid var(--amber-border); border-radius: var(--r-md);
+}
+.azs-unknown svg { flex-shrink: 0; margin-top: 1px; }
+.azs-row em { font-style: normal; color: var(--amber); }
 
 .azs-map {
   display: flex; align-items: center; justify-content: center; gap: 7px;
