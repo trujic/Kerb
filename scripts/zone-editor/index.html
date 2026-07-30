@@ -45,7 +45,10 @@
   #toast { position:fixed; bottom:14px; left:300px; background:#1A1D23; color:#fff; padding:8px 14px; border-radius:8px; opacity:0; transition:opacity .2s; z-index:2000; pointer-events:none; }
   .leaflet-tooltip.zone-label { font-size:11px; line-height:1.4; padding:4px 7px; border-radius:6px; box-shadow:0 1px 4px rgba(0,0,0,.15); }
   #noimg { position:fixed; inset:0 0 0 280px; display:flex; align-items:center; justify-content:center; background:rgba(242,243,245,.85); z-index:900; pointer-events:none; }
-  #noimg .card { background:#fff; border:1px solid #C9CDD6; border-radius:12px; padding:18px 22px; max-width:320px; text-align:center; pointer-events:auto; box-shadow:0 4px 20px rgba(0,0,0,.08); }
+  #noimg .card { position:relative; background:#fff; border:1px solid #C9CDD6; border-radius:12px; padding:18px 34px 16px 22px; max-width:340px; text-align:center; pointer-events:auto; box-shadow:0 4px 20px rgba(0,0,0,.08); }
+  #noimg .card .sub { display:block; margin-top:8px; font-size:11px; color:#5B6270; line-height:1.45; }
+  #noimgx { position:absolute; top:6px; right:6px; width:24px; height:24px; display:flex; align-items:center; justify-content:center; font-size:13px; line-height:1; color:#5B6270; background:#fff; border:1px solid #C9CDD6; border-radius:50%; cursor:pointer; }
+  #noimgx:hover { color:#1A1D23; border-color:#9AA1AD; }
 </style>
 </head>
 <body>
@@ -146,7 +149,9 @@
 <div id="map"></div>
 <div id="noimg" style="display:none">
   <div class="card">
-    Nema podloge za ovaj grad još.<br>Klikni <b>"Učitaj sliku/PDF-snimak karte…"</b> da dodaš zvaničnu kartu.
+    <button type="button" id="noimgx" title="Sakrij" aria-label="Sakrij">✕</button>
+    Nema podloge za ovaj grad još.<br>Klikni <b>"Zameni sliku ove podloge…"</b> da dodaš zvaničnu kartu.
+    <span class="sub">Zrenjanin i slični gradovi nemaju objavljenu zonsku kartu — geometrija je izvedena iz spiska ulica, pa podloga i ne treba.</span>
   </div>
 </div>
 <div id="toast"></div>
@@ -325,7 +330,20 @@ function transparentPixel() {
 }
 document.getElementById('op').value = sheetOf().opacity ?? 65
 document.getElementById('op').oninput = (e) => { overlay.setOpacity(e.target.value / 100); persist() }
-document.getElementById('noimg').style.display = hasImage ? 'none' : 'flex'
+// Dismissed per city and remembered: a city with no published sheet would
+// otherwise cover its map with the same notice on every single reload.
+const NOIMG_KEY = `kerb-zone-editor-noimg-${cityId}`
+let noimgHidden = localStorage.getItem(NOIMG_KEY) === '1'
+const showNoImg = () => {
+  document.getElementById('noimg').style.display = (hasImage || noimgHidden) ? 'none' : 'flex'
+}
+document.getElementById('noimgx').onclick = () => {
+  noimgHidden = true
+  localStorage.setItem(NOIMG_KEY, '1')
+  showNoImg()
+  toast('Sakriveno — vraća se preko „Zameni sliku ove podloge…"')
+}
+showNoImg()
 document.getElementById('imgstatus').textContent = hasImage
   ? (CITY.defaultImage ? `Učitano: ${CITY.defaultImage}` : 'Slika učitana ovoj sesiji')
   : 'Nema učitane slike'
@@ -372,7 +390,7 @@ async function loadActiveImage() {
     st.textContent = `Zapamćena podloga (${(blob.size / 1048576).toFixed(1)} MB)`
     document.getElementById('dropimg').style.display = ''
   }
-  document.getElementById('noimg').style.display = hasImage ? 'none' : 'flex'
+  showNoImg()
 }
 loadActiveImage()
 
