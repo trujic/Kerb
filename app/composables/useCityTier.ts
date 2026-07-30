@@ -23,6 +23,10 @@ const CITY_TIERS: Record<string, MapTier> = {
   'novi-sad': 'cadastre',         // per-street geometry in /zones/novi-sad.json
   'nis': 'cadastre',              // official zone-area polygons in /zones/nis.json
   'belgrade': 'cadastre_approx',  // coarse polygons traced from the official raster map
+  // Zrenjanin has no zone map published at all — geometry is derived from the
+  // official street list plus OSM parking areas, so it is a reasoned guess at
+  // where those streets are, not a traced cadastre.
+  'zrenjanin': 'cadastre_approx',
 }
 
 export const useCityTier = (slug: MaybeRefOrGetter<string | null | undefined>) => {

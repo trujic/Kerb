@@ -25,6 +25,24 @@ const SCHEDULES: Record<string, CitySchedule> = {
       0: null,                             // Sun — free
     },
   },
+  // Zrenjanin — Mon–Fri 07–21, Sat 07–15, Sun free (pijaceiparkinzizr.rs).
+  // Saturday runs an hour later here than in Novi Sad or Niš. City events extend
+  // street parking to 23:00, which a weekly schedule cannot express — those days
+  // will read as free from 21:00 when they are not, so the sign still decides.
+  // The two barrier lots (Žitni trg, Prevlaka) charge 24/7 and are not in these
+  // SMS zones at all.
+  'zrenjanin': {
+    timezone: 'Europe/Belgrade',
+    days: {
+      1: { start: '07:00', end: '21:00' },
+      2: { start: '07:00', end: '21:00' },
+      3: { start: '07:00', end: '21:00' },
+      4: { start: '07:00', end: '21:00' },
+      5: { start: '07:00', end: '21:00' },
+      6: { start: '07:00', end: '15:00' },
+      0: null,
+    },
+  },
   // Niš — Mon–Fri 07–21, Sat 07–14, Sun free (nisparking.rs).
   'nis': {
     timezone: 'Europe/Belgrade',
