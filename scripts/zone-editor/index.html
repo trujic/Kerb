@@ -127,9 +127,9 @@
     <span class="t">Fajl</span>
     <div class="row"><button class="btn" id="imp">Uvezi GeoJSON…</button></div>
     <div class="row"><button class="btn primary" id="exp">Izvezi <span id="expname">grad.json</span></button></div>
-    <div class="row"><button class="btn" id="save">Sačuvaj u aplikaciju</button></div>
+    <div class="row"><button class="btn primary" id="save">Objavi korisnicima</button></div>
     <label style="display:flex;gap:6px;align-items:center;font-size:12px;margin:2px 0 6px">
-      <input type="checkbox" id="autosave"> čuvaj automatski dok crtam
+      <input type="checkbox" id="autosave"> objavljuj automatski dok crtam
     </label>
     <div class="hint" id="savemsg"></div>
     <div class="row">
@@ -1110,7 +1110,7 @@ async function saveToApp(quiet) {
   if (!servedByApp) { saveMsg.textContent = 'Dostupno samo kad Nuxt servira editor (/zone-editor/).'; return }
   const fc = toFC()
   try {
-    const res = await fetch('/api/dev-zones', {
+    const res = await fetch('/api/zones', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ city: cityId, fc }),
     })
@@ -1119,11 +1119,14 @@ async function saveToApp(quiet) {
       saveMsg.textContent = `Nije sačuvano: ${msg}`
       return
     }
-    // Nudge any open tab of the app to swap its geometry without a reload.
+    const out = await res.json().catch(() => ({}))
+    // Local tabs get it instantly; everyone else through the database row.
     live?.postMessage({ city: cityId, fc })
     const t = new Date().toLocaleTimeString('sr-RS', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-    saveMsg.textContent = `Sačuvano u aplikaciju · ${fc.features.length} delova · ${t}`
-    if (!quiet) toast('Sačuvano — aplikacija je osvežena')
+    saveMsg.innerHTML = out.live
+      ? `<b>Objavljeno korisnicima</b> · ${fc.features.length} delova · ${t}`
+      : `Sačuvano lokalno · ${fc.features.length} delova · ${t}<br><span style="color:#B45309">nije živo: ${out.reason || 'nepoznato'}</span>`
+    if (!quiet) toast(out.live ? 'Objavljeno — korisnici vide izmenu' : 'Sačuvano lokalno (nije živo)')
   } catch (e) {
     saveMsg.textContent = 'Nije sačuvano: ' + (e.message || 'greška')
   }

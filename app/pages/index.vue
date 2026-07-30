@@ -1595,9 +1595,7 @@ watch(detectedCity, async (city) => {
   // is already healed (no old→new flash). displayZones reads both refs.
   try {
     const [geo, reports] = await Promise.all([
-      fetch(`/zones/${city.id}.json`)
-        .then((r) => (r.ok ? r.json() : null))
-        .catch(() => null),
+      loadZoneGeometry(city.id),
       loadSignReports(city.id),
     ]);
     signReports.value = reports;
@@ -1605,19 +1603,61 @@ watch(detectedCity, async (city) => {
   } finally {
     geoResolved.value = true; // a failed fetch must still release the verdict UI
   }
+  watchLiveZones(city.id);
 });
 
-// Dev only: the zone editor broadcasts each save, so a trace can be checked
-// against the real resolver as it is drawn instead of export → copy → reload.
+// ── zone geometry: live row first, committed file second ──────────────────────
+const db = useSupabaseClient<any>();
+// A corrected boundary has to reach drivers without waiting for a deploy, so the
+// database holds the live copy. The file stays the fallback: an empty table, an
+// unreachable database or a bad write must never leave someone with no map.
+const loadZoneGeometry = async (cityId: string) => {
+  try {
+    const { data } = await db
+      .from("city_zones")
+      .select("geojson")
+      .eq("city_id", cityId)
+      .maybeSingle();
+    if (data?.geojson?.features?.length) return data.geojson;
+  } catch {
+    // table not migrated yet, or offline — fall through to the file
+  }
+  return fetch(`/zones/${cityId}.json`)
+    .then((r) => (r.ok ? r.json() : null))
+    .catch(() => null);
+};
+
+// An open tab swaps geometry the moment the row changes, so a fix lands on the
+// screen of someone already standing at the kerb.
+let liveZones: any = null;
+const watchLiveZones = (cityId: string) => {
+  if (!import.meta.client) return;
+  liveZones?.unsubscribe();
+  liveZones = db
+    .channel(`city_zones:${cityId}`)
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "city_zones", filter: `city_id=eq.${cityId}` },
+      (payload: any) => {
+        const fc = payload.new?.geojson;
+        if (fc?.features?.length) zoneBoundaries.value = fc;
+      }
+    )
+    .subscribe();
+};
+onUnmounted(() => liveZones?.unsubscribe());
+
+// Dev extra: the editor also broadcasts on save, which lands instantly in a
+// local tab without waiting on the realtime round trip.
 if (import.meta.dev && import.meta.client && "BroadcastChannel" in window) {
-  const live = new BroadcastChannel("kerb-zones");
-  live.onmessage = (e) => {
+  const bc = new BroadcastChannel("kerb-zones");
+  bc.onmessage = (e) => {
     const { city, fc } = e.data ?? {};
     if (!city || city !== detectedCity.value?.id || !fc?.features) return;
     zoneBoundaries.value = fc;
     geoResolved.value = true;
   };
-  onUnmounted(() => live.close());
+  onUnmounted(() => bc.close());
 }
 
 // A new confirmed scan: pin it immediately and make it the selected pay zone.
