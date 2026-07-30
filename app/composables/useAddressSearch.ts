@@ -37,6 +37,7 @@ const CITY_BOX: Record<string, [number, number, number, number]> = {
   'belgrade':  [44.70, 20.30, 44.90, 20.60],
   'nis':       [43.26, 21.83, 43.38, 21.99],
   'zrenjanin': [45.33, 20.34, 45.42, 20.45],
+  'thessaloniki': [40.56, 22.88, 40.68, 23.02],
 }
 
 export const useAddressSearch = () => {
@@ -63,7 +64,7 @@ export const useAddressSearch = () => {
     try {
       const params = new URLSearchParams({
         q, format: 'json', limit: '8', addressdetails: '1',
-        countrycodes: 'rs', 'accept-language': 'sr,en',
+        countrycodes: 'rs,gr', 'accept-language': 'sr,en',
       })
       const box = nearCity ? CITY_BOX[nearCity] : null
       if (box) {

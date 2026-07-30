@@ -65,21 +65,31 @@ export const useNearestParking = (
       // Zone-area polygons (Niš areas, Novi Sad street networks): inside → distance 0;
       // else nearest edge. Rings beyond the first are HOLES (city blocks inside a
       // street network) — standing in one is outside, and its boundary counts.
-      if (geom.type === 'Polygon') {
-        const rings = (geom.coordinates ?? [])
-          .map((r: number[][]) => r.map(([lng, lat]: number[]) => [px(lng), py(lat)]))
-          .filter((r: number[][]) => r.length >= 3)
-        if (!rings.length) continue
-        const inHole = rings.slice(1).some((r: number[][]) => originInRing(r))
-        if (originInRing(rings[0]) && !inHole) {
-          if (!best || best.dist > 0) best = { dist: 0, cx: 0, cy: 0, zone, street }
-          continue
-        }
-        for (const ring of rings) {
-          for (let i = 0; i < ring.length; i++) {
-            const n = (i + 1) % ring.length
-            const r = closestOnSegment(ring[i][0], ring[i][1], ring[n][0], ring[n][1])
-            if (!best || r.dist < best.dist) best = { dist: r.dist, cx: r.cx, cy: r.cy, zone, street }
+      // MultiPolygon is what operators publish — Thessaloniki's space-level export
+      // is 1,957 of them. Unhandled, it fell through to the line branch below and
+      // matched nothing: a whole city reading as "no paid parking", with no error
+      // to notice. Each part is measured as its own polygon, holes included.
+      const polys: number[][][][] =
+        geom.type === 'MultiPolygon' ? (geom.coordinates ?? [])
+        : geom.type === 'Polygon' ? [geom.coordinates ?? []]
+        : []
+      if (polys.length) {
+        for (const poly of polys) {
+          const rings = poly
+            .map((r: number[][]) => r.map(([lng, lat]: number[]) => [px(lng), py(lat)]))
+            .filter((r: number[][]) => r.length >= 3)
+          if (!rings.length) continue
+          const inHole = rings.slice(1).some((r: number[][]) => originInRing(r))
+          if (originInRing(rings[0]) && !inHole) {
+            if (!best || best.dist > 0) best = { dist: 0, cx: 0, cy: 0, zone, street }
+            continue
+          }
+          for (const ring of rings) {
+            for (let i = 0; i < ring.length; i++) {
+              const n = (i + 1) % ring.length
+              const r = closestOnSegment(ring[i][0], ring[i][1], ring[n][0], ring[n][1])
+              if (!best || r.dist < best.dist) best = { dist: r.dist, cx: r.cx, cy: r.cy, zone, street }
+            }
           }
         }
         continue

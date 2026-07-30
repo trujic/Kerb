@@ -130,10 +130,16 @@ export const useGPS = () => {
       // Strip the administrative wrapper words so "City of Novi Sad" can meet
       // "Novi Sad", and compare transliterated + unaccented so Cyrillic answers
       // and "Niš"/"Nis" all land on the same key.
+      // Administrative wrappers, which differ by country and sit on either side of
+      // the name. Serbia says "City of Novi Sad"; Greece answers a Thessaloniki
+      // street with "Thessaloniki Municipal Unit", "Municipality of Thessaloniki"
+      // and "Thessaloniki Regional Unit" and nothing else — so a Serbia-shaped
+      // strip list left the app on its marketing page while standing on a mapped
+      // parking space.
       const bare = (s: string) =>
         transliterate(s)
-          .replace(/^(city of|grad|opstina|gradska opstina)\s+/i, '')
-          .replace(/\s+(urban municipality|municipality|administrative district|district|city)$/i, '')
+          .replace(/^(city of|municipality of|the municipality of|grad|gradska opstina|opstina)\s+/i, '')
+          .replace(/\s+(municipal unit|regional unit|urban municipality|municipality|regional district|administrative district|district|prefecture|city)$/i, '')
           .trim()
       const key = (s: string) =>
         bare(s).toLowerCase()

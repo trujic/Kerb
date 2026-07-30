@@ -63,9 +63,21 @@ features.forEach((f, i) => {
 })
 badRing ? fail(`${badRing} ring(s)/line(s) with too few points`) : ok('all rings closed and well-formed')
 if (unclosed) fail(`${unclosed} unclosed ring(s)`)
-if (tiny.length) {
-  fail(`${tiny.length} polygon(s) under 50 m² — likely stray clicks`)
-  note(tiny.map(([i, a]) => `#${i} (${a} m²)`).join(', '))
+// A stray click is small AND unusual. Where most of the file is that size, the
+// smallness is the data's granularity, not a mistake — Thessaloniki publishes
+// individual 10 m² parking spaces, and calling all 1,959 of them errors buries
+// the one that is genuinely degenerate.
+const degenerate = tiny.filter(([, a]) => a < 1)
+if (degenerate.length) {
+  fail(`${degenerate.length} polygon(s) with no area`)
+  note(degenerate.slice(0, 20).map(([i, a]) => `#${i} (${a} m²)`).join(', '))
+}
+const strays = tiny.filter(([, a]) => a >= 1)
+if (strays.length && strays.length <= features.length * 0.05) {
+  fail(`${strays.length} polygon(s) under 50 m² — likely stray clicks`)
+  note(strays.map(([i, a]) => `#${i} (${a} m²)`).join(', '))
+} else if (strays.length) {
+  ok(`${strays.length} small polygons, consistent with space-level data`)
 }
 
 // ── zone names against the database ───────────────────────────────────────────

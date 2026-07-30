@@ -65,6 +65,18 @@ function originInRing(ring: number[][]): boolean {
 // network): standing in a hole is NOT inside, and its boundary counts for distance.
 function featureMinDist(geom: any, px: (n: number) => number, py: (n: number) => number): number {
   if (!geom) return Infinity
+  // MultiPolygon is what operators publish (Thessaloniki's space-level export is
+  // 1,957 of them). Unhandled, it fell through to the line branch and matched
+  // nothing — a whole city reading as "no paid parking" without an error.
+  if (geom.type === 'MultiPolygon') {
+    let min = Infinity
+    for (const poly of geom.coordinates ?? []) {
+      const d = featureMinDist({ type: 'Polygon', coordinates: poly }, px, py)
+      if (d === 0) return 0
+      if (d < min) min = d
+    }
+    return min
+  }
   if (geom.type === 'Polygon') {
     const rings = (geom.coordinates ?? [])
       .map((r: number[][]) => r.map((c: number[]) => [px(c[0]), py(c[1])]))

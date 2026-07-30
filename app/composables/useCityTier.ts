@@ -27,6 +27,9 @@ const CITY_TIERS: Record<string, MapTier> = {
   // official street list plus OSM parking areas, so it is a reasoned guess at
   // where those streets are, not a traced cadastre.
   'zrenjanin': 'cadastre_approx',
+  // Thessaloniki publishes its own GeoJSON — per-space polygons straight from the
+  // operator, not traced by us. The best source any city here has.
+  'thessaloniki': 'cadastre',
 }
 
 export const useCityTier = (slug: MaybeRefOrGetter<string | null | undefined>) => {

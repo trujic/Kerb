@@ -33,6 +33,24 @@ const SCHEDULES: Record<string, CitySchedule> = {
       0: null,                             // Sun — free
     },
   },
+  // Thessaloniki — Mon–Fri 08:00–21:00, Sat 09:00–16:00, Sun and public holidays
+  // free (thesi.gr). Note this is the first city here whose clock is not Belgrade's;
+  // paidExpiry has always read the city's timezone rather than the device's, which
+  // is exactly what a visitor arriving from Serbia needs.
+  // Not modelled: Greek public holidays, which are free and a weekly schedule
+  // cannot express — those days will read as paid when they are free.
+  'thessaloniki': {
+    timezone: 'Europe/Athens',
+    days: {
+      1: { start: '08:00', end: '21:00' },
+      2: { start: '08:00', end: '21:00' },
+      3: { start: '08:00', end: '21:00' },
+      4: { start: '08:00', end: '21:00' },
+      5: { start: '08:00', end: '21:00' },
+      6: { start: '09:00', end: '16:00' },
+      0: null,
+    },
+  },
   // Belgrade — two schedules in one city (parking-servis.co.rs). The default is
   // the yellow/green one; purple, red and white run later and charge on Sunday
   // mornings. Not modelled: streets around Klinički centar Srbije are free after

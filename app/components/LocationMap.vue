@@ -118,6 +118,7 @@ const zoneBounds = (zones: any): [[number, number], [number, number]] | null => 
     const g = f.geometry
     if (!g) continue
     if (g.type === 'Polygon') g.coordinates[0]?.forEach(visit)
+    else if (g.type === 'MultiPolygon') g.coordinates.forEach((poly: any) => poly[0]?.forEach(visit))
     else if (g.type === 'LineString') g.coordinates.forEach(visit)
     else if (g.type === 'MultiLineString') g.coordinates.forEach((l: any) => l.forEach(visit))
   }
@@ -137,6 +138,7 @@ watchEffect((onCleanup) => {
     const g = f.geometry
     const pts: number[][] =
       g?.type === 'Polygon' ? g.coordinates[0]
+      : g?.type === 'MultiPolygon' ? g.coordinates.flatMap((p: any) => p[0])
       : g?.type === 'LineString' ? g.coordinates
       : g?.type === 'MultiLineString' ? g.coordinates.flat() : []
     let len = 0
@@ -166,6 +168,15 @@ watchEffect((onCleanup) => {
       if (g.coordinates[0].length < 3) continue
       // all rings — holes (city blocks inside street networks) must stay unfilled
       layer = L.polygon(g.coordinates.map((ring: number[][]) => toLatLngs(ring)), {
+        color, fillColor: color, fillOpacity: 0.13, weight: 2, opacity: 0.55,
+      })
+    } else if (g.type === 'MultiPolygon') {
+      // Leaflet takes the nested array directly; each part keeps its own holes.
+      const parts = (g.coordinates ?? [])
+        .filter((poly: number[][][]) => poly[0]?.length >= 3)
+        .map((poly: number[][][]) => poly.map((ring: number[][]) => toLatLngs(ring)))
+      if (!parts.length) continue
+      layer = L.polygon(parts, {
         color, fillColor: color, fillOpacity: 0.13, weight: 2, opacity: 0.55,
       })
     } else if (g.type === 'LineString') {

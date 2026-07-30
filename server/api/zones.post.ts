@@ -31,6 +31,7 @@ export default defineEventHandler(async (event) => {
     const g = f?.geometry
     const ok =
       (g?.type === 'Polygon' && g.coordinates?.length) ||
+      (g?.type === 'MultiPolygon' && g.coordinates?.length) ||
       (g?.type === 'LineString' && g.coordinates?.length >= 2) ||
       (g?.type === 'MultiLineString' && g.coordinates?.length)
     if (!ok) throw createError({ statusCode: 400, statusMessage: `Feature ${i} has unusable geometry` })
