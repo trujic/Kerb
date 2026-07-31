@@ -8,9 +8,8 @@
     <!-- ── cadastre / cadastre_approx: interactive reference map ── -->
     <template v-if="tier === 'cadastre' || tier === 'cadastre_approx'">
       <div v-if="tier === 'cadastre_approx'" class="czm-warn">
-        <Icon name="alert" :size="13" /> {{ cityName }} publishes no official vector map — these zone areas are
-        <strong>approximate</strong>, coarsely traced from the official zone image. Treat them as a
-        rough guide and confirm on the sign before you pay.
+        <Icon name="alert" :size="13" /> {{ cityName }} publishes no official vector map — these zone
+        areas are <strong>approximate</strong>: {{ approxReason }} Confirm on the sign before you pay.
       </div>
 
       <ClientOnly>
@@ -38,7 +37,7 @@
 
       <p class="czm-prov">
         <template v-if="tier === 'cadastre_approx'">
-          Approximate overlay traced from the official zone map{{ provenance }} — not an exact cadastre.
+          Approximate overlay derived from the official source{{ provenance }} — not an exact cadastre.
           It narrows it down — <strong>the sign always wins</strong>.
         </template>
         <template v-else>
@@ -106,6 +105,10 @@ const props = defineProps<{
 }>()
 
 const { searchStreetZone } = useCity()
+
+// tier arrives as a prop, but the reason behind an approximate map is per-city
+// and lives with the classification.
+const { approxReason } = useCityTier(() => props.cityId)
 
 const tierLabel = computed(() => ({
   cadastre: 'Mapped',
