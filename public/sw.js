@@ -13,6 +13,84 @@
 const SHELL = 'kerb-shell-v1'
 const DATA = 'kerb-data-v1'
 
+// ── LOCAL ALARMS ──────────────────────────────────────────────────────────────
+// Expiry reminders are written to IndexedDB by the page (see useLocalReminders)
+// so they can be delivered with no network and no account. Whichever of the two
+// is awake when one comes due delivers it; the deliverer stamps `firedAt` first
+// so the other stays silent.
+//
+// A service worker cannot hold a timer — it is killed between events. So instead
+// of scheduling, it drains: every time something wakes this worker for any
+// reason, it checks whether a deadline has passed. That is not a guarantee, and
+// nothing in the UI claims it is; it is a second chance for the case where the
+// page is already gone.
+
+const ALARM_DB = 'kerb-alarms'
+const ALARM_STORE = 'alarms'
+const ALARM_STALE_MS = 60 * 60 * 1000
+const DRAIN_THROTTLE_MS = 30 * 1000
+
+const alarmDb = () =>
+  new Promise((res, rej) => {
+    const r = indexedDB.open(ALARM_DB, 1)
+    r.onupgradeneeded = () => {
+      if (!r.result.objectStoreNames.contains(ALARM_STORE))
+        r.result.createObjectStore(ALARM_STORE, { keyPath: 'id' })
+    }
+    r.onsuccess = () => res(r.result)
+    r.onerror = () => rej(r.error)
+  })
+
+const readAlarms = async () => {
+  try {
+    const db = await alarmDb()
+    return await new Promise((res) => {
+      const tx = db.transaction(ALARM_STORE, 'readonly')
+      const q = tx.objectStore(ALARM_STORE).getAll()
+      q.onsuccess = () => res(q.result || [])
+      q.onerror = () => res([])
+    })
+  } catch {
+    return []
+  }
+}
+
+const stampFired = async (alarm) => {
+  try {
+    const db = await alarmDb()
+    await new Promise((res, rej) => {
+      const tx = db.transaction(ALARM_STORE, 'readwrite')
+      tx.objectStore(ALARM_STORE).put(alarm)
+      tx.oncomplete = res
+      tx.onerror = () => rej(tx.error)
+    })
+  } catch { /* the page will re-stamp it; a duplicate buzz beats a missed hour */ }
+}
+
+let lastDrain = 0
+
+const drainAlarms = async () => {
+  lastDrain = Date.now()
+  if (self.Notification?.permission !== 'granted') return
+  const alarms = await readAlarms()
+  const now = Date.now()
+  for (const a of alarms) {
+    if (a.firedAt || a.fireAt > now) continue
+    await stampFired({ ...a, firedAt: now })
+    // A deadline an hour past is not news. A phone switched on at noon must not
+    // announce "10 minutes left" about an hour that ended before breakfast.
+    if (now - a.fireAt > ALARM_STALE_MS) continue
+    await self.registration.showNotification(a.title, {
+      body: a.body,
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      tag: a.tag,
+      renotify: true,
+      data: { url: a.url || '/' },
+    })
+  }
+}
+
 self.addEventListener('install', (e) => {
   // Warm the shell during install. Without this the first visit registers the
   // worker mid-load, so no navigation ever passes through the fetch handler and
@@ -40,7 +118,20 @@ self.addEventListener('activate', (e) => {
       await Promise.all(stale.map((r) => cache.delete(r)))
     }
     await self.clients.claim()
+    await drainAlarms()
   })())
+})
+
+// Every wake is a chance to deliver: a reconnect, the browser's own periodic
+// sync, or the page telling us a deadline just moved.
+self.addEventListener('sync', (e) => {
+  if (e.tag === 'kerb-alarms') e.waitUntil(drainAlarms())
+})
+self.addEventListener('periodicsync', (e) => {
+  if (e.tag === 'kerb-alarms') e.waitUntil(drainAlarms())
+})
+self.addEventListener('message', (e) => {
+  if (e.data?.type === 'kerb:alarms') e.waitUntil?.(drainAlarms())
 })
 
 const isZoneData = (url) => url.pathname.startsWith('/zones/')
@@ -58,6 +149,10 @@ const IS_DEV_ORIGIN = ['localhost', '127.0.0.1', '[::1]'].includes(self.location
 
 self.addEventListener('fetch', (event) => {
   const req = event.request
+  // Any request at all means this worker is alive right now — the cheapest wake
+  // there is, and often the only one a phone will hand us. Throttled so a page
+  // load pulling forty assets does not open forty transactions.
+  if (Date.now() - lastDrain > DRAIN_THROTTLE_MS) event.waitUntil(drainAlarms())
   if (req.method !== 'GET') return
   const url = new URL(req.url)
   // Never touch other origins: Supabase, Nominatim and Overpass must fail
@@ -123,11 +218,31 @@ self.addEventListener('push', (event) => {
     renotify: true,
     data: { url: data.url || '/sessions' },
   }
-  event.waitUntil(self.registration.showNotification(title, options))
+
+  event.waitUntil((async () => {
+    // The device may have already delivered this exact reminder from its local
+    // alarm — offline, or simply a few seconds sooner. Sharing the tag means one
+    // entry in the tray either way; this stops the phone buzzing a second time
+    // for news the driver already has, while still updating what it says.
+    try {
+      const local = (await readAlarms()).find((a) => a.tag === options.tag && a.firedAt)
+      if (local && Date.now() - local.firedAt < 30 * 60 * 1000) {
+        options.renotify = false
+        options.silent = true
+      }
+    } catch { /* no store, no dedupe — show it */ }
+    await self.registration.showNotification(title, options)
+  })())
 })
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
+  // The standing notice's "Stop" action lands here too, and deliberately does no
+  // more than a tap: ending a start-stop session is not this worker's to do. The
+  // record lives in Supabase or in localStorage depending on who is parked, and
+  // in a real start-stop city the operator has to be told as well — none of
+  // which a worker can honestly complete on its own. So it opens the app at the
+  // running session, where stopping means all of it. See useActiveNotice.
   const url = event.notification.data?.url || '/sessions'
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {

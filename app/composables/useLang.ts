@@ -185,6 +185,51 @@ const dict = {
   end: { sr: 'Završi', en: 'End' },
   dismissSession: { sr: 'Ukloni istekli parking', en: 'Dismiss expired parking' },
 
+  // Expiry reminders. The notification text is baked in when the alarm is
+  // written, because the service worker that may deliver it has no dictionary.
+  remExpiryTitle: { sr: '⏳ Parking uskoro ističe', en: '⏳ Parking running out' },
+  remExpiryBody: {
+    sr: 'Još {mins} min — {zone}{where}. Dodirni da produžiš.',
+    en: '{mins} min left — {zone}{where}. Tap to extend.',
+  },
+  remLimitTitle: { sr: '🚗 Vreme je da pomeriš auto', en: '🚗 Time to move your car' },
+  remLimitBody: {
+    sr: 'Limit zone {zone} ({min} min) je pri kraju{where}. Moraš da pomeriš auto — ovde se ne može ponovo platiti.',
+    en: "{zone}'s {min}-min limit is almost up{where}. You must move the car — no re-pay here.",
+  },
+  // The standing notice while parking runs. Every line has to survive being read
+  // hours later on a phone that never woke the app, so each one states a fixed
+  // time rather than a present tense — "active until 15:40" is still true at
+  // 18:00, where "42 min left" would be a lie. See useActiveNotice.
+  noticeTitle: { sr: '🅿️ Parking · {zone}', en: '🅿️ Parking · {zone}' },
+  noticeUntil: { sr: 'Aktivan do {time}', en: 'Active until {time}' },
+  noticeEnded: { sr: 'Istekao u {time}', en: 'Ran out at {time}' },
+  // Start-stop: nothing runs out, so the only fixed point is when it began.
+  noticeSince: { sr: 'Aktivan od {time} · naplata teče', en: 'Active since {time} · still charging' },
+  noticeStop: { sr: 'Zaustavi', en: 'Stop' },
+
+  remindTitle: { sr: 'Podsetnik pred istek', en: 'Reminder before it runs out' },
+  remindOff: {
+    sr: 'Javimo ti 10 minuta ranije. Radi i bez interneta.',
+    en: 'We ping you 10 minutes early. Works with no signal too.',
+  },
+  // The honest version of the promise: no web app can wake a phone that has
+  // closed it, so this says "while Kerbo is running" rather than guaranteeing.
+  remindOn: {
+    sr: 'Uključeno — javimo se 10 min pre isteka, dok je Kerbo pokrenut.',
+    en: 'On — we ping you 10 min before expiry, while Kerbo is running.',
+  },
+  remindEnable: { sr: 'Uključi', en: 'Turn on' },
+  remindOnShort: { sr: 'Uključeno', en: 'On' },
+  remindBlocked: {
+    sr: 'Obaveštenja su blokirana za ovaj sajt — uključi ih u podešavanjima pregledača.',
+    en: 'Notifications are blocked for this site — enable them in your browser settings.',
+  },
+  remindNeedsInstall: {
+    sr: 'Na iPhone-u obaveštenja stižu tek kad je Kerbo dodat na početni ekran.',
+    en: 'On iPhone, notifications only arrive once Kerbo is on the home screen.',
+  },
+
   // Plate input
   plateHow: { sr: 'Vidi kako', en: 'See how' },
   plateOcrHint: {

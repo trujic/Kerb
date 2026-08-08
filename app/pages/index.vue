@@ -153,6 +153,46 @@
           @dismiss="onEndSession"
         />
 
+        <!-- Expiry reminder — offered next to the hour it is about, not buried
+             in settings, and open to guests: a device-local alarm needs
+             notification permission, not an account and not a network. Armed
+             pre-pays are excluded on purpose — that reminder is hours away and
+             the phone will almost certainly have closed the app by then. -->
+        <div
+          v-if="
+            displaySession &&
+            displaySession.type !== 'armed' &&
+            (remindSupported || iosNoNotifications)
+          "
+          class="remind"
+        >
+          <span class="remind-icon"><Icon name="bell" :size="15" /></span>
+          <div class="remind-text">
+            <p class="remind-title">{{ t("remindTitle") }}</p>
+            <p class="remind-sub">
+              {{
+                remindBlocked
+                  ? t("remindBlocked")
+                  : iosNoNotifications
+                    ? t("remindNeedsInstall")
+                    : remindOn
+                      ? t("remindOn")
+                      : t("remindOff")
+              }}
+            </p>
+          </div>
+          <button
+            v-if="remindSupported && !remindBlocked"
+            type="button"
+            class="remind-btn"
+            :class="{ on: remindOn }"
+            :aria-pressed="remindOn"
+            @click="toggleReminders"
+          >
+            {{ remindOn ? t("remindOnShort") : t("remindEnable") }}
+          </button>
+        </div>
+
         <!-- ═══ FREE-NOW SURFACE — when no payment is needed, the screen IS the answer ═══ -->
         <div v-if="freeSurface" class="free-surface">
           <span class="free-now-tag"
@@ -1149,6 +1189,53 @@ const displayAtLimit = computed(() =>
 );
 const displayCanExtend = computed(() =>
   user.value ? canExtend.value : guest.canExtend.value
+);
+
+// ── Expiry reminder, held on the device ───────────────────────────────────────
+// Web Push covers the online, logged-in case from the server. This covers the
+// rest of reality: no signal, no account, a foreign SIM. The deadline is written
+// to IndexedDB and fired by whichever of page or service worker is awake.
+const {
+  supported: remindSupported,
+  enabled: remindOn,
+  blocked: remindBlocked,
+  enable: enableReminders,
+  disable: disableReminders,
+  scheduleFor: scheduleReminders,
+} = useLocalReminders();
+
+// iPhone in a Safari tab has no Notification API at all — the only route to a
+// reminder there is the home screen, so say that instead of an empty switch.
+const iosNoNotifications = computed(() => {
+  if (!import.meta.client || remindSupported.value) return false;
+  const ua = navigator.userAgent;
+  return /iphone|ipad|ipod/i.test(ua) || (/macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
+});
+
+const toggleReminders = async () => {
+  if (remindOn.value) await disableReminders();
+  else if (await enableReminders()) await scheduleReminders(displaySession.value);
+};
+
+// The standing "parking is running" notice, so a locked screen answers the
+// question without opening anything. Shares the reminder switch above.
+const { syncFor: syncNotice } = useActiveNotice();
+
+// A single flip, not a countdown: the notice only needs rewriting when the hour
+// actually runs out, and watching the millisecond remainder would rewrite it
+// every second for no visible change.
+const sessionExpired = computed(() => (displayRemaining.value ?? 1) <= 0);
+
+// Re-arm whenever the running session changes — paid, extended, ended, or just
+// reloaded from storage. Keyed on the expiry so extending an hour moves the
+// alarm rather than leaving the old one to fire early.
+watch(
+  [displaySession, remindOn, sessionExpired],
+  ([s]) => {
+    scheduleReminders(s ?? null);
+    syncNotice(s ?? null);
+  },
+  { immediate: true }
 );
 
 // Lock body scroll + close on Escape while the fullscreen map is open
@@ -3126,6 +3213,46 @@ h2 {
 .stale svg { flex-shrink: 0; margin-top: 1px; }
 .stale-title { font-size: 13px; font-weight: 700; color: var(--text); margin-bottom: 2px; }
 .stale-sub { font-size: 12px; color: var(--muted); line-height: 1.5; }
+
+/* Expiry reminder switch — sits under the running hour. Deliberately quiet:
+   it is a convenience, not the job, and it must never outshout the countdown. */
+.remind {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin: -8px 0 20px;
+  padding: 11px 13px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+}
+.remind-icon {
+  display: flex;
+  flex-shrink: 0;
+  color: var(--muted2);
+}
+.remind-text { flex: 1; min-width: 0; }
+.remind-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 2px; }
+.remind-sub { font-size: 12px; color: var(--muted); line-height: 1.45; }
+.remind-btn {
+  flex-shrink: 0;
+  padding: 8px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text2);
+  background: var(--bg);
+  border: 1px solid var(--border2);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  transition: background 150ms, color 150ms, border-color 150ms;
+}
+.remind-btn:hover { color: var(--text); border-color: var(--text2); }
+.remind-btn.on {
+  color: var(--green);
+  background: var(--green-bg);
+  border-color: var(--green-border);
+}
+.remind-btn:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
 
 /* No payment route from here — an honest dead end, not a broken button */
 .nopay {
