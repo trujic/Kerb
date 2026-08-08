@@ -277,8 +277,9 @@ const esc = (s: string) => s.replace(/[&<>"]/g, (c) => (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string))
 
 // ── Confirmed sign scans — verified community pins (✓ in the zone colour) ──────
-// Each pin carries a heading arrow (the way the sign faced when scanned) and a
-// popup with zone, price, the photo, and how recently it was confirmed.
+// Each pin opens a popup with zone, price, the photo, and how recently it was
+// confirmed. The scan's compass heading is stored but not drawn: phone headings
+// at capture time were too unreliable to point anywhere useful.
 watchEffect((onCleanup) => {
   const signs = props.signs
   const map   = mapRef.value
@@ -289,12 +290,9 @@ watchEffect((onCleanup) => {
   for (const s of signs) {
     if (s.lat == null || s.lng == null) continue
     const color = (s.zone_color ?? '#2563EB').trim()
-    const arrow = s.heading != null
-      ? `<span class="lm-sign-arrow" style="transform:rotate(${s.heading}deg) translateY(-15px)"></span>`
-      : ''
     const icon = L.divIcon({
       className: '',
-      html: `<div class="lm-sign-wrap" style="--sign:${color}">${arrow}<span class="lm-sign"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3M12 13v8M8 21h8"/><path d="M5 6h12.5L20 9.5 17.5 13H5z"/></svg></span></div>`,
+      html: `<div class="lm-sign-wrap" style="--sign:${color}"><span class="lm-sign"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v3M12 13v8M8 21h8"/><path d="M5 6h12.5L20 9.5 17.5 13H5z"/></svg></span></div>`,
       iconSize: [40, 40],
       iconAnchor: [20, 20],
     })
@@ -459,17 +457,6 @@ onMounted(async () => {
   border: 2px solid var(--sign, #2563EB);
   border-radius: 50%;
   box-shadow: 0 1px 5px rgba(0, 0, 0, 0.3);
-}
-.lm-sign-arrow {
-  position: absolute;
-  top: 50%; left: 50%;
-  margin: -5px 0 0 -6px;
-  width: 0; height: 0;
-  border-left: 6px solid transparent;
-  border-right: 6px solid transparent;
-  border-bottom: 9px solid var(--sign, #2563EB);
-  transform-origin: center;
-  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.25));
 }
 /* Sign popup */
 .lm-pop-wrap .leaflet-popup-content-wrapper { border-radius: 12px; padding: 0; overflow: hidden; }
