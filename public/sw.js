@@ -31,6 +31,14 @@ self.addEventListener('activate', (e) => {
     // Drop caches from older shell versions so a deploy cannot be shadowed.
     const keys = await caches.keys()
     await Promise.all(keys.filter((k) => k !== SHELL && k !== DATA).map((k) => caches.delete(k)))
+    // Evict assets an earlier worker cached on a dev origin. They are why this
+    // guard exists, and leaving them would keep dev broken until a manual
+    // "Clear storage" — the one thing a self-healing worker can spare you.
+    if (IS_DEV_ORIGIN) {
+      const cache = await caches.open(SHELL)
+      const stale = (await cache.keys()).filter((r) => isAsset(new URL(r.url)))
+      await Promise.all(stale.map((r) => cache.delete(r)))
+    }
     await self.clients.claim()
   })())
 })
@@ -39,6 +47,14 @@ const isZoneData = (url) => url.pathname.startsWith('/zones/')
 const isAsset = (url) =>
   url.pathname.startsWith('/_nuxt/') ||
   /\.(css|js|woff2?|png|svg|ico|webp|jpg|jpeg)$/.test(url.pathname)
+
+// The asset cache below is cache-first, which is only safe because production
+// builds are content-hashed. The dev server breaks both halves of that: its
+// /_nuxt/ paths are not hashed, and Vite serves CSS as a JavaScript module, so
+// a replayed /_nuxt/main.css arrives as text/css into a <script type="module">
+// and the whole app fails to boot. On a dev origin assets always go to the
+// network; caching there bought nothing anyway.
+const IS_DEV_ORIGIN = ['localhost', '127.0.0.1', '[::1]'].includes(self.location.hostname)
 
 self.addEventListener('fetch', (event) => {
   const req = event.request
@@ -82,6 +98,7 @@ self.addEventListener('fetch', (event) => {
 
   // Build assets are content-hashed, so a hit is the same bytes forever.
   if (isAsset(url)) {
+    if (IS_DEV_ORIGIN) return
     event.respondWith((async () => {
       const cache = await caches.open(SHELL)
       const hit = await cache.match(req)
