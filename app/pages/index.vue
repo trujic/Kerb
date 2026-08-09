@@ -1219,7 +1219,11 @@ const toggleReminders = async () => {
 
 // The standing "parking is running" notice, so a locked screen answers the
 // question without opening anything. Shares the reminder switch above.
-const { syncFor: syncNotice } = useActiveNotice();
+const { syncFor: syncNotice, rearmOnHide } = useActiveNotice();
+
+// Rewrite it as the screen goes dark, so iOS has a chance of treating it as
+// something you have not seen yet and keeping it on the lock screen.
+rearmOnHide(() => displaySession.value ?? null);
 
 // A single flip, not a countdown: the notice only needs rewriting when the hour
 // actually runs out, and watching the millisecond remainder would rewrite it

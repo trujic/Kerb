@@ -25,6 +25,15 @@ const TAG = 'parking-active'
 /** How long an expired session keeps its notice before it is dropped entirely. */
 const EXPIRED_GRACE_MS = 30 * 60_000
 
+/** Floor between forced rewrites, so app-switching does not repost in a loop. */
+const REARM_THROTTLE_MS = 60_000
+/**
+ * Module scope on purpose. The composable is instantiated per component — and a
+ * page whose setup runs twice would otherwise get two counters, two handlers,
+ * and two rewrites for one lock of the screen.
+ */
+let lastForcedAt = 0
+
 export const useActiveNotice = () => {
   // The text is baked in at write time, in the language the driver is reading —
   // the tray keeps the string, not a key, exactly as the alarms do. Switching
@@ -61,8 +70,10 @@ export const useActiveNotice = () => {
    * Put the tray in sync with the session. Safe to call on every change — it
    * skips the write when nothing the driver can read has changed, which matters
    * on iOS where a repeat is a repeat buzz rather than a silent replace.
+   *
+   * `force` drops that skip and rewrites identical text on purpose. See rearm().
    */
-  const syncFor = async (s: RemindableSession | null) => {
+  const syncFor = async (s: RemindableSession | null, force = false) => {
     if (!supported) return
     // The notice rides the reminder switch: same permission, same intent.
     const wanted = localStorage.getItem(REMINDERS_PREF_KEY) === '1'
@@ -97,7 +108,11 @@ export const useActiveNotice = () => {
     // reload, which is exactly when the watcher fires with unchanged content.
     try {
       const open = await reg.getNotifications({ tag: TAG })
-      if (open.some((n) => n.title === title && n.body === body)) return
+      if (!force && open.some((n) => n.title === title && n.body === body)) return
+      // A same-tag write is a replace, and iOS treats a replaced notification as
+      // one it has already shown you. Closing first is what makes it arrive as
+      // new — which is the entire point of a forced rewrite.
+      if (force) for (const n of open) n.close()
     } catch {
       /* unsupported: fall through and write it */
     }
@@ -121,5 +136,32 @@ export const useActiveNotice = () => {
     } as NotificationOptions)
   }
 
-  return { syncFor, clear }
+  /**
+   * Rewrite the notice as the app goes to the background — which on a phone is
+   * usually the screen being locked, the moment the driver next wants to read it.
+   *
+   * This exists because of one iOS rule: the lock screen lists only what you have
+   * not already seen, and a notice written while you were holding an unlocked
+   * phone counts as seen, so it goes straight to Notification Center. Writing it
+   * again at the last instant before the screen goes dark is the only lever a web
+   * app has left. Whether iOS accepts that as new is genuinely not knowable from
+   * here — if it does not, this changes nothing and the notice stays one swipe
+   * away, which is where it already was.
+   *
+   * Throttled, because visibility also flips on every app switch, and each forced
+   * write is a close-then-show that iOS may well announce.
+   */
+  const rearmOnHide = (getSession: () => RemindableSession | null) => {
+    if (!supported) return
+    const onHide = () => {
+      if (!document.hidden) return
+      if (Date.now() - lastForcedAt < REARM_THROTTLE_MS) return
+      lastForcedAt = Date.now()
+      syncFor(getSession(), true)
+    }
+    onMounted(() => document.addEventListener('visibilitychange', onHide))
+    onUnmounted(() => document.removeEventListener('visibilitychange', onHide))
+  }
+
+  return { syncFor, clear, rearmOnHide }
 }
