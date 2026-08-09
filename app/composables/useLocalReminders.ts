@@ -51,13 +51,7 @@ export interface RemindableSession {
 
 const DB = 'kerb-alarms'
 const STORE = 'alarms'
-/**
- * The user's one notification switch, shared with the active-parking notice —
- * two toggles for "tell me about my parking" would be two ways to say the same
- * thing. See useActiveNotice.
- */
-export const REMINDERS_PREF_KEY = 'kerb_local_reminders'
-const PREF_KEY = REMINDERS_PREF_KEY
+const PREF_KEY = 'kerb_local_reminders'
 
 /** Same lead time as the server reminder, so the two never disagree by minutes. */
 const LEAD_MS = 10 * 60_000

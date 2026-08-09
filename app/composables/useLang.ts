@@ -197,17 +197,6 @@ const dict = {
     sr: 'Limit zone {zone} ({min} min) je pri kraju{where}. Moraš da pomeriš auto — ovde se ne može ponovo platiti.',
     en: "{zone}'s {min}-min limit is almost up{where}. You must move the car — no re-pay here.",
   },
-  // The standing notice while parking runs. Every line has to survive being read
-  // hours later on a phone that never woke the app, so each one states a fixed
-  // time rather than a present tense — "active until 15:40" is still true at
-  // 18:00, where "42 min left" would be a lie. See useActiveNotice.
-  noticeTitle: { sr: '🅿️ Parking · {zone}', en: '🅿️ Parking · {zone}' },
-  noticeUntil: { sr: 'Aktivan do {time}', en: 'Active until {time}' },
-  noticeEnded: { sr: 'Istekao u {time}', en: 'Ran out at {time}' },
-  // Start-stop: nothing runs out, so the only fixed point is when it began.
-  noticeSince: { sr: 'Aktivan od {time} · naplata teče', en: 'Active since {time} · still charging' },
-  noticeStop: { sr: 'Zaustavi', en: 'Stop' },
-
   remindTitle: { sr: 'Podsetnik pred istek', en: 'Reminder before it runs out' },
   remindOff: {
     sr: 'Javimo ti 10 minuta ranije. Radi i bez interneta.',

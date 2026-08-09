@@ -237,12 +237,6 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
-  // The standing notice's "Stop" action lands here too, and deliberately does no
-  // more than a tap: ending a start-stop session is not this worker's to do. The
-  // record lives in Supabase or in localStorage depending on who is parked, and
-  // in a real start-stop city the operator has to be told as well — none of
-  // which a worker can honestly complete on its own. So it opens the app at the
-  // running session, where stopping means all of it. See useActiveNotice.
   const url = event.notification.data?.url || '/sessions'
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {

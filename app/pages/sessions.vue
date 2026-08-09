@@ -120,12 +120,6 @@ const {
 
 onMounted(() => { loadActive(); loadHistory() })
 
-// The dashboard writes the standing notice, but parking can also be extended or
-// ended from here — and a notice still claiming an hour that was stopped on this
-// page is the one failure worth ruling out.
-const { syncFor: syncNotice } = useActiveNotice()
-watch(active, (s) => { syncNotice(s) }, { immediate: true })
-
 // ── Push reminders ──────────────────────────────────────────────────────────
 const {
   supported: pushSupported, enabled: pushEnabled, busy: pushBusy, error: pushError,
