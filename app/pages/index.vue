@@ -473,9 +473,13 @@
                   :label="payLabel"
                   :done-label="payDoneLabel"
                   :color="selectedZone.color"
+                  :disabled="!defaultPlate"
                   @confirm="pay(selectedZone, { armed: true })"
                 />
-                <p class="pay-note">
+                <p v-if="!defaultPlate" class="pay-need-plate">
+                  {{ t("needPlate") }}
+                </p>
+                <p v-else class="pay-note">
                   {{ t("slideConfirms") }} {{ payNote }}
                 </p>
               </div>
@@ -488,9 +492,13 @@
                     :label="payLabel"
                     :done-label="payDoneLabel"
                     :color="selectedZone.color"
+                    :disabled="!defaultPlate"
                     @confirm="pay(selectedZone)"
                   />
-                  <p class="pay-note">
+                  <p v-if="!defaultPlate" class="pay-need-plate">
+                    {{ t("needPlate") }}
+                  </p>
+                  <p v-else class="pay-note">
                     {{ t("slideConfirms") }} {{ payNote }}
                   </p>
                 </template>
@@ -499,6 +507,7 @@
                   v-else
                   type="button"
                   class="zone-act-btn"
+                  :disabled="!defaultPlate"
                   :style="{
                     background: selectedZone.color,
                     color: inkOn(selectedZone.color),
@@ -516,6 +525,9 @@
                     >→ {{ payAction.label }}</span
                   >
                 </button>
+                <p v-if="skipConfirm && !defaultPlate" class="pay-need-plate">
+                  {{ t("needPlate") }}
+                </p>
               </template>
             </div>
 
@@ -1331,14 +1343,17 @@ const choosePlate = (p: string) => {
   plateOpen.value = false;
 };
 
+// What pays is what the screen shows. A guest sees the plate field, so a guest
+// pays with the plate field and nothing else — reaching past it into a profile
+// is how a signed-out driver ended up paying for a car they no longer own.
 const defaultPlate = computed(() => {
+  if (!user.value) {
+    return guestPlate.value.trim() ? guestPlate.value.trim().toUpperCase() : null;
+  }
   if (chosenPlate.value) return chosenPlate.value;
-  const saved = (
-    profilePlates.value.find((p: any) => p.is_default) ?? profilePlates.value[0]
-  )?.plate;
   return (
-    saved ??
-    (guestPlate.value.trim() ? guestPlate.value.trim().toUpperCase() : null)
+    (profilePlates.value.find((p: any) => p.is_default) ?? profilePlates.value[0])
+      ?.plate ?? null
   );
 });
 
@@ -1622,6 +1637,11 @@ const armSentPrompt = () => {
 
 // Confirmed (slide/tap) → open the SMS composer + arm the "did you send it?" check.
 const pay = (zone: any, opts: { armed?: boolean } = {}) => {
+  // No plate, no payment. The SMS is nothing but the plate — sending it without
+  // one buys the driver an unpaid hour they believe is paid, which is the exact
+  // fine this app exists to prevent. The surfaces above disable themselves, but
+  // the scan flow reaches this function by another route.
+  if (!defaultPlate.value) return;
   if (user.value) {
     onPay(zone); // logged-in keeps its immediate Supabase log (unchanged)
   } else {
@@ -1941,6 +1961,17 @@ watch(
     }
   }
 );
+
+// Signing out has to empty the profile too. Left behind, it kept feeding the pay
+// path a plate from an account nobody is signed into — the field showed its
+// placeholder while the SMS carried the old plate, which is the one mismatch this
+// screen must never have.
+watch(user, (u) => {
+  if (!u) {
+    userProfile.value = null;
+    chosenPlate.value = null;
+  }
+});
 
 // Guest-first: the live dashboard is available to anyone once a city is detected.
 // Login only adds memory (session tracking, reminders, fine alerts).
@@ -3692,6 +3723,19 @@ h2 {
   color: var(--muted);
   text-align: center;
   line-height: 1.4;
+}
+/* Why the slide won't move, said where the eye already is. */
+.pay-need-plate {
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: var(--text2);
+  text-align: center;
+  line-height: 1.4;
+  font-weight: 500;
+}
+.zone-act-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 .zone-act-btn {
   display: flex;

@@ -34,6 +34,17 @@ export const useAuth = () => {
   }
 
   const signOut = async () => {
+    // Carry the account's plate down to the guest field before the session goes.
+    // Signing out should not mean typing your own plate again, and it must not
+    // mean paying with a plate nothing on screen shows — which is what happened
+    // while the profile outlived the session in memory.
+    try {
+      const profile = await getProfile()
+      const plate = (profile?.plates?.find((p: any) => p.is_default) ?? profile?.plates?.[0])?.plate
+      if (import.meta.client && plate) localStorage.setItem(GUEST_PLATE_KEY, plate)
+    } catch {
+      /* offline or no profile — the guest field just starts empty */
+    }
     const { error } = await supabase.auth.signOut()
     if (error) throw error
   }

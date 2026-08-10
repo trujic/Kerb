@@ -43,6 +43,14 @@ export interface GuestPayload {
 
 const KEY = 'kerbo_guest_sessions'
 
+/**
+ * The plate a guest pays with, kept on the device. Lives here rather than in the
+ * dashboard because signing out writes to it too — the plate from the account
+ * carries over so the field is not empty the next time, and so the plate that
+ * pays is always the plate on screen.
+ */
+export const GUEST_PLATE_KEY = 'kerb_guest_plate'
+
 export const useGuestSession = () => {
   const all = ref<GuestSession[]>([])
 

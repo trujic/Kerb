@@ -2,7 +2,8 @@
   <div
     ref="track"
     class="s2c"
-    :class="{ 's2c--drag': dragging, 's2c--done': done, 's2c--nudge': nudging }"
+    :class="{ 's2c--drag': dragging, 's2c--done': done, 's2c--nudge': nudging, 's2c--off': disabled }"
+    :aria-disabled="disabled"
     :style="{ '--s2c-color': color }"
     @pointerdown="onDown"
   >
@@ -18,6 +19,7 @@
       class="s2c-thumb"
       :style="{ left: thumbLeft + 'px', color: ink }"
       :aria-label="done ? doneLabel : `${label}. Slide right or press Enter to confirm.`"
+      :disabled="disabled"
       @keydown.enter.prevent="onKeyConfirm"
       @keydown.space.prevent="onKeyConfirm"
     >
@@ -32,7 +34,8 @@ const props = withDefaults(defineProps<{
   doneLabel?: string
   color?: string
   confirmRatio?: number // fraction of the track you must cross to confirm (rest of the way snaps for you)
-}>(), { doneLabel: 'Confirmed', color: 'var(--blue)', confirmRatio: 0.55 })
+  disabled?: boolean    // nothing to confirm yet — e.g. no plate to send
+}>(), { doneLabel: 'Confirmed', color: 'var(--blue)', confirmRatio: 0.55, disabled: false })
 
 const emit = defineEmits<{ confirm: [] }>()
 
@@ -112,7 +115,7 @@ const onUp = () => {
 // Keyboard path: pressing Enter/Space on the focused thumb is as deliberate as
 // the drag — switch and screen-reader users get the same confirm.
 const onKeyConfirm = () => {
-  if (done.value || dragging.value) return
+  if (done.value || dragging.value || props.disabled) return
   measure()
   thumbLeft.value = maxLeft.value
   done.value = true
@@ -122,7 +125,7 @@ const onKeyConfirm = () => {
 
 // The whole track is grabbable — the thumb is the visual, not the only handle.
 const onDown = (e: PointerEvent) => {
-  if (done.value) return
+  if (done.value || props.disabled) return
   measure()
   dragging.value = true
   moved = false
@@ -161,6 +164,9 @@ onUnmounted(() => {
   cursor: grab;
 }
 .s2c--drag { cursor: grabbing; }
+/* Visibly not ready, rather than a track that silently refuses to move. */
+.s2c--off { opacity: 0.5; cursor: not-allowed; }
+.s2c--off .s2c-thumb { cursor: not-allowed; }
 .s2c-fill {
   position: absolute;
   inset: 0;

@@ -30,6 +30,13 @@ const dict = {
   // Pay surface: zone card → covered-until → slide
   coveredUntil: { sr: 'Pokriveno do {time}', en: 'Covered until {time}' },
   managePlates: { sr: 'Upravljaj tablicama →', en: 'Manage plates →' },
+  // The SMS is nothing but the plate, so without one there is no payment to make.
+  // "Add" rather than "type": a guest types it into the field, a signed-in driver
+  // with no plate yet gets an Add-plate link. Both sit directly above this line.
+  needPlate: {
+    sr: 'Dodaj tablicu iznad — SMS se šalje sa njom.',
+    en: 'Add your plate above — the SMS is sent with it.',
+  },
   heroCheckSign: {
     sr: 'Proveri znak — znak je zvaničan.',
     en: 'Check the sign — the sign is official.',
