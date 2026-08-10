@@ -1365,11 +1365,20 @@ const { nearest } = useNearestParking(coords, zoneBoundaries);
 const { tier: dashTier } = useCityTier(() => detectedCity.value?.id);
 const mapApprox = computed(() => dashTier.value === "cadastre_approx");
 
-// Self-healing map: confirmed signs recolour segments they disagree with (≥2 scans).
-// The resolver + nearest stay on the raw geometry; only the map display heals.
-const displayZones = computed(() =>
-  applySignOverrides(zoneBoundaries.value, signReports.value)
-);
+// The map draws the geometry as published, full stop. Confirmed scans used to
+// recolour segments they disagreed with; that is gone, because it repainted the
+// wrong street every time it mattered. A scan at a corner sat within the 25 m
+// radius of BOTH streets meeting there, and the vote counted scans without ever
+// weighing distance — so two reds at a kerb outvoted the blue sign standing on
+// the perpendicular street, and the segment was then labelled "✓ sign-confirmed".
+// Corners are where zones change, so it failed exactly where it was needed.
+//
+// The scans are still on the map as pins, which is the honest form of that
+// evidence: someone stood here and saw this sign. Turning a pin into a verdict
+// about a street needs rules this had none of — nearest segment only, street
+// name agreement, a clear margin over the nearest segment of another zone, and
+// votes weighted by distance rather than counted.
+const displayZones = computed(() => zoneBoundaries.value);
 
 // on  = standing on a paid street · near = just off one · none = no paid parking
 const parkingState = computed<"on" | "near" | "none" | null>(() => {
@@ -1719,8 +1728,8 @@ const onLocateCar = () => {
 };
 
 // ── Ask AI — deterministic candidate-set zone resolver ─────────────────────────
-// Resolve against the HEALED geometry so AI never contradicts the map the user sees
-// (sign-first logic is independent; this just keeps the fallback boundary calc honest).
+// Resolves against the same geometry the map draws, so the AI never contradicts
+// what the user is looking at (sign-first logic is independent of this).
 const { verdict: aiVerdict } = useZoneResolver(
   coords,
   displayZones,
@@ -1823,8 +1832,8 @@ watch(detectedCity, async (city) => {
     loadingCityDetail.value = false;
   }
 
-  // Load signs + geometry together, then set signs FIRST so the map's first paint
-  // is already healed (no old→new flash). displayZones reads both refs.
+  // Load signs + geometry together so the pins and the streets land in the same
+  // paint rather than one after the other.
   try {
     const [geo, reports] = await Promise.all([
       loadZoneGeometry(city.id),
