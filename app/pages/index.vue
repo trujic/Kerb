@@ -681,6 +681,13 @@
             <!-- Full weekly charging schedule (reference) -->
             <ParkingHours :city-id="detectedCity!.id" class="gps-hours" />
 
+            <!-- Add to home screen. Client-only: whether it shows at all depends
+                 on the browser and on being installed already, neither of which
+                 the server can know. -->
+            <ClientOnly>
+              <AddToHomeScreen />
+            </ClientOnly>
+
             <!-- Guest → account nudge (memory + reminders + fine alerts) -->
             <div v-if="!user" class="guest-upsell">
               <span class="guest-upsell-icon"
