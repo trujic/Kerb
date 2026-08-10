@@ -26,8 +26,16 @@
 </template>
 
 <script setup lang="ts">
+// `earned` is the caller saying the driver has actually parked with Kerbo at
+// least once. Asking someone to keep an app they have not used yet is asking
+// before there is anything to say yes to; after a paid hour the question
+// answers itself, and the ones who see no value simply never see the card.
+const props = defineProps<{ earned?: boolean }>()
+
 const { t } = useLang()
-const { visible, canPrompt, install, dismiss } = useInstallPrompt()
+const { visible: offerable, canPrompt, install, dismiss } = useInstallPrompt()
+
+const visible = computed(() => offerable.value && props.earned === true)
 
 const stepsOpen = ref(false)
 </script>

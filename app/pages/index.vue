@@ -681,11 +681,11 @@
             <!-- Full weekly charging schedule (reference) -->
             <ParkingHours :city-id="detectedCity!.id" class="gps-hours" />
 
-            <!-- Add to home screen. Client-only: whether it shows at all depends
-                 on the browser and on being installed already, neither of which
-                 the server can know. -->
+            <!-- Add to home screen, but only once there is something to keep.
+                 Client-only: whether it shows at all depends on the browser and
+                 on being installed already, neither of which the server knows. -->
             <ClientOnly>
-              <AddToHomeScreen />
+              <AddToHomeScreen :earned="hasParked" />
             </ClientOnly>
 
             <!-- Guest → account nudge (memory + reminders + fine alerts) -->
@@ -1725,6 +1725,15 @@ const onAiScan = () => {
   showAi.value = false;
   showScan.value = true;
 };
+
+// Has this driver actually parked with Kerbo — now or before, with an account or
+// as a guest? Gates the home-screen offer, which has nothing to earn until then.
+const hasParked = computed(
+  () =>
+    !!displaySession.value ||
+    sessionHistory.value.length > 0 ||
+    guest.history.value.length > 0
+);
 
 const pastSessions = computed(() =>
   sessionHistory.value
