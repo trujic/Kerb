@@ -28,6 +28,9 @@ export interface AspDay {
   note?: string | null
 }
 
+/** Cities with a suspension calendar in public/calendars. */
+const WITH_CALENDAR = new Set(['new-york-city'])
+
 export const useAspCalendar = (cityId: MaybeRefOrGetter<string | null | undefined>) => {
   const days = ref<AspDay[]>([])
   const timezone = ref('America/New_York')
@@ -49,7 +52,10 @@ export const useAspCalendar = (cityId: MaybeRefOrGetter<string | null | undefine
     const id = toValue(cityId)
     loaded.value = false
     days.value = []
-    if (!id || !import.meta.client) return
+    // Only ask for a calendar that exists. Probing every city produced a 404 in
+    // the console on each Serbian city page — harmless, but noise in a log is
+    // how a real error gets missed.
+    if (!id || !import.meta.client || !WITH_CALENDAR.has(id)) return
     try {
       const res = await fetch(`/calendars/${id}-asp-2026.json`)
       if (!res.ok) return // no calendar for this city — the card simply never shows

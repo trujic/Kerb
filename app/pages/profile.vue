@@ -7,7 +7,6 @@
           <h1>Your profile</h1>
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
-          <NuxtLink to="/sessions" class="btn-ghost">Parking sessions →</NuxtLink>
           <button class="btn-ghost signout-btn" @click="handleSignOut">Sign out</button>
         </div>
       </div>

@@ -115,84 +115,6 @@
           </div>
         </div>
 
-        <!-- Armed night pre-pay — scheduled for the next paid window, not live yet -->
-        <div
-          v-if="displaySession && displaySession.type === 'armed'"
-          class="armed-card"
-        >
-          <div class="armed-main">
-            <span class="armed-moon"><Icon name="moon" :size="20" /></span>
-            <div>
-              <p class="armed-title">
-                {{ t("armedTitle", { zone: displaySession.zone_name }) }}
-              </p>
-              <p class="armed-sub">
-                {{
-                  t("armedSub", {
-                    start: clockOf(displaySession.started_at),
-                    end: clockOf(displaySession.expires_at),
-                  })
-                }}
-              </p>
-            </div>
-          </div>
-          <button type="button" class="armed-cancel" @click="onEndSession">
-            {{ t("cancel") }}
-          </button>
-        </div>
-
-        <!-- Active parking session -->
-        <SessionCard
-          v-else-if="displaySession"
-          :session="displaySession"
-          :remaining-ms="displayRemaining"
-          :at-zone-limit="displayAtLimit"
-          :can-extend="displayCanExtend"
-          @extend="onExtend"
-          @locate="onLocateCar"
-          @dismiss="onEndSession"
-        />
-
-        <!-- Expiry reminder — offered next to the hour it is about, not buried
-             in settings, and open to guests: a device-local alarm needs
-             notification permission, not an account and not a network. Armed
-             pre-pays are excluded on purpose — that reminder is hours away and
-             the phone will almost certainly have closed the app by then. -->
-        <div
-          v-if="
-            displaySession &&
-            displaySession.type !== 'armed' &&
-            (remindSupported || iosNoNotifications)
-          "
-          class="remind"
-        >
-          <span class="remind-icon"><Icon name="bell" :size="15" /></span>
-          <div class="remind-text">
-            <p class="remind-title">{{ t("remindTitle") }}</p>
-            <p class="remind-sub">
-              {{
-                remindBlocked
-                  ? t("remindBlocked")
-                  : iosNoNotifications
-                    ? t("remindNeedsInstall")
-                    : remindOn
-                      ? t("remindOn")
-                      : t("remindOff")
-              }}
-            </p>
-          </div>
-          <button
-            v-if="remindSupported && !remindBlocked"
-            type="button"
-            class="remind-btn"
-            :class="{ on: remindOn }"
-            :aria-pressed="remindOn"
-            @click="toggleReminders"
-          >
-            {{ remindOn ? t("remindOnShort") : t("remindEnable") }}
-          </button>
-        </div>
-
         <!-- ═══ FREE-NOW SURFACE — when no payment is needed, the screen IS the answer ═══ -->
         <div v-if="freeSurface" class="free-surface">
           <span class="free-now-tag"
@@ -395,29 +317,8 @@
               </div>
             </div>
 
-            <!-- ── Already running here — the card above owns this zone ── -->
-            <div v-if="coveredHere && selectedZone" class="pay-step">
-              <div class="covered">
-                <Icon name="check" :size="15" />
-                <div>
-                  <p class="covered-title">{{ t("alreadyRunning") }}</p>
-                  <p class="covered-sub">{{ t("alreadyRunningSub") }}</p>
-                  <!-- The one action Kerb can't infer: their SMS may never have
-                       landed, and only they can tell. Quiet on purpose — it must
-                       not read as a second way to pay. -->
-                  <button
-                    type="button"
-                    class="covered-resend"
-                    @click="resend(selectedZone)"
-                  >
-                    {{ t("resendSms") }}
-                  </button>
-                </div>
-              </div>
-            </div>
-
             <!-- ── Pay — consequence first, then the gesture ── -->
-            <div v-else-if="payAction?.actionable" class="pay-step">
+            <div v-if="payAction?.actionable" class="pay-step">
               <!-- Covered-until + the plate chip (accounts only — guests type the
                plate in the open above). At night the free-surface tip already
                explained the carry-over, so no consequence line repeats it here. -->
@@ -474,7 +375,7 @@
                   :done-label="payDoneLabel"
                   :color="selectedZone.color"
                   :disabled="!defaultPlate"
-                  @confirm="pay(selectedZone, { armed: true })"
+                  @confirm="pay(selectedZone)"
                 />
                 <p v-if="!defaultPlate" class="pay-need-plate">
                   {{ t("needPlate") }}
@@ -700,44 +601,12 @@
               <AddToHomeScreen :earned="hasParked" />
             </ClientOnly>
 
-            <!-- Guest → account nudge (memory + reminders + fine alerts) -->
-            <div v-if="!user" class="guest-upsell">
-              <span class="guest-upsell-icon"
-                ><Icon name="bell" :size="16"
-              /></span>
-              <p class="guest-upsell-text">
-                {{ t("guestPre") }}
-                <NuxtLink to="/login">{{ t("createAccount") }}</NuxtLink>
-                {{ t("guestPost") }}
-              </p>
-            </div>
-
-            <!-- Personal fine check (manual) — works for guests too -->
-            <FineCheck :initial-plate="defaultPlate" class="gps-finecheck" />
-
             <!-- Fine warning -->
             <div v-if="cityDetail.fine" class="gps-fine">
               <span class="gps-fine-label">{{ t("fineIfUnpaid") }}</span>
               <span class="gps-fine-amount">{{ cityDetail.fine }}</span>
             </div>
 
-            <!-- Recent sessions -->
-            <div v-if="pastSessions.length" class="gps-history">
-              <p class="section-label">{{ t("recentSessions") }}</p>
-              <div v-for="s in pastSessions" :key="s.id" class="hist-row">
-                <span
-                  class="hist-dot"
-                  :style="{ background: s.zone_color || 'var(--text2)' }"
-                />
-                <span class="hist-main">
-                  <span class="hist-zone">{{ s.zone_name }}</span>
-                  <span v-if="s.street_name" class="hist-street">
-                    · {{ s.street_name }}</span
-                  >
-                </span>
-                <span class="hist-when">{{ relTime(s.started_at) }}</span>
-              </div>
-            </div>
           </div>
           <!-- /city info --> </template
         ><!-- /full dashboard -->
@@ -775,35 +644,6 @@
         />
       </ClientOnly>
 
-      <!-- SMS handoff — the web can't verify the send, so we ask -->
-      <ClientOnly>
-        <Teleport to="body">
-          <div
-            v-if="showSentPrompt"
-            class="sent"
-            role="dialog"
-            aria-label="Confirm SMS sent"
-          >
-            <div ref="sentSheetEl" class="sent-sheet" tabindex="-1">
-              <p class="sent-title">{{ t("sentTitle") }}</p>
-              <p class="sent-sub">
-                {{ t("sentBody1") }}
-                <strong>{{ pendingPay?.zone.sms_shortcode }}</strong
-                >.
-                {{ t("sentBody2") }}
-              </p>
-              <div class="sent-actions">
-                <button type="button" class="sent-no" @click="onSentNo">
-                  {{ t("sentNo") }}
-                </button>
-                <button type="button" class="sent-yes" @click="onSentYes">
-                  {{ t("sentYes") }}
-                </button>
-              </div>
-            </div>
-          </div>
-        </Teleport>
-      </ClientOnly>
     </section>
 
     <template v-else>
@@ -1131,31 +971,6 @@ const showScan = ref(false); // scan-the-sign modal
 const showAi = ref(false); // ask-AI resolver panel
 const signReports = ref<any[]>([]); // confirmed sign scans → map pins
 const { loadForCity: loadSignReports } = useSignScan();
-const locateCar = ref(false); // "find my car" — point the map at the saved session
-
-// Parking session tracking (logs each pay, geotagged)
-const {
-  active: activeSession,
-  history: sessionHistory,
-  remainingMs,
-  atZoneLimit,
-  canExtend,
-  loadActive,
-  loadHistory,
-  startOrExtend,
-  endSession,
-} = useParkingSession();
-
-watch(
-  user,
-  (u) => {
-    if (u) {
-      loadActive();
-      loadHistory();
-    }
-  },
-  { immediate: true }
-);
 
 // Time-aware hours — drives free-now desaturation + the night pre-pay path.
 // Falls back to the remembered city so the pre-GPS skeleton already knows which
@@ -1185,7 +1000,7 @@ const statusCanPrepay = computed(
 // (to pre-pay or browse zones) — that flips forceBrowse and reveals the tabs.
 const forceBrowse = ref(false);
 const freeSurface = computed(
-  () => freeNow.value && !forceBrowse.value && !displaySession.value
+  () => freeNow.value && !forceBrowse.value
 );
 const browseAnyway = () => {
   forceBrowse.value = true;
@@ -1194,84 +1009,23 @@ const statusToPrepay = () => {
   forceBrowse.value = true;
 };
 
-// Guest sessions (no account), persisted on-device. Created only AFTER the user
-// confirms they sent the SMS. Logged-in users keep the Supabase-backed session.
-const guest = useGuestSession();
-const displaySession = computed<any>(() =>
-  user.value ? activeSession.value : guest.active.value
-);
-const displayRemaining = computed(() =>
-  user.value ? remainingMs.value : guest.remainingMs.value
-);
-const displayAtLimit = computed(() =>
-  user.value ? atZoneLimit.value : guest.atZoneLimit.value
-);
-const displayCanExtend = computed(() =>
-  user.value ? canExtend.value : guest.canExtend.value
-);
-
-// ── Expiry reminder, held on the device ───────────────────────────────────────
-// Web Push covers the online, logged-in case from the server. This covers the
-// rest of reality: no signal, no account, a foreign SIM. The deadline is written
-// to IndexedDB and fired by whichever of page or service worker is awake.
-const {
-  supported: remindSupported,
-  enabled: remindOn,
-  blocked: remindBlocked,
-  enable: enableReminders,
-  disable: disableReminders,
-  scheduleFor: scheduleReminders,
-} = useLocalReminders();
-
-// iPhone in a Safari tab has no Notification API at all — the only route to a
-// reminder there is the home screen, so say that instead of an empty switch.
-const iosNoNotifications = computed(() => {
-  if (!import.meta.client || remindSupported.value) return false;
-  const ua = navigator.userAgent;
-  return /iphone|ipad|ipod/i.test(ua) || (/macintosh/i.test(ua) && navigator.maxTouchPoints > 1);
-});
-
-const toggleReminders = async () => {
-  if (remindOn.value) await disableReminders();
-  else if (await enableReminders()) await scheduleReminders(displaySession.value);
-};
-
-// Re-arm whenever the running session changes — paid, extended, ended, or just
-// reloaded from storage. Keyed on the expiry so extending an hour moves the
-// alarm rather than leaving the old one to fire early.
-watch(
-  [displaySession, remindOn],
-  ([s]) => {
-    scheduleReminders(s ?? null);
-  },
-  { immediate: true }
-);
-
 // Lock body scroll + close on Escape while the fullscreen map is open
 watch(mapExpanded, (open) => {
   if (import.meta.server) return;
   document.body.style.overflow = open ? "hidden" : "";
   if (!open) {
-    locateCar.value = false; // reset find-my-car when the map closes
     leadSignPoint.value = null; // and the lead-to-sign pointer
     searchPin.value = null; // and any searched address
     searchZones.value = null;
     searchCityName.value = null;
   }
 });
-// Escape closes whatever is on top: SMS-sent sheet → map.
+// Escape closes the fullscreen map.
 // (ScanSign / AskAi / CityHelp handle their own Escape via useDialogBehavior.)
 const onKeydown = (e: KeyboardEvent) => {
   if (e.key !== "Escape") return;
-  if (showSentPrompt.value) {
-    onSentNo();
-    return;
-  }
   mapExpanded.value = false;
 };
-
-// Move focus into the SMS-sent sheet when it opens so keyboard/SR users land there.
-const sentSheetEl = ref<HTMLElement | null>(null);
 onMounted(() => window.addEventListener("keydown", onKeydown));
 onUnmounted(() => {
   window.removeEventListener("keydown", onKeydown);
@@ -1468,16 +1222,6 @@ const selectedZone = computed(
 // only mislabelled as a fresh payment. With skip-confirm on it is a single tap,
 // and Kerb cannot see whether the SMS landed, so the only thing standing between
 // the user and a second billed message is not offering the button twice.
-// Expired does not count as covered: that is precisely the moment the driver
-// needs the pay button back, so an hour that has run out must not go on
-// suppressing it.
-const coveredHere = computed(
-  () =>
-    !!displaySession.value &&
-    displaySession.value.zone_name === selectedZone.value?.name &&
-    (displayRemaining.value == null || displayRemaining.value > 0)
-);
-
 // Once the user explicitly taps/scans/AI-picks a zone, stop auto-following the
 // likely guess. Before that, the selection must track likelyZoneName — otherwise
 // the early fallback (first zone, while GPS is still resolving) sticks and the
@@ -1565,16 +1309,9 @@ const nearestSignArrow = computed(() => {
   return heading.value != null ? n.bearing - heading.value : n.bearing;
 });
 
-// "Find my car" point, a tapped lead-to-sign point, else the nearest paid segment.
+// A tapped lead-to-sign point, else the nearest paid segment.
 const leadSignPoint = ref<{ lat: number; lng: number } | null>(null);
 const highlightPoint = computed(() => {
-  if (
-    locateCar.value &&
-    displaySession.value?.lat != null &&
-    displaySession.value?.lng != null
-  ) {
-    return { lat: displaySession.value.lat, lng: displaySession.value.lng };
-  }
   if (leadSignPoint.value) return leadSignPoint.value;
   return parkingState.value === "near" || parkingState.value === "none"
     ? nearest.value?.point ?? null
@@ -1589,119 +1326,22 @@ const onLeadToSign = () => {
   mapExpanded.value = true;
 };
 
-// ── Session actions ───────────────────────────────────────────────────────────
-const sessionPayload = (zone: any) => ({
-  cityId: detectedCity.value!.id,
-  zone: {
-    name: zone.name,
-    color: zone.color,
-    price: zone.price,
-    rules: zone.rules,
-  },
-  street: nearest.value?.streetName ?? null,
-  lat: coords.value?.lat ?? null,
-  lng: coords.value?.lng ?? null,
-  plate: defaultPlate.value,
-});
-
-// Logged-in users get the Supabase session logged on tap (existing behaviour).
-const onPay = (zone: any) => {
-  startOrExtend(sessionPayload(zone));
-};
-
-const guestPayload = (zone: any, armed: boolean) => ({
-  cityId: detectedCity.value!.id,
-  zone: {
-    name: zone.name,
-    color: zone.color,
-    price: zone.price,
-    rules: zone.rules,
-  },
-  street: nearest.value?.streetName ?? null,
-  lat: coords.value?.lat ?? null,
-  lng: coords.value?.lng ?? null,
-  plate: defaultPlate.value,
-  armed,
-});
-
 // ── SMS handoff ────────────────────────────────────────────────────────────────
-// The web can't verify an SMS was sent. So: open the composer, and when the user
-// returns to the tab, ask. Only on "yes" do we record a (self-reported) session.
-const pendingPay = ref<{ zone: any; armed: boolean } | null>(null);
-const showSentPrompt = ref(false);
-watch(showSentPrompt, (open) => {
-  if (open) nextTick(() => sentSheetEl.value?.focus());
-});
-let _visHandler: (() => void) | null = null;
-const armSentPrompt = () => {
-  if (!import.meta.client || _visHandler) return;
-  _visHandler = () => {
-    if (document.visibilityState !== "visible") return;
-    document.removeEventListener("visibilitychange", _visHandler!);
-    _visHandler = null;
-    if (pendingPay.value) showSentPrompt.value = true;
-  };
-  document.addEventListener("visibilitychange", _visHandler);
-};
-
-// Confirmed (slide/tap) → open the SMS composer + arm the "did you send it?" check.
-const pay = (zone: any, opts: { armed?: boolean } = {}) => {
+// Open the composer, and stop. Kerb never learns whether the message was sent,
+// what it cost, or when the hour really began — the operator's reply is the
+// receipt and its own warning before expiry is the reminder. Recording a session
+// here would be recording a guess, and dressing a guess as a record is the one
+// thing this app does not do.
+const pay = (zone: any) => {
   // No plate, no payment. The SMS is nothing but the plate — sending it without
   // one buys the driver an unpaid hour they believe is paid, which is the exact
   // fine this app exists to prevent. The surfaces above disable themselves, but
   // the scan flow reaches this function by another route.
-  if (!defaultPlate.value) return;
-  if (user.value) {
-    onPay(zone); // logged-in keeps its immediate Supabase log (unchanged)
-  } else {
-    pendingPay.value = { zone, armed: !!opts.armed }; // guest: confirm the send first
-    armSentPrompt();
-  }
-  if (import.meta.client) {
-    const a = payActionFor(zone, { plate: defaultPlate.value });
-    if (a.actionable) openPayAction(a);
-  }
-};
-
-// Re-open the composer for a zone already running, for the one case Kerb can't
-// see: the first SMS never landed. Deliberately does NOT touch the session — if
-// the original did go through this buys a real second hour we can't detect, and
-// under-reporting that is safer than a record claiming time nobody paid for.
-const resend = (zone: any) => {
-  if (!import.meta.client || !zone) return;
+  if (!defaultPlate.value || !import.meta.client) return;
   const a = payActionFor(zone, { plate: defaultPlate.value });
   if (a.actionable) openPayAction(a);
 };
 
-const onSentYes = () => {
-  const p = pendingPay.value;
-  if (p && !user.value)
-    guest.create(guestPayload(p.zone, p.armed), "self_reported");
-  showSentPrompt.value = false;
-  pendingPay.value = null;
-};
-const onSentNo = () => {
-  showSentPrompt.value = false;
-  pendingPay.value = null;
-};
-
-const onExtend = () => {
-  const name = displaySession.value?.zone_name;
-  const z = cityDetail.value?.zones?.find((x: any) => x.name === name);
-  if (!z) return;
-  if (user.value) {
-    startOrExtend(sessionPayload(z));
-    if (import.meta.client && z.sms_shortcode) openSms(smsLink(z));
-  } else {
-    pay(z); // guest: re-open the SMS, confirm, log a fresh hour
-  }
-};
-
-const onEndSession = () => {
-  const s = displaySession.value;
-  if (!s) return;
-  user.value ? endSession(s.id) : guest.end(s.id);
-};
 // A searched address drops a pin on the expanded map, the same way a scanned
 // sign or a parked car does — nothing about the pay flow changes, since the
 // driver is not standing there.
@@ -1719,11 +1359,6 @@ const onLocateAddress = (hit: any) => {
   searchZones.value = hit.geojson?.features?.length ? hit.geojson : null;
   searchCityName.value = hit.detail?.split(' · ').pop() || null;
   leadSignPoint.value = null;
-  mapExpanded.value = true;
-};
-
-const onLocateCar = () => {
-  locateCar.value = true;
   mapExpanded.value = true;
 };
 
@@ -1755,20 +1390,10 @@ const onAiScan = () => {
   showScan.value = true;
 };
 
-// Has this driver actually parked with Kerbo — now or before, with an account or
-// as a guest? Gates the home-screen offer, which has nothing to earn until then.
-const hasParked = computed(
-  () =>
-    !!displaySession.value ||
-    sessionHistory.value.length > 0 ||
-    guest.history.value.length > 0
-);
-
-const pastSessions = computed(() =>
-  sessionHistory.value
-    .filter((s: any) => s.id !== activeSession.value?.id)
-    .slice(0, 5)
-);
+// The home-screen offer used to wait for a parking session to prove the app had
+// been worth something. With no sessions to wait for, a saved plate is the
+// nearest honest proxy: typing it is how far into the pay flow anyone gets.
+const hasParked = computed(() => !!defaultPlate.value);
 
 const relTime = (iso: string) => {
   const sr = lang.value === "sr";

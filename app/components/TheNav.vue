@@ -4,7 +4,6 @@
       <NuxtLink to="/" class="nav-logo">Kerb</NuxtLink>
       <ul class="nav-links">
         <li><NuxtLink to="/cities">Cities</NuxtLink></li>
-        <li v-if="user"><NuxtLink to="/sessions">Sessions</NuxtLink></li>
         <li><NuxtLink to="/roadmap">Roadmap</NuxtLink></li>
         <li><NuxtLink to="/contribute">Contribute</NuxtLink></li>
       </ul>
@@ -38,10 +37,6 @@
     <NuxtLink to="/cities" class="tabbar-item" :class="{ on: route.path.startsWith('/cities') }">
       <Icon name="city" :size="20" />
       <span>Cities</span>
-    </NuxtLink>
-    <NuxtLink v-if="user" to="/sessions" class="tabbar-item" :class="{ on: route.path.startsWith('/sessions') }">
-      <Icon name="clock" :size="20" />
-      <span>Sessions</span>
     </NuxtLink>
     <NuxtLink to="/contribute" class="tabbar-item" :class="{ on: route.path.startsWith('/contribute') }">
       <Icon name="plus" :size="20" />
