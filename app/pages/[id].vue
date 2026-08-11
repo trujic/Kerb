@@ -118,6 +118,13 @@
               :zones="city.zones"
             />
 
+            <!-- The one city that publishes its signs. The rate zone gives the
+                 price; the plate on the block decides whether you may park at
+                 all, so it gets its own surface directly under the map. -->
+            <ClientOnly>
+              <NycSignLookup v-if="city.id === 'new-york-city'" class="sign-lookup" />
+            </ClientOnly>
+
             <!-- Zones -->
             <div class="info-block">
               <p class="section-label">Parking zones</p>
@@ -435,6 +442,7 @@ useSeoMeta({
 .tag-row { display: flex; flex-wrap: wrap; gap: 6px; }
 
 /* Disclaimer */
+.sign-lookup { margin-bottom: 22px; }
 /* Today's suspensions. Two rows because they are two different answers, and the
    whole point is that they can disagree with each other. */
 .asp-bar {
