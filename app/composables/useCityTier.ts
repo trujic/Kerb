@@ -32,6 +32,10 @@ const CITY_TIERS: Record<string, MapTier> = {
   // Thessaloniki publishes its own GeoJSON — per-space polygons straight from the
   // operator, not traced by us. The best source any city here has.
   'thessaloniki': 'cadastre',
+  // New York publishes the meter rate zones as an open dataset with geometry and
+  // the rate on every feature, refreshed by the city itself — nothing is traced
+  // and nothing is derived. See scripts/build-nyc-zones.mjs.
+  'new-york-city': 'cadastre',
 }
 
 // Why a city is only approximate differs by city, and the difference matters to

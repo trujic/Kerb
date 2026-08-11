@@ -117,10 +117,16 @@
                   {{ pm.label }}
                 </div>
               </div>
+              <!-- Not every city pays by SMS. New York has no shortcode at all,
+                   and a box headed "SMS" over text saying so reads as a mistake —
+                   so the heading follows the city, and the receipt line only
+                   appears where there is actually a reply to keep. -->
               <div v-if="city.sms_instructions" class="sms-box">
-                <p class="sms-label">Step by step — SMS</p>
+                <p class="sms-label">Step by step — {{ usesSms ? 'SMS' : 'paying here' }}</p>
                 <p>{{ city.sms_instructions }}</p>
-                <p class="sms-receipt">The operator's reply SMS is your official receipt — keep it.</p>
+                <p v-if="usesSms" class="sms-receipt">
+                  The operator's reply SMS is your official receipt — keep it.
+                </p>
               </div>
             </div>
 
@@ -186,6 +192,12 @@ const { data: city, pending, error } = await useAsyncData(
 
 // Live paid/free status for the pinned chip.
 const { status } = useParkingHours(() => city.value?.id)
+
+// Does this city pay by SMS at all? A shortcode on any zone is the only evidence
+// that matters — New York has none, and metered cities never will.
+const usesSms = computed(() =>
+  (city.value?.zones ?? []).some((z: any) => !!z.sms_shortcode)
+)
 
 // Map tier — how authoritative our spatial data is for this city.
 const { tier: mapTier } = useCityTier(() => city.value?.id)

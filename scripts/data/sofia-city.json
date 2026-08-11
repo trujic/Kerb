@@ -1,0 +1,98 @@
+{
+  "_provenance": {
+    "read_on": "2026-08-11",
+    "act": "Решение № 883 по Протокол № 51 от 13.11.2025 на Столичния общински съвет, in force from 05.01.2026 (amending НОДТСО). Reinstated by the Supreme Administrative Court after the Sofia Administrative Court's suspension was overturned as inadmissible — the increase applies retroactively from 05.01.2026.",
+    "prices_from": "Appendix to the ordinance (price schedule), Decision № 883/13.11.2025",
+    "hours_and_zones_from": "Council decision as reported by Boulevard Bulgaria and Mediapool, consistent with the price schedule",
+    "operator_page_conflict": "https://www.sofiatraffic.bg/bg/info-center/pochasovo-plateno-parkirane still shows €1.02 / €0.51, a 20:00 close, no Sunday charging, only two zones, and cites amendments only up to Decision № 704/2021. It is the operator's information page, not the act. We publish the act.",
+    "not_verified_on_the_ground": "Nobody has stood at a Sofia sign and confirmed this. verified stays false.",
+    "sms_shortcodes_withheld": "1302 (Blue) and 1303 (Green) are real, but they only accept a Bulgarian mobile number. Left out of the zone rows on purpose: a shortcode there becomes a slide-to-pay, and for a driver on a foreign SIM that slide sends a message that is silently never delivered. The numbers are stated in the instructions and payment methods, where the BG-SIM condition can be stated with them.",
+    "unresolved": "Whether the 3h/4h maximum applies outside charging hours is not stated in the act we read; deliberately not claimed either way."
+  },
+  "city": {
+    "id": "sofia",
+    "name": "Sofia",
+    "country": "Bulgaria",
+    "flag": "🇧🇬",
+    "verified": false,
+    "verified_by": null,
+    "last_updated": "August 2026",
+    "overview": "Sofia's street parking is run by the Centre for Urban Mobility (ЦГМ) for Sofia Municipality. Since 5 January 2026 there are three zones: Blue in the centre at €2/h, Green around it at €1/h, and a new Yellow weekend zone in Bankya at €0.50/h. The one that catches visitors out is the Blue zone — it charges every day 09:00–21:00, including Sundays and public holidays, which almost no other city does. Green runs Mon–Sat, free on Sundays and holidays. Two things worth knowing before you travel: the SMS numbers only work from a Bulgarian SIM, so with a foreign phone you need the Urbo or Sofia Plus app and a card; and you cannot buy a whole day on the street — 3 hours maximum in Blue, 4 in Green.",
+    "fine": "Clamp: €30 + the hourly charge due until the zone closes · Towing: €75",
+    "official_url": "https://www.sofiatraffic.bg/bg/info-center/pochasovo-plateno-parkirane",
+    "sms_instructions": "The SMS numbers only work from a Bulgarian mobile number — a Serbian or other foreign SIM cannot pay this way, and there is no error to tell you so. With a BG SIM: send the plate in LATIN capitals, no spaces, to 1302 (Blue) or 1303 (Green), before you leave the car, and keep the confirmation as your receipt. With a foreign SIM: pay by card in the Urbo or Sofia Plus app, or buy a paper coupon from a controller or a ЦГМ kiosk."
+  },
+  "zones": [
+    {
+      "name": "Blue Zone",
+      "color": "#2F6FDB",
+      "sms_shortcode": null,
+      "sort_order": 1,
+      "price": "€2.00/h",
+      "rules": "City centre. Max 3 hours. Charged EVERY day 09:00–21:00 — including Sundays and public holidays. SMS 1302 needs a Bulgarian SIM; with a foreign phone use Urbo or Sofia Plus."
+    },
+    {
+      "name": "Green Zone",
+      "color": "#2FB36B",
+      "sms_shortcode": null,
+      "sort_order": 2,
+      "price": "€1.00/h",
+      "rules": "The ring around the centre. Max 4 hours. Charged Mon–Sat 09:00–21:00; free on Sundays and public holidays. SMS 1303 needs a Bulgarian SIM; with a foreign phone use Urbo or Sofia Plus."
+    },
+    {
+      "name": "Yellow Zone (weekend)",
+      "color": "#E6A700",
+      "sms_shortcode": null,
+      "sort_order": 3,
+      "price": "€0.50/h",
+      "rules": "Bankya only, and only at the weekend: Saturday and Sunday 10:00–18:00. New since 5 Jan 2026. Residents get a free local sticker. Pay by app — we have not confirmed a dedicated SMS number for this zone."
+    }
+  ],
+  "payment_methods": [
+    { "label": "📱 Urbo app — card, works with a foreign phone", "sort_order": 1 },
+    { "label": "📱 Sofia Plus app — card, works with a foreign phone", "sort_order": 2 },
+    { "label": "💬 SMS 1302 / 1303 — Bulgarian SIM only", "sort_order": 3 },
+    { "label": "🎟 Paper coupon from a controller or ЦГМ kiosk", "sort_order": 4 },
+    { "label": "💬 Viber chatbot “Център за градска мобилност”", "sort_order": 5 }
+  ],
+  "tips": [
+    {
+      "icon": "🇧🇬",
+      "text": "With a foreign SIM the SMS numbers simply do not work — no error, no payment, and you find out when you see the clamp. Install Urbo or Sofia Plus before you travel, or buy a paper coupon from a controller.",
+      "sort_order": 1
+    },
+    {
+      "icon": "🗓",
+      "text": "The Blue zone charges on Sundays and public holidays too, 09:00–21:00. Most European cities are free then, so this is where visitors get caught.",
+      "sort_order": 2
+    },
+    {
+      "icon": "⏱",
+      "text": "You cannot buy a whole day on the street: 3 hours maximum in Blue, 4 in Green. For a longer stay use a car park — ЦГМ publishes a list of car parks inside the zones.",
+      "sort_order": 3
+    },
+    {
+      "icon": "⚠",
+      "text": "Sources disagree right now, and we follow the act. Decision № 883 of 13.11.2025, in force since 5 Jan 2026, sets €2 and €1 an hour and a 21:00 close. The operator's own information page still shows €1.02 and €0.51, closes at 20:00 and does not mention Sunday — it cites amendments only up to 2021. We publish the decision, because that is what legally applies, and because being wrong toward 'you must pay' costs a euro while being wrong toward 'it is free' costs a clamp.",
+      "sort_order": 4
+    },
+    {
+      "icon": "🔤",
+      "text": "Type your plate in Latin characters, exactly as on the car. One wrong character means the payment is never matched to your vehicle — people have paid in full and been clamped anyway.",
+      "sort_order": 5
+    },
+    {
+      "icon": "🅿️",
+      "text": "Kerb has no zone map for Sofia yet, on purpose. The operator's published zone scheme is from February 2025 and predates two rounds of expansion, so drawing it would show you last year's city. Read the sign where you park.",
+      "sort_order": 6
+    }
+  ],
+  "tags": [
+    { "label": "Blue zone" },
+    { "label": "Green zone" },
+    { "label": "Weekend zone" },
+    { "label": "App pay" },
+    { "label": "BG SIM for SMS" },
+    { "label": "Sunday charged" }
+  ]
+}

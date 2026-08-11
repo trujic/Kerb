@@ -27,11 +27,20 @@ export const useCity = () => {
       .order('name')
 
     if (error) throw error
+    // Drafts sit alongside the real list in dev so the grid shows what the card
+    // will look like — badge, tags and all — before anything is published.
+    if (import.meta.dev) {
+      const drafts = await Promise.all(draftCityIds().map((id) => draftCity(id)))
+      const extra = drafts.filter((d) => d && !data?.some((c: any) => c.id === d.id))
+      if (extra.length) return [...(data ?? []), ...extra].sort((a: any, b: any) => a.name.localeCompare(b.name))
+    }
     return data
   }
 
   // Fetch one city with all related data for the detail page
   const getCity = async (id: string) => {
+    const draft = await draftCity(id)
+    if (draft) return draft
     const { data, error } = await supabase
       .from('cities')
       .select(`

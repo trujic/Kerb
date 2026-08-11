@@ -1,0 +1,126 @@
+{
+  "_provenance": {
+    "read_on": "2026-08-11",
+    "rates_from": "NYC Open Data, 'Parking Meters - Citywide Rate Zones' (dataset f72k-2u3b) — 52 official MultiPolygon features carrying the rate text verbatim. Queried live, not transcribed from a page.",
+    "rules_from": "NYC DOT, Parking Meters (nyc.gov/html/dot/html/motorist/parking-rates.shtml) and Alternate Side Parking Suspensions (…/alternate-side-parking.shtml)",
+    "sign_data_available": "NYC Open Data, 'Parking Regulation Locations and Signs' (nfid-uabd) — 441,270 rows, current and historical, per sign: on_street, from_street, to_street, side_of_street, sign_description, distance_from_intersection, coordinates, and the date the sign order was completed. The most recent rows are from July 2026.",
+    "blockface_rates_available": "NYC Open Data, 'Parking Meters - ParkNYC Block Faces' (s7zi-dgdx) — 11,185 blockfaces, last updated 2026-08-01.",
+    "not_verified": "Ticket amounts and towing fees are NOT read from source yet — the fine field says so rather than guessing. Congestion pricing (a toll for entering Manhattan below 60th St, not a parking charge) is deliberately left out until read from the MTA source. The widely repeated 'five-minute grace period' for ASP comes from secondary sources and is not claimed here.",
+    "source_conflict_asp_calendar": "NYC DOT publishes the 2026 Alternate Side Parking suspension calendar twice — as an HTML table and as a downloadable .ics — and they do not agree. Six dates appear in the table and are absent from the .ics: 2026-03-21 (Idul-Fitr), 2026-05-23 (Shavuoth 2nd day), 2026-05-28 (Idul-Adha), 2026-07-04 (Independence Day), 2026-09-13 (Rosh Hashanah), 2026-09-27 (Succoth 2nd day). July 4th is the one that costs money: the table marks it a major legal holiday, which suspends the METERS as well, while the machine-readable file — the one any developer would parse — does not list the day at all. Both readings are shipped in public/calendars/new-york-city-asp-2026.json, marked `disputed`, and on those days the app refuses to say the meters are free. Read 2026-08-11.",
+    "model_mismatch": "NYC does not work like a European zone city. There are no zone shortcodes and nothing to send an SMS to; you pay the meter or the ParkNYC app. The rate zone tells you the price, but the posted sign on that blockface tells you whether you may park at all, and for how long. That is why every zone row here ends by pointing at the sign."
+  },
+  "city": {
+    "id": "new-york-city",
+    "name": "New York City",
+    "country": "United States",
+    "flag": "🇺🇸",
+    "verified": false,
+    "verified_by": null,
+    "last_updated": "August 2026",
+    "overview": "New York does not sell zone stickers — it meters the kerb and regulates it by sign. What you pay depends on which of the six meter rate zones you are in, and rates step up by the hour: in the Financial District the first hour is $5.50 and the second is $9.00, while most of the outer boroughs are $1.50 then $2.50. Metered regulations do not apply on Sundays or on six major legal holidays. The part that actually catches people is not the price but the sign: maximum stay ranges from one to fifteen hours depending on the block and vehicle, and Alternate Side Parking means the car must be moved on street-cleaning days unless the city has suspended the rules that day. Pay at the meter — most are now pay-by-plate — or with the ParkNYC app. Read the sign on the block before you walk away; in New York it outranks everything on this page.",
+    "fine": "Not yet read from source — ticket and towing amounts vary by violation and location, and we will not guess them",
+    "official_url": "https://www.nyc.gov/html/dot/html/motorist/parking-rates.shtml",
+    "sms_instructions": "There is no SMS payment in New York — no shortcode exists. Pay at the meter (most are now pay-by-plate: type your plate, keep no receipt on the dashboard) or in the ParkNYC app, which covers on-street parking in all five boroughs and can warn you before your time runs out. Older pay-and-display meters still require the receipt on the dashboard."
+  },
+  "zones": [
+    {
+      "name": "Zone M1 — Financial District",
+      "color": "#B4232B",
+      "sms_shortcode": null,
+      "sort_order": 1,
+      "price": "$5.50 → $9.00/h",
+      "rules": "Manhattan's Financial District, the most expensive kerb in the city. All vehicles: $5.50 first hour, $9.00 second, $5.50 third. Commercial: $7.00 / $10.00 / $13.00. Maximum stay is set by the sign on the block, not by the zone."
+    },
+    {
+      "name": "Zone M2 — Manhattan Neighborhood",
+      "color": "#DC4B3E",
+      "sms_shortcode": null,
+      "sort_order": 2,
+      "price": "$5.00 → $8.25/h",
+      "rules": "Most of metered Manhattan. All vehicles: $5.00 first hour, $8.25 second. Commercial: $6.00 / $9.00 / $12.00. Maximum stay is set by the sign on the block."
+    },
+    {
+      "name": "Zone M3 — 96th to 110th St",
+      "color": "#E6A700",
+      "sms_shortcode": null,
+      "sort_order": 3,
+      "price": "$3.00 → $5.00/h",
+      "rules": "Upper Manhattan between 96th and 110th Street. All vehicles: $3.00 first hour, $5.00 second."
+    },
+    {
+      "name": "Zone 1 — Boerum Hill / Carroll Gardens / Cobble Hill",
+      "color": "#2F6FDB",
+      "sms_shortcode": null,
+      "sort_order": 4,
+      "price": "$2.50 → $5.00/h",
+      "rules": "Brownstone Brooklyn plus pockets of Manhattan and Queens. All vehicles: $2.50 first hour, $5.00 second."
+    },
+    {
+      "name": "Zone 2 — Bronx Hub",
+      "color": "#7A5AF8",
+      "sms_shortcode": null,
+      "sort_order": 5,
+      "price": "$2.00 → $3.00/h",
+      "rules": "Busy commercial strips across all five boroughs. All vehicles: $2.00 first hour, $3.00 second."
+    },
+    {
+      "name": "Zone 3 — Outerborough",
+      "color": "#2FB36B",
+      "sms_shortcode": null,
+      "sort_order": 6,
+      "price": "$1.50 → $2.50/h",
+      "rules": "The default rate across most of the city outside the Manhattan core. All vehicles: $1.50 first hour, $2.50 second."
+    }
+  ],
+  "payment_methods": [
+    { "label": "📱 ParkNYC app — all five boroughs", "sort_order": 1 },
+    { "label": "🅿️ Pay-by-plate meter — type your plate, no receipt needed", "sort_order": 2 },
+    { "label": "🎫 Pay-and-display meter — receipt goes on the dashboard", "sort_order": 3 },
+    { "label": "💳 Card or coins at the meter", "sort_order": 4 }
+  ],
+  "tips": [
+    {
+      "icon": "🪧",
+      "text": "The rate zone tells you the price. The sign on the block tells you whether you may park there at all, and for how long — anywhere from one hour to fifteen. In New York the sign always outranks the zone.",
+      "sort_order": 1
+    },
+    {
+      "icon": "🧹",
+      "text": "Alternate Side Parking is the rule that tows visitors. On street-cleaning days the car has to be off that side of the street during the posted window. The city suspends ASP on a long list of legal and religious holidays, and for weather emergencies — check the day before you leave the car overnight.",
+      "sort_order": 2
+    },
+    {
+      "icon": "🗓",
+      "text": "Metered regulations do not apply on Sundays, nor on New Year's Day, Memorial Day, Independence Day, Labor Day, Thanksgiving and Christmas. Every other posted rule still applies on those days — free meter does not mean free-for-all.",
+      "sort_order": 3
+    },
+    {
+      "icon": "📈",
+      "text": "Rates step up by the hour rather than staying flat. A second hour in the Financial District costs $9.00 on top of the first hour's $5.50 — parking for two hours is not double the one-hour price, it is more.",
+      "sort_order": 4
+    },
+    {
+      "icon": "🚚",
+      "text": "Commercial vehicles pay their own, higher rates in the Manhattan zones — up to $13.00 for a third hour in the Financial District. If you are in a van with company plates, do not read the passenger-car number.",
+      "sort_order": 5
+    },
+    {
+      "icon": "🗄",
+      "text": "New York publishes its parking signs as open data — 441,270 of them, with the street, the side, the sign text and the date it was installed. It is the only city in Kerb where the sign itself is a dataset, and we have not built on it yet.",
+      "sort_order": 6
+    },
+    {
+      "icon": "🤨",
+      "text": "The city publishes its 2026 suspension calendar twice — as a table and as a downloadable file — and the two disagree on six days: 21 Mar, 23 May, 28 May, 4 July, 13 Sep and 27 Sep. The 4th of July matters most: the table calls it a major legal holiday, which would make the meters free, and the downloadable file does not list the day at all. On those six days we will not tell you the meters are free. Pay, or read the sign.",
+      "sort_order": 7
+    }
+  ],
+  "tags": [
+    { "label": "Metered" },
+    { "label": "Pay by plate" },
+    { "label": "ParkNYC" },
+    { "label": "Alternate Side" },
+    { "label": "Sunday free" },
+    { "label": "No SMS" }
+  ]
+}
