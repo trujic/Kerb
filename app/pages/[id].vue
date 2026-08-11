@@ -63,6 +63,46 @@
         </div>
       </div>
 
+      <!-- Today, where the city suspends things on its own calendar. Two separate
+           suspensions: street cleaning on ~40 days, the meters on only six of
+           them — and being told "parking is suspended" is exactly how people end
+           up not paying a meter that is running. -->
+      <ClientOnly>
+        <section v-if="aspLoaded" class="asp-bar">
+          <div class="container asp-inner">
+            <div class="asp-row">
+              <span class="asp-key">Street cleaning</span>
+              <span class="asp-val" :class="cleaningSuspended ? 'ok' : 'on'">
+                {{ cleaningSuspended ? 'Suspended today' : 'In effect today' }}
+              </span>
+            </div>
+            <div class="asp-row">
+              <span class="asp-key">Meters</span>
+              <span
+                class="asp-val"
+                :class="metersSuspended === true ? 'ok' : metersSuspended === null ? 'warn' : 'on'"
+              >
+                {{ metersSuspended === true ? 'Free today'
+                   : metersSuspended === null ? 'Assume they are running'
+                   : 'Charging as normal' }}
+              </span>
+            </div>
+            <p v-if="aspToday?.holiday" class="asp-why">
+              {{ aspToday.holiday }}<span v-if="!aspDisputed && metersSuspended === false">
+                — street cleaning only; the meters still charge</span>
+            </p>
+            <p v-if="aspDisputed" class="asp-dispute">
+              ⚠ The city's own calendar page and its downloadable calendar disagree
+              about today. We will not tell you the meters are free on a day we
+              cannot confirm — pay, or check the sign.
+            </p>
+            <p v-if="aspNext" class="asp-next">
+              Next suspension {{ aspNext.date }}<span v-if="aspNext.holiday"> · {{ aspNext.holiday }}</span>
+            </p>
+          </div>
+        </section>
+      </ClientOnly>
+
       <!-- Body -->
       <section class="city-body">
         <div class="container city-grid">
@@ -198,6 +238,17 @@ const { status } = useParkingHours(() => city.value?.id)
 const usesSms = computed(() =>
   (city.value?.zones ?? []).some((z: any) => !!z.sms_shortcode)
 )
+
+// Cities that publish a suspension calendar get a "today" bar. Only New York has
+// one so far; the card appears wherever the file exists, and nowhere else.
+const {
+  loaded: aspLoaded,
+  today: aspToday,
+  next: aspNext,
+  cleaningSuspended,
+  metersSuspended,
+  disputed: aspDisputed,
+} = useAspCalendar(() => city.value?.id)
 
 // Map tier — how authoritative our spatial data is for this city.
 const { tier: mapTier } = useCityTier(() => city.value?.id)
@@ -384,6 +435,32 @@ useSeoMeta({
 .tag-row { display: flex; flex-wrap: wrap; gap: 6px; }
 
 /* Disclaimer */
+/* Today's suspensions. Two rows because they are two different answers, and the
+   whole point is that they can disagree with each other. */
+.asp-bar {
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border2);
+  padding: 12px 0;
+}
+.asp-inner { display: flex; flex-direction: column; gap: 6px; }
+.asp-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.asp-key { font-size: 13px; color: var(--muted); }
+.asp-val { font-size: 13px; font-weight: 700; font-family: var(--font-mono, monospace); }
+.asp-val.ok { color: #2FB36B; }
+.asp-val.on { color: var(--text2); }
+.asp-val.warn { color: #D97706; }
+.asp-why { font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+.asp-dispute {
+  margin-top: 2px;
+  padding: 8px 10px;
+  background: #FEF6E7;
+  border: 1px solid #F0D9A8;
+  border-radius: var(--r-sm, 8px);
+  font-size: 12.5px;
+  color: #8A5A00;
+  line-height: 1.5;
+}
+.asp-next { font-size: 12px; color: var(--muted); }
 .disclaimer-bar {
   background: var(--blue-bg);
   border-bottom: 1px solid var(--blue-border);

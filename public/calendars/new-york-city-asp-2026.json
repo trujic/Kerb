@@ -1,0 +1,313 @@
+{
+ "city_id": "new-york-city",
+ "year": 2026,
+ "timezone": "America/New_York",
+ "built_on": "2026-08-11",
+ "sources": {
+  "calendar": "https://www.nyc.gov/html/dot/downloads/misc/2026-alternate-side.ics",
+  "page": "https://www.nyc.gov/html/dot/html/motorist/alternate-side-parking.shtml"
+ },
+ "disputed_count": 6,
+ "days": [
+  {
+   "date": "2026-01-01",
+   "holiday": "New Year’s Day",
+   "meters_suspended": true,
+   "source": "ics",
+   "note": "Alternate Side Parking suspended for New Year’s Day. Parking meters will not be in effect. Stopping, standing and parking are permitted, except in areas where stopping, standing and parking rules are in effect seven days a week (for example"
+  },
+  {
+   "date": "2026-01-06",
+   "holiday": "Three Kings' Day",
+   "meters_suspended": false,
+   "source": "ics",
+   "note": "Alternate Side Parking suspended for Three Kings' Day. Parking meters will be in effect."
+  },
+  {
+   "date": "2026-01-19",
+   "holiday": "Martin Luther King Jr",
+   "meters_suspended": false,
+   "source": "ics",
+   "note": "Alternate Side Parking suspended for Martin Luther King Jr.’s Birthday. Parking meters will be in effect."
+  },
+  {
+   "date": "2026-02-12",
+   "holiday": "Lincoln’s Birthday",
+   "meters_suspended": false,
+   "source": "ics",
+   "note": "Alternate Side Parking suspended for Lincoln’s Birthday. Parking meters will be in effect."
+  },
+  {
+   "date": "2026-02-16",
+   "holiday": "Washington’s Birthday (Presidents Day)",
+   "meters_suspended": false,
+   "source": "ics",
+   "note": "Alternate Side Parking suspended for Washington’s Birthday (Presidents Day). Parking meters will be in effect."
+  },
+  {
+   "date": "2026-02-17",
+   "holiday": "Lunar New Year",
+   "meters_suspended": false,
+   "source": "ics",
+   "note": "Alternate Side Parking suspended for Lunar New Year. Parking meters will be in effect."
+  },
+  {
+   "date": "2026-02-18",
+   "holiday": "Ash Wednesday",
+   "meters_suspended": false,
+   "source": "ics",
+   "note": "Alternate Side Parking suspended for Ash Wednesday. Parking meters will be in effect."
+  },
+  {
+   "date": "2026-03-03",
+   "holiday": "Purim",
+   "meters_suspended": false,
+   "source": "ics",
+   "note": "Alternate Side Parking suspended for Purim. Parking meters will be in effect."
+  },
+  {
+   "date": "2026-03-20",
+   "holiday": "Idul-Fitr (Eid Al-Fitr)",
+   "meters_suspended": false,
+   "source": "ics",
+   "note": "Alternate Side Parking suspended for Idul-Fitr (Eid Al-Fitr). Parking meters will be in effect."
+  },
+  {
+   "date": "2026-03-21",
+   "holiday": "Idul-Fitr (Eid Al-Fitr)",
+   "meters_suspended": null,
+   "source": "html-table-only",
+   "disputed": true,
+   "note": "The calendar table on nyc.gov lists this as a suspension day; the city's own .ics file does not contain it. Street cleaning is likely suspended; the meters are unaffected either way."
+  },
+  {
+   "date": "2026-04-02",
+   "holiday": "Holy Thursday",
+   "meters_suspended": false,
+   "source": "ics",
+   "note": "Alternate Side Parking suspended for Holy Thursday. Parking meters will be in effect."
+  },
+  {
+   "date": "2026-04-03",
+   "holiday": "Good Friday",
+   "meters_suspended": false,
+   "source": "ics",
+   "note": "Alternate Side Parking suspended for Good Friday. Parking meters will be in effect."
+  },
+  {
+   "date": "2026-04-08",
+   "holiday": "the seventh and eighth days of Passover",
+   "meters_suspended": false,
+   "source": "ics",
+   "note": "Alternate Side Parking suspended for the seventh and eighth days of Passover. Parking meters will be in effect."
+  },
+  {
+   "date": "2026-04-09",
+   "holiday": "Orthodox Holy Thursday",
+   "meters_suspended": false,
+   "source": "ics",
+   "note": "Alternate Side Parking suspended for Orthodox Holy Thursday. Parking meters will be in effect."
+  },
+  {
+   "date": "2026-04-10",
+   "holiday": "Orthodox Good Friday",
+   "meters_suspended": false,
+   "source": "ics",
+   "note": "Alternate Side Parking suspended for Orthodox Good Friday. Parking meters will be in effect."
+  },
+  {
+   "date": "2026-05-14",
+   "holiday": "Solemnity of the Ascension",
+   "meters_suspended": false,
+   "source": "ics",
+   "note": "Alternate Side Parking suspended for Solemnity of the Ascension. Parking meters will be in effect."
+  },
+  {
+   "date": "2026-05-22",
+   "holiday": "Shavuoth",
+   "meters_suspended": false,
+   "source": "ics",
+   "note": "Alternate Side Parking suspended for Shavuoth. Parking meters will be in effect."
+  },
+  {
+   "date": "2026-05-23",
+   "holiday": "Shavuoth (2nd Day)",
+   "meters_suspended": null,
+   "source": "html-table-only",
+   "disputed": true,
+   "note": "The calendar table on nyc.gov lists this as a suspension day; the city's own .ics file does not contain it. Street cleaning is likely suspended; the meters are unaffected either way."
+  },
+  {
+   "date": "2026-05-25",
+   "holiday": "Memorial Day",
+   "meters_suspended": true,
+   "source": "ics",
+   "note": "Alternate Side Parking suspended for Memorial Day. Parking meters will not be in effect. Stopping, standing and parking are permitted, except in areas where stopping, standing and parking rules are in effect seven days a week (for example, "
+  },
+  {
+   "date": "2026-05-27",
+   "holiday": "Idul-Adha (Eid Al-Adha)",
+   "meters_suspended": false,
+   "source": "ics",
+   "note": "Alternate Side Parking suspended for Idul-Adha (Eid Al-Adha). Parking meters will be in effect."
+  },
+  {
+   "date": "2026-05-28",
+   "holiday": "Idul-Adha (Eid Al-Adha)",
+   "meters_suspended": null,
+   "source": "html-table-only",
+   "disputed": true,
+   "note": "The calendar table on nyc.gov lists this as a suspension day; the city's own .ics file does not contain it. Street cleaning is likely suspended; the meters are unaffected either way."
+  },
+  {
+   "date": "2026-06-19",
+   "holiday": "Juneteenth",
+   "meters_suspended": false,
+   "source": "ics",
+   "note": "Alternate Side Parking suspended for Juneteenth. Parking meters will be in effect."
+  },
+  {
+   "date": "2026-07-03",
+   "holiday": "Independence Day",
+   "meters_suspended": true,
+   "source": "ics",
+   "note": "Alternate Side Parking suspended for Independence Day. Parking meters will not be in effect. Stopping, standing and parking are permitted, except in areas where stopping, standing and parking rules are in effect seven days a week (for examp"
+  },
+  {
+   "date": "2026-07-04",
+   "holiday": "Independence Day",
+   "meters_suspended": null,
+   "source": "html-table-only",
+   "disputed": true,
+   "note": "The calendar table on nyc.gov lists this as a suspension day; the city's own .ics file does not contain it. The table marks it a major legal holiday, which would also suspend the meters — the .ics implies the opposite. Assume the meters are running."
+  },
+  {
+   "date": "2026-07-23",
+   "holiday": "Tisha B'Av",
+   "meters_suspended": false,
+   "source": "ics",
+   "note": "Alternate Side Parking suspended for Tisha B'Av. Parking meters will be in effect."
+  },
+  {
+   "date": "2026-08-15",
+   "holiday": "Feast of the Assumption",
+   "meters_suspended": false,
+   "source": "ics",
+   "note": "Alternate Side Parking suspended for Feast of the Assumption. Parking meters will be in effect."
+  },
+  {
+   "date": "2026-09-07",
+   "holiday": "Labor Day",
+   "meters_suspended": true,
+   "source": "ics",
+   "note": "Alternate Side Parking suspended for Labor Day. Parking meters will not be in effect. Stopping, standing and parking are permitted, except in areas where stopping, standing and parking rules are in effect seven days a week (for example, “No"
+  },
+  {
+   "date": "2026-09-12",
+   "holiday": "Rosh Hashanah",
+   "meters_suspended": false,
+   "source": "ics",
+   "note": "Alternate Side Parking suspended for Rosh Hashanah. Parking meters will be in effect."
+  },
+  {
+   "date": "2026-09-13",
+   "holiday": "Rosh Hashanah",
+   "meters_suspended": null,
+   "source": "html-table-only",
+   "disputed": true,
+   "note": "The calendar table on nyc.gov lists this as a suspension day; the city's own .ics file does not contain it. Street cleaning is likely suspended; the meters are unaffected either way."
+  },
+  {
+   "date": "2026-09-21",
+   "holiday": "Yom Kippur",
+   "meters_suspended": false,
+   "source": "ics",
+   "note": "Alternate Side Parking suspended for Yom Kippur. Parking meters will be in effect."
+  },
+  {
+   "date": "2026-09-26",
+   "holiday": "Succoth",
+   "meters_suspended": false,
+   "source": "ics",
+   "note": "Alternate Side Parking suspended for Succoth. Parking meters will be in effect."
+  },
+  {
+   "date": "2026-09-27",
+   "holiday": "Succoth (2nd Day)",
+   "meters_suspended": null,
+   "source": "html-table-only",
+   "disputed": true,
+   "note": "The calendar table on nyc.gov lists this as a suspension day; the city's own .ics file does not contain it. Street cleaning is likely suspended; the meters are unaffected either way."
+  },
+  {
+   "date": "2026-10-03",
+   "holiday": "Shemini Atzereth",
+   "meters_suspended": false,
+   "source": "ics",
+   "note": "Alternate Side Parking suspended for Shemini Atzereth. Parking meters will be in effect."
+  },
+  {
+   "date": "2026-10-04",
+   "holiday": "Simchas Torah",
+   "meters_suspended": false,
+   "source": "ics",
+   "note": "Alternate Side Parking suspended for Simchas Torah. Parking meters will be in effect."
+  },
+  {
+   "date": "2026-10-12",
+   "holiday": "Columbus Day",
+   "meters_suspended": false,
+   "source": "ics",
+   "note": "Alternate Side Parking suspended for Columbus Day. Parking meters will be in effect."
+  },
+  {
+   "date": "2026-11-01",
+   "holiday": "All Saints' Day",
+   "meters_suspended": false,
+   "source": "ics",
+   "note": "Alternate Side Parking suspended for All Saints' Day. Parking meters will be in effect."
+  },
+  {
+   "date": "2026-11-03",
+   "holiday": "Election Day",
+   "meters_suspended": false,
+   "source": "ics",
+   "note": "Alternate Side Parking suspended for Election Day. Parking meters will be in effect."
+  },
+  {
+   "date": "2026-11-08",
+   "holiday": "Diwali",
+   "meters_suspended": false,
+   "source": "ics",
+   "note": "Alternate Side Parking suspended for Diwali. Parking meters will be in effect."
+  },
+  {
+   "date": "2026-11-11",
+   "holiday": "Veterans Day",
+   "meters_suspended": false,
+   "source": "ics",
+   "note": "Alternate Side Parking suspended for Veterans Day. Parking meters will be in effect."
+  },
+  {
+   "date": "2026-11-26",
+   "holiday": "Thanksgiving Day",
+   "meters_suspended": true,
+   "source": "ics",
+   "note": "Alternate Side Parking suspended for Thanksgiving Day. Parking meters will not be in effect. Stopping, standing and parking are permitted, except in areas where stopping, standing and parking rules are in effect seven days a week (for examp"
+  },
+  {
+   "date": "2026-12-08",
+   "holiday": "Immaculate Conception",
+   "meters_suspended": false,
+   "source": "ics",
+   "note": "Alternate Side Parking suspended for Immaculate Conception. Parking meters will be in effect."
+  },
+  {
+   "date": "2026-12-25",
+   "holiday": "Christmas Day",
+   "meters_suspended": true,
+   "source": "ics",
+   "note": "Alternate Side Parking suspended for Christmas Day. Parking meters will not be in effect. Stopping, standing and parking are permitted, except in areas where stopping, standing and parking rules are in effect seven days a week (for example,"
+  }
+ ]
+}
