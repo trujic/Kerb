@@ -470,6 +470,30 @@
                     >→ {{ payAction.label }}</span
                   >
                 </button>
+                <!-- The daily ticket, where this lot sells it. A second way to
+                     pay rather than a replacement: under two hours the hourly
+                     rate still wins, and the app says which is which instead of
+                     choosing for the driver. -->
+                <div v-if="dailyHere" class="daily">
+                  <p class="daily-title">
+                    <Icon name="clock" :size="14" /> {{ t("dailyTitle") }}
+                  </p>
+                  <p v-if="dailyFromHours" class="daily-note">
+                    {{ t("dailyCheaper", { hours: dailyFromHours }) }}
+                  </p>
+                  <SlideToConfirm
+                    :key="'daily-' + selectedZone.name"
+                    :label="t('dailySend', {
+                      amount: selectedZone.daily_amount + ' ' + (selectedZone.price_currency || 'RSD'),
+                      code: selectedZone.daily_target,
+                    })"
+                    :done-label="t('openingSms')"
+                    :color="selectedZone.color"
+                    :disabled="!defaultPlate"
+                    @confirm="payDaily"
+                  />
+                </div>
+
                 <p v-if="skipConfirm && !defaultPlate" class="pay-need-plate">
                   {{ t("needPlate") }}
                 </p>
@@ -1489,6 +1513,42 @@ const smsLink = (zone: any) => smsHref(zone.sms_shortcode, defaultPlate.value);
 // Asked, not assumed. The surface used to key off sms_shortcode, which quietly
 // meant "Serbia only" — and left Belgrade, which has zones and prices but no
 // shortcode, with a screen that identified the zone and then offered nothing.
+// ── Daily ticket ──────────────────────────────────────────────────────────────
+// The zone defines the product (Blue: 95 RSD → 8215); the geometry says which
+// lots actually sell it — nine of Novi Sad's 262 segments. Both have to hold, so
+// the offer never appears on a stretch of the same zone that does not sell it.
+//
+// The editor has captured this flag all along and nothing ever read it, so a
+// driver parking for three hours on one of those nine lots paid 150 RSD for
+// something that costs 95.
+const dailyHere = computed(() => {
+  const z: any = selectedZone.value;
+  return !!(
+    nearest.value?.daily &&
+    parkingState.value === "on" &&
+    !atBoundary.value &&
+    z?.daily_amount &&
+    z?.daily_target &&
+    z.name === nearest.value.zoneName
+  );
+});
+
+// From which hour the daily is the cheaper answer. Rounded up, because the hour
+// you are part-way through is an hour you have paid for.
+const dailyFromHours = computed(() => {
+  const z: any = selectedZone.value;
+  const perHour = z?.price_amount;
+  if (!perHour || !z?.daily_amount) return null;
+  return Math.ceil(z.daily_amount / perHour);
+});
+
+// Paying the daily is the same SMS to a different shortcode.
+const payDaily = () => {
+  const z: any = selectedZone.value;
+  if (!z?.daily_target) return;
+  pay({ ...z, sms_shortcode: z.daily_target });
+};
+
 const payAction = computed(() =>
   selectedZone.value
     ? payActionFor(selectedZone.value, { plate: defaultPlate.value })
@@ -3449,6 +3509,20 @@ h2 {
   margin-left: auto; font-size: 11px; letter-spacing: 0.04em;
   color: var(--muted); font-family: var(--font-mono, monospace);
 }
+/* The daily ticket — an alternative, not an upgrade. Kept visually quieter than
+   the hourly slide above it, because under two hours it is the worse buy. */
+.daily {
+  margin-top: 14px;
+  padding: 12px;
+  background: var(--bg2);
+  border: 1px dashed var(--border2);
+  border-radius: var(--r-md);
+}
+.daily-title {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 13px; font-weight: 700; color: var(--text);
+}
+.daily-note { margin: 3px 0 10px; font-size: 12.5px; color: var(--muted); line-height: 1.45; }
 .pay-need-plate {
   margin-top: 8px;
   font-size: 12.5px;

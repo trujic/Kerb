@@ -11,6 +11,13 @@ export interface NearestParking {
   zoneName: string
   streetName: string
   point: { lat: number; lng: number }
+  /**
+   * This lot sells the zone's daily ticket. It is a property of the LOT, not the
+   * zone: Novi Sad's Blue zone has a 95 RSD daily, but only nine of its 262
+   * segments actually sell it, and the flag is drawn per polygon in the editor.
+   * Carried here because the pay card is where it saves anyone money.
+   */
+  daily: boolean
 }
 
 /**
@@ -72,7 +79,7 @@ export const useNearestParking = (
     const px = (lng: number) => (lng - c.lng) * mLng
     const py = (lat: number) => (lat - c.lat) * M_PER_DEG_LAT
 
-    let best: { dist: number; cx: number; cy: number; zone: string; street: string } | null = null
+    let best: { dist: number; cx: number; cy: number; zone: string; street: string; daily: boolean } | null = null
     const perZone = new Map<string, { dist: number; street: string }>()
     const note = (zone: string, dist: number, street: string) => {
       const seen = perZone.get(zone)
@@ -84,6 +91,7 @@ export const useNearestParking = (
       if (!geom) continue
       const zone = f.properties?.zone ?? ''
       const street = f.properties?.name ?? ''
+      const daily = f.properties?.daily === true
 
       // Zone-area polygons (Niš areas, Novi Sad street networks): inside → distance 0;
       // else nearest edge. Rings beyond the first are HOLES (city blocks inside a
@@ -104,7 +112,7 @@ export const useNearestParking = (
           if (!rings.length) continue
           const inHole = rings.slice(1).some((r: number[][]) => originInRing(r))
           if (originInRing(rings[0]) && !inHole) {
-            if (!best || best.dist > 0) best = { dist: 0, cx: 0, cy: 0, zone, street }
+            if (!best || best.dist > 0) best = { dist: 0, cx: 0, cy: 0, zone, street, daily }
             note(zone, 0, street)
             continue
           }
@@ -112,7 +120,7 @@ export const useNearestParking = (
             for (let i = 0; i < ring.length; i++) {
               const n = (i + 1) % ring.length
               const r = closestOnSegment(ring[i][0], ring[i][1], ring[n][0], ring[n][1])
-              if (!best || r.dist < best.dist) best = { dist: r.dist, cx: r.cx, cy: r.cy, zone, street }
+              if (!best || r.dist < best.dist) best = { dist: r.dist, cx: r.cx, cy: r.cy, zone, street, daily }
               note(zone, r.dist, street)
             }
           }
@@ -130,7 +138,7 @@ export const useNearestParking = (
           const bx = px(line[i + 1][0]), by = py(line[i + 1][1])
           const r = closestOnSegment(ax, ay, bx, by)
           if (!best || r.dist < best.dist) {
-            best = { dist: r.dist, cx: r.cx, cy: r.cy, zone, street }
+            best = { dist: r.dist, cx: r.cx, cy: r.cy, zone, street, daily }
           }
           note(zone, r.dist, street)
         }
@@ -147,6 +155,7 @@ export const useNearestParking = (
         distanceM: best.dist,
         zoneName: best.zone,
         streetName: best.street,
+        daily: best.daily,
         point: { lat: c.lat + best.cy / M_PER_DEG_LAT, lng: c.lng + best.cx / mLng },
       },
       byZone,

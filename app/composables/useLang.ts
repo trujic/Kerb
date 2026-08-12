@@ -54,6 +54,16 @@ const dict = {
     sr: 'Proveri tablu i plati po njoj.',
     en: 'Check the sign and pay accordingly.',
   },
+  // The daily ticket. Sold at only some lots inside a zone, so it can only be
+  // offered where the geometry says this lot sells it — and it is worth offering
+  // loudly, because it is the one place the app saves a driver money rather than
+  // just saving them from a fine.
+  dailyTitle: { sr: 'Ovde postoji i dnevna karta', en: 'A daily ticket is sold here' },
+  dailyCheaper: {
+    sr: 'Od {hours} h naviše jeftinija je od plaćanja po satu.',
+    en: 'From {hours} h it costs less than paying by the hour.',
+  },
+  dailySend: { sr: 'Prevuci za dnevnu — {amount} → {code}', en: 'Slide for the daily — {amount} → {code}' },
   wrongZone: { sr: 'Pogrešna zona? Pogledaj sve zone', en: 'Wrong zone? See all zones' },
   askAiShort: { sr: 'Pitaj AI', en: 'Ask AI' },
   approxWarn: {

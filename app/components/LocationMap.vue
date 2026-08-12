@@ -166,13 +166,18 @@ watchEffect((onCleanup) => {
     if (!g) continue
     const color = (feature.properties?.color ?? '#3B82F6').trim()
     const name  = feature.properties?.name ?? ''
+    // Lots that sell the zone's daily ticket get a dashed outline. Not a colour
+    // of their own — they are still that zone, at that hourly rate; the dashes
+    // say there is a second way to pay here, and the pay card says what it costs.
+    const daily = feature.properties?.daily === true
+    const dash  = daily ? { dashArray: '6 4', weight: 3 } : {}
 
     let layer: any = null
     if (g.type === 'Polygon') {
       if (g.coordinates[0].length < 3) continue
       // all rings — holes (city blocks inside street networks) must stay unfilled
       layer = L.polygon(g.coordinates.map((ring: number[][]) => toLatLngs(ring)), {
-        color, fillColor: color, fillOpacity: 0.13, weight: 2, opacity: 0.55,
+        color, fillColor: color, fillOpacity: 0.13, weight: 2, opacity: 0.55, ...dash,
       })
     } else if (g.type === 'MultiPolygon') {
       // Leaflet takes the nested array directly; each part keeps its own holes.
@@ -181,15 +186,15 @@ watchEffect((onCleanup) => {
         .map((poly: number[][][]) => poly.map((ring: number[][]) => toLatLngs(ring)))
       if (!parts.length) continue
       layer = L.polygon(parts, {
-        color, fillColor: color, fillOpacity: 0.13, weight: 2, opacity: 0.55,
+        color, fillColor: color, fillOpacity: 0.13, weight: 2, opacity: 0.55, ...dash,
       })
     } else if (g.type === 'LineString') {
       layer = L.polyline(toLatLngs(g.coordinates), {
-        color, weight: 5, opacity: 0.85, lineCap: 'round', lineJoin: 'round',
+        color, weight: 5, opacity: 0.85, lineCap: 'round', lineJoin: 'round', ...dash,
       })
     } else if (g.type === 'MultiLineString') {
       layer = L.polyline(g.coordinates.map(toLatLngs), {
-        color, weight: 5, opacity: 0.85, lineCap: 'round', lineJoin: 'round',
+        color, weight: 5, opacity: 0.85, lineCap: 'round', lineJoin: 'round', ...dash,
       })
     }
     if (!layer) continue
