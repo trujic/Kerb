@@ -1185,12 +1185,41 @@ const { nearest, zoneDistances } = useNearestParking(coords, zoneBoundaries);
 // floored at 15 m — even a clean urban fix is worth about that, and the geometry
 // is not sharper. Anything inside that margin is a tie, and a tie is not a guess
 // to be dressed up: it is an answer the app does not have.
-const BOUNDARY_FLOOR_M = 15;
+// Ten metres is about two parking spaces, and it is the floor our own drawing
+// supports: the polygons are traced off the official cadastre sheet and are not
+// themselves accurate to better than a car length. Twenty was four to eight
+// spaces — wide enough that standing squarely inside a zone would read as doubt.
+// There is no ceiling: a phone reporting ±35 m gets a 35 m margin, because then
+// we really do not know.
+const BOUNDARY_FLOOR_M = 10;
 const tiedZones = computed(() => {
   const ds = zoneDistances.value;
   if (ds.length < 2 || parkingState.value === "none") return [];
   const margin = Math.max(coords.value?.accuracy ?? 0, BOUNDARY_FLOOR_M);
-  const tied = ds.filter((d) => d.distanceM - ds[0]!.distanceM < margin);
+  // One disc, radius r, centred on the driver: every zone it touches is a zone
+  // they might be standing in. Distance to the ZONE, which is zero inside it —
+  // so three metres inside the Blue line with Red beginning there puts Red at
+  // three metres and Blue at zero, and both are candidates. Three metres outside
+  // gives the same pair. The symmetry falls out of the disc; it does not need a
+  // rule of its own.
+  //
+  // An earlier version compared the two nearest distances instead. That called a
+  // point 22 m from Blue and 22 m from Red a boundary, when the honest answer is
+  // that it is on neither — a tie between two things that are both far away is
+  // not a close call.
+  // Two ways to be unsure, and they catch different mistakes:
+  //
+  //   near   — the zone is inside the disc, so the driver could be standing in it
+  //   level  — the two nearest zones are the same distance away, so whichever
+  //            side of the line they are on, we cannot say which
+  //
+  // The first alone let a point 22 m from Blue and 22 m from Red fall through to
+  // a confident "Blue, likely yours": neither was inside a 20 m disc, so nothing
+  // was flagged, and being equidistant between them counted for nothing.
+  const level = ds[0]!.distanceM;
+  const tied = ds.filter(
+    (d) => d.distanceM <= margin || d.distanceM - level <= BOUNDARY_FLOOR_M,
+  );
   if (tied.length < 2) return [];
   // Ordered the way the city orders its own zones, never by distance — distance
   // is precisely the thing we have just declared unreliable here.

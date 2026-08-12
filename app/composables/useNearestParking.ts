@@ -32,7 +32,11 @@ export interface NearestParking {
  */
 export interface ZoneDistance {
   zoneName: string
+  /** Distance to the zone's EDGE, unsigned — inside counts the same as outside. */
+  edgeM: number
+  /** Distance to the zone as a place to park: 0 anywhere inside it. */
   distanceM: number
+  inside: boolean
   streetName: string
 }
 
@@ -80,10 +84,24 @@ export const useNearestParking = (
     const py = (lat: number) => (lat - c.lat) * M_PER_DEG_LAT
 
     let best: { dist: number; cx: number; cy: number; zone: string; street: string; daily: boolean } | null = null
-    const perZone = new Map<string, { dist: number; street: string }>()
-    const note = (zone: string, dist: number, street: string) => {
+    // Two different distances, and conflating them is what made the app certain
+    // right up to a line it cannot see:
+    //
+    //   dist — how far away the zone is as somewhere to park. Zero inside it.
+    //   edge — how far the BOUNDARY is, unsigned. Five metres inside the edge and
+    //          five metres outside it are the same amount of doubt, because a
+    //          phone off by ten puts you on the other side either way.
+    //
+    // Only `dist` was measured before: stepping inside a polygon set it to 0 and
+    // skipped the edge entirely, so the whole interior read as maximum confidence
+    // — the middle of a block and half a metre from the line, identical.
+    const perZone = new Map<string, { dist: number; edge: number; inside: boolean; street: string }>()
+    const note = (zone: string, dist: number, edge: number, inside: boolean, street: string) => {
       const seen = perZone.get(zone)
-      if (!seen || dist < seen.dist) perZone.set(zone, { dist, street })
+      if (!seen) { perZone.set(zone, { dist, edge, inside, street }); return }
+      if (dist < seen.dist) { seen.dist = dist; seen.street = street }
+      if (edge < seen.edge) seen.edge = edge
+      seen.inside = seen.inside || inside
     }
 
     for (const f of g.features) {
@@ -111,17 +129,16 @@ export const useNearestParking = (
             .filter((r: number[][]) => r.length >= 3)
           if (!rings.length) continue
           const inHole = rings.slice(1).some((r: number[][]) => originInRing(r))
-          if (originInRing(rings[0]) && !inHole) {
-            if (!best || best.dist > 0) best = { dist: 0, cx: 0, cy: 0, zone, street, daily }
-            note(zone, 0, street)
-            continue
-          }
+          const inside = originInRing(rings[0]) && !inHole
+          if (inside && (!best || best.dist > 0)) best = { dist: 0, cx: 0, cy: 0, zone, street, daily }
+          // The edge is measured either way now — being inside no longer excuses
+          // us from knowing how close the line is.
           for (const ring of rings) {
             for (let i = 0; i < ring.length; i++) {
               const n = (i + 1) % ring.length
               const r = closestOnSegment(ring[i][0], ring[i][1], ring[n][0], ring[n][1])
-              if (!best || r.dist < best.dist) best = { dist: r.dist, cx: r.cx, cy: r.cy, zone, street, daily }
-              note(zone, r.dist, street)
+              if (!inside && (!best || r.dist < best.dist)) best = { dist: r.dist, cx: r.cx, cy: r.cy, zone, street, daily }
+              note(zone, inside ? 0 : r.dist, r.dist, inside, street)
             }
           }
         }
@@ -140,13 +157,15 @@ export const useNearestParking = (
           if (!best || r.dist < best.dist) {
             best = { dist: r.dist, cx: r.cx, cy: r.cy, zone, street, daily }
           }
-          note(zone, r.dist, street)
+          note(zone, r.dist, r.dist, false, street)
         }
       }
     }
 
     const byZone: ZoneDistance[] = [...perZone.entries()]
-      .map(([zoneName, v]) => ({ zoneName, distanceM: v.dist, streetName: v.street }))
+      .map(([zoneName, v]) => ({
+        zoneName, distanceM: v.dist, edgeM: v.edge, inside: v.inside, streetName: v.street,
+      }))
       .sort((a, b) => a.distanceM - b.distanceM)
 
     if (!best) return { nearest: null, byZone }
