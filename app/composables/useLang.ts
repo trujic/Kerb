@@ -41,6 +41,19 @@ const dict = {
     sr: 'Proveri znak — znak je zvaničan.',
     en: 'Check the sign — the sign is official.',
   },
+  // On a boundary the app stops recommending — and stops adding, too. An earlier
+  // version said "whichever it is, do not stay longer than 120 minutes", taking
+  // the strictest limit among the candidates as the safe one. It is not safe, it
+  // is invented: a driver who turns out to be in the unlimited zone has no such
+  // limit, and inventing one costs them a moved car or an hour they need not buy.
+  // The app says what it knows — you are near a boundary — and nothing else.
+  boundaryHere: { sr: 'Blizu si granice zona', en: 'You are near zone boundaries' },
+  // NB: `boundarySub` below is a different message (standing off the mapped kerb).
+  // Two keys with one name would silently resolve to whichever came last.
+  boundaryCheckSign: {
+    sr: 'Proveri tablu i plati po njoj.',
+    en: 'Check the sign and pay accordingly.',
+  },
   wrongZone: { sr: 'Pogrešna zona? Pogledaj sve zone', en: 'Wrong zone? See all zones' },
   askAiShort: { sr: 'Pitaj AI', en: 'Ask AI' },
   approxWarn: {

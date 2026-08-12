@@ -13,6 +13,22 @@ export interface NearestParking {
   point: { lat: number; lng: number }
 }
 
+/**
+ * The closest segment OF EACH ZONE, nearest first.
+ *
+ * The single nearest segment answers "am I on a paid street". It cannot answer
+ * "which zone am I in" at a corner, where two zones meet and the winner is
+ * decided by a margin far smaller than any phone can measure — at Trg neznanog
+ * junaka the two are 22.4 m and 22.3 m away, and picking the first was a coin
+ * toss wearing a "likely yours" badge. Comparing the top two is the only way to
+ * know that the question has no answer.
+ */
+export interface ZoneDistance {
+  zoneName: string
+  distanceM: number
+  streetName: string
+}
+
 type Coords = { lat: number; lng: number; accuracy?: number } | null
 
 const M_PER_DEG_LAT = 110_540
@@ -44,10 +60,12 @@ export const useNearestParking = (
   coords: Ref<Coords> | (() => Coords),
   geojson: Ref<any> | (() => any),
 ) => {
-  const nearest = computed<NearestParking | null>(() => {
+  // The geometry is walked once and answers both questions: which segment is
+  // closest, and how close the closest segment of every zone is.
+  const scan = computed<{ nearest: NearestParking | null; byZone: ZoneDistance[] }>(() => {
     const c = toValue(coords)
     const g = toValue(geojson)
-    if (!c || !g?.features?.length) return null
+    if (!c || !g?.features?.length) return { nearest: null, byZone: [] }
 
     const mLng = mPerDegLng(c.lat)
     // project [lng,lat] → local metres relative to the user
@@ -55,6 +73,11 @@ export const useNearestParking = (
     const py = (lat: number) => (lat - c.lat) * M_PER_DEG_LAT
 
     let best: { dist: number; cx: number; cy: number; zone: string; street: string } | null = null
+    const perZone = new Map<string, { dist: number; street: string }>()
+    const note = (zone: string, dist: number, street: string) => {
+      const seen = perZone.get(zone)
+      if (!seen || dist < seen.dist) perZone.set(zone, { dist, street })
+    }
 
     for (const f of g.features) {
       const geom = f.geometry
@@ -82,6 +105,7 @@ export const useNearestParking = (
           const inHole = rings.slice(1).some((r: number[][]) => originInRing(r))
           if (originInRing(rings[0]) && !inHole) {
             if (!best || best.dist > 0) best = { dist: 0, cx: 0, cy: 0, zone, street }
+            note(zone, 0, street)
             continue
           }
           for (const ring of rings) {
@@ -89,6 +113,7 @@ export const useNearestParking = (
               const n = (i + 1) % ring.length
               const r = closestOnSegment(ring[i][0], ring[i][1], ring[n][0], ring[n][1])
               if (!best || r.dist < best.dist) best = { dist: r.dist, cx: r.cx, cy: r.cy, zone, street }
+              note(zone, r.dist, street)
             }
           }
         }
@@ -107,18 +132,29 @@ export const useNearestParking = (
           if (!best || r.dist < best.dist) {
             best = { dist: r.dist, cx: r.cx, cy: r.cy, zone, street }
           }
+          note(zone, r.dist, street)
         }
       }
     }
 
-    if (!best) return null
+    const byZone: ZoneDistance[] = [...perZone.entries()]
+      .map(([zoneName, v]) => ({ zoneName, distanceM: v.dist, streetName: v.street }))
+      .sort((a, b) => a.distanceM - b.distanceM)
+
+    if (!best) return { nearest: null, byZone }
     return {
-      distanceM: best.dist,
-      zoneName: best.zone,
-      streetName: best.street,
-      point: { lat: c.lat + best.cy / M_PER_DEG_LAT, lng: c.lng + best.cx / mLng },
+      nearest: {
+        distanceM: best.dist,
+        zoneName: best.zone,
+        streetName: best.street,
+        point: { lat: c.lat + best.cy / M_PER_DEG_LAT, lng: c.lng + best.cx / mLng },
+      },
+      byZone,
     }
   })
 
-  return { nearest }
+  return {
+    nearest: computed(() => scan.value.nearest),
+    zoneDistances: computed(() => scan.value.byZone),
+  }
 }

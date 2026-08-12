@@ -235,7 +235,48 @@
             </div>
 
             <!-- ── Zone — GPS's best guess as the hero; the sign decides ── -->
-            <div v-if="selectedZone" class="pay-step">
+            <!-- ── On a boundary: no recommendation, just the candidates ── -->
+            <!-- The app knows it is one of these and knows it cannot say which.
+                 Both facts are shown: the shortlist is kept (it is real
+                 information — it is not every zone in the city), and the choice
+                 is handed to the only party standing at the sign. Each candidate
+                 keeps its own slide, so refusing to guess never costs the driver
+                 the ability to pay. -->
+            <div v-if="atBoundary" class="pay-step">
+              <div class="bnd">
+                <div class="bnd-head">
+                  <Icon name="alert" :size="18" />
+                  <div>
+                    <p class="bnd-title">{{ t("boundaryHere") }}</p>
+                    <p class="bnd-why">{{ t("boundaryCheckSign") }}</p>
+                  </div>
+                </div>
+
+
+                <div v-for="z in tiedZones" :key="z.name" class="bnd-zone">
+                  <div class="bnd-zone-head" :style="{ borderColor: z.color }">
+                    <span class="bnd-zone-dot" :style="{ background: z.color }" />
+                    <span class="bnd-zone-name">{{ z.name }}</span>
+                    <span class="bnd-zone-price">{{ z.price }}</span>
+                    <span v-if="zoneLimits[z.name]?.label" class="bnd-zone-limit">
+                      {{ zoneLimits[z.name]!.label }}
+                    </span>
+                  </div>
+                  <SlideToConfirm
+                    :key="'bnd-' + z.name"
+                    :label="t('sendSms', { code: z.sms_shortcode })"
+                    :done-label="t('openingSms')"
+                    :color="z.color"
+                    :disabled="!defaultPlate"
+                    @confirm="pay(z)"
+                  />
+                </div>
+
+                <p v-if="!defaultPlate" class="pay-need-plate">{{ t("needPlate") }}</p>
+              </div>
+            </div>
+
+            <div v-else-if="selectedZone" class="pay-step">
               <div
                 class="zone-hero"
                 :class="{
@@ -318,7 +359,10 @@
             </div>
 
             <!-- ── Pay — consequence first, then the gesture ── -->
-            <div v-if="payAction?.actionable" class="pay-step">
+            <!-- Suppressed on a boundary: the candidates above carry their own
+                 slides, and a third one underneath would be the recommendation
+                 we just refused to make. -->
+            <div v-if="!atBoundary && payAction?.actionable" class="pay-step">
               <!-- Covered-until + the plate chip (accounts only — guests type the
                plate in the open above). At night the free-surface tip already
                explained the carry-over, so no consequence line repeats it here. -->
@@ -1112,7 +1156,38 @@ const defaultPlate = computed(() => {
 });
 
 // Geometry-based detection: distance to the nearest paid-parking segment.
-const { nearest } = useNearestParking(coords, zoneBoundaries);
+const { nearest, zoneDistances } = useNearestParking(coords, zoneBoundaries);
+
+// ── On the boundary ───────────────────────────────────────────────────────────
+// At a corner two zones meet, and the nearest segment of each can be metres — or
+// centimetres — apart. At Trg neznanog junaka they are 22.4 m and 22.3 m away:
+// the app used to pick the first, badge it "likely yours", and offer a slide, on
+// a margin no phone on earth can measure. It was confidently right half the time.
+//
+// So the margin is measured against the accuracy of the fix that produced it,
+// floored at 15 m — even a clean urban fix is worth about that, and the geometry
+// is not sharper. Anything inside that margin is a tie, and a tie is not a guess
+// to be dressed up: it is an answer the app does not have.
+const BOUNDARY_FLOOR_M = 15;
+const tiedZones = computed(() => {
+  const ds = zoneDistances.value;
+  if (ds.length < 2 || parkingState.value === "none") return [];
+  const margin = Math.max(coords.value?.accuracy ?? 0, BOUNDARY_FLOOR_M);
+  const tied = ds.filter((d) => d.distanceM - ds[0]!.distanceM < margin);
+  if (tied.length < 2) return [];
+  // Ordered the way the city orders its own zones, never by distance — distance
+  // is precisely the thing we have just declared unreliable here.
+  const order = allZones.value.map((z: any) => z.name);
+  return tied
+    .map((d) => allZones.value.find((z: any) => z.name === d.zoneName))
+    .filter(Boolean)
+    .sort((a: any, b: any) => order.indexOf(a.name) - order.indexOf(b.name));
+});
+
+// Once the driver picks a zone themselves, the tie is settled — by the only
+// party standing at the sign.
+const atBoundary = computed(() => !userPickedZone.value && tiedZones.value.length > 1);
+
 
 // When a city's zone geometry is only coarsely traced (no official vector cadastre),
 // the dashboard flags it: GPS proximity here is a hint, never a claim.
@@ -1185,6 +1260,9 @@ const limitOf = (rules?: string | null) => {
   if (cap)
     return {
       cap: true,
+      // The number as well as the label: the boundary card needs to compare caps
+      // across zones, and comparing "MAX 120 MIN" as a string is not comparing.
+      maxMin: Number(cap[1]),
       label: `MAX ${cap[1]} MIN`,
       note: rules.slice(cap[0].length).trim(),
     };
@@ -1192,10 +1270,11 @@ const limitOf = (rules?: string | null) => {
   if (free)
     return {
       cap: false,
+      maxMin: null,
       label: "No time limit",
       note: rules.slice(free[0].length).trim(),
     };
-  return { cap: false, label: "", note: rules };
+  return { cap: false, maxMin: null, label: "", note: rules };
 };
 // Parsed limit per zone, keyed by name — drives the inline chip + the fine print.
 const zoneLimits = computed<Record<string, ReturnType<typeof limitOf>>>(() => {
@@ -3359,6 +3438,29 @@ h2 {
   line-height: 1.4;
 }
 /* Why the slide won't move, said where the eye already is. */
+/* On a boundary — the shortlist, not a verdict. Deliberately not styled like the
+   hero card: it must not read as "here is your zone, in a different colour". */
+.bnd {
+  padding: 14px;
+  background: #FEF6E7;
+  border: 1px solid #F0D9A8;
+  border-radius: var(--r-md);
+}
+.bnd-head { display: flex; gap: 10px; align-items: flex-start; color: #8A5A00; }
+.bnd-title { font-size: 15px; font-weight: 700; color: var(--text); line-height: 1.35; }
+.bnd-why { margin-top: 3px; font-size: 13px; color: #8A5A00; line-height: 1.5; }
+.bnd-zone { margin-top: 8px; }
+.bnd-zone-head {
+  display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+  padding: 0 2px 7px;
+}
+.bnd-zone-dot { width: 10px; height: 10px; border-radius: 50%; align-self: center; }
+.bnd-zone-name { font-size: 14px; font-weight: 700; color: var(--text); }
+.bnd-zone-price { font-size: 13px; font-weight: 600; color: var(--text2); font-family: var(--font-mono, monospace); }
+.bnd-zone-limit {
+  margin-left: auto; font-size: 11px; letter-spacing: 0.04em;
+  color: var(--muted); font-family: var(--font-mono, monospace);
+}
 .pay-need-plate {
   margin-top: 8px;
   font-size: 12.5px;
