@@ -1,0 +1,2376 @@
+{
+ "listToMap": [
+  {
+   "zone": "Extra Zone",
+   "street": "Bulevar Mihajla Pupina",
+   "scope": "Ulice Narodnih heroja → Ulice Jovana Đorđevića",
+   "points": 71,
+   "pct": 66,
+   "ours": {
+    "Extra Zone": 47,
+    "none": 21,
+    "Red Zone": 3
+   },
+   "status": "OK-MIXED"
+  },
+  {
+   "zone": "Extra Zone",
+   "street": "Ignjata Pavlasa",
+   "status": "UNRESOLVED",
+   "range": "Dunavske ulice → Ulice Konstantina Danila"
+  },
+  {
+   "zone": "Extra Zone",
+   "street": "Ilije Ognjanovića",
+   "status": "NOT-A-STREET"
+  },
+  {
+   "zone": "Extra Zone",
+   "street": "Narodnih heroja",
+   "scope": "whole street",
+   "points": 5,
+   "pct": 100,
+   "ours": {
+    "Extra Zone": 5
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Extra Zone",
+   "street": "Trg republike",
+   "scope": "whole street",
+   "points": 29,
+   "pct": 21,
+   "ours": {
+    "Blue Zone": 8,
+    "none": 15,
+    "Extra Zone": 6
+   },
+   "status": "OK-MIXED"
+  },
+  {
+   "zone": "Red Zone",
+   "street": "Bulevar kralja Petra Prvog I",
+   "status": "NOT-A-STREET"
+  },
+  {
+   "zone": "Red Zone",
+   "street": "Bulevar kralja Petra Prvog XIII",
+   "status": "NOT-A-STREET"
+  },
+  {
+   "zone": "Red Zone",
+   "street": "Bulevar Mihajla Pupina",
+   "scope": "Jovana Đorđevića → Trga neznanog junaka",
+   "points": 17,
+   "pct": 71,
+   "ours": {
+    "Red Zone": 12,
+    "none": 3,
+    "Extra Zone": 2
+   },
+   "status": "OK-MIXED"
+  },
+  {
+   "zone": "Red Zone",
+   "street": "Bulevar oslobođenja I",
+   "status": "UNRESOLVED",
+   "range": "Bulevara Jaše Tomića → Bulevara kralja Petra Prvog"
+  },
+  {
+   "zone": "Red Zone",
+   "street": "Bulevar oslobođenja II",
+   "status": "UNRESOLVED",
+   "range": "Bulevara kralja Petra Prvog → Ulice Pap Pavla"
+  },
+  {
+   "zone": "Red Zone",
+   "street": "Bulevar oslobođenja III",
+   "status": "UNRESOLVED",
+   "range": "Ulice Pap Pavla → Jevrejske ulice"
+  },
+  {
+   "zone": "Red Zone",
+   "street": "Bulevar oslobođenja IV",
+   "status": "UNRESOLVED",
+   "range": "Jevrejske ulice → Ulice Maksima Gorkog"
+  },
+  {
+   "zone": "Red Zone",
+   "street": "Bulevar oslobođenja V",
+   "status": "UNRESOLVED",
+   "range": "Ulice Maksima Gorkog → Bulevara cara Lazara"
+  },
+  {
+   "zone": "Red Zone",
+   "street": "Vojvode Putnika",
+   "scope": "whole street",
+   "points": 101,
+   "pct": 8,
+   "ours": {
+    "Red Zone": 8,
+    "none": 93
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Red Zone",
+   "street": "Grčkoškolska",
+   "scope": "whole street",
+   "points": 7,
+   "pct": 100,
+   "ours": {
+    "Red Zone": 7
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Red Zone",
+   "street": "Daničićeva",
+   "scope": "whole street",
+   "points": 13,
+   "pct": 62,
+   "ours": {
+    "Blue Zone": 4,
+    "Extra Zone": 1,
+    "Red Zone": 8
+   },
+   "status": "OK-MIXED"
+  },
+  {
+   "zone": "Red Zone",
+   "street": "dr Laze Stanojevića",
+   "scope": "whole street",
+   "points": 12,
+   "pct": 92,
+   "ours": {
+    "Red Zone": 11,
+    "none": 1
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Red Zone",
+   "street": "Dunavska",
+   "scope": "whole street",
+   "points": 320,
+   "pct": 3,
+   "ours": {
+    "Extra Zone": 4,
+    "none": 303,
+    "Red Zone": 11,
+    "Blue Zone": 2
+   },
+   "status": "OK-MIXED"
+  },
+  {
+   "zone": "Red Zone",
+   "street": "Đure Jakšića",
+   "scope": "whole street",
+   "points": 32,
+   "pct": 25,
+   "ours": {
+    "Blue Zone": 2,
+    "none": 22,
+    "Red Zone": 8
+   },
+   "status": "OK-MIXED"
+  },
+  {
+   "zone": "Red Zone",
+   "street": "Železnička I",
+   "scope": "whole street",
+   "points": 132,
+   "pct": 11,
+   "ours": {
+    "none": 118,
+    "Red Zone": 14
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Red Zone",
+   "street": "Železnička II",
+   "scope": "whole street",
+   "points": 132,
+   "pct": 11,
+   "ours": {
+    "none": 118,
+    "Red Zone": 14
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Red Zone",
+   "street": "Žitni trg, plato",
+   "status": "NOT-A-STREET"
+  },
+  {
+   "zone": "Red Zone",
+   "street": "Ive Lole Ribara",
+   "scope": "whole street",
+   "points": 65,
+   "pct": 11,
+   "ours": {
+    "none": 58,
+    "Red Zone": 7
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Red Zone",
+   "street": "Jevrejska",
+   "scope": "whole street",
+   "points": 58,
+   "pct": 76,
+   "ours": {
+    "Red Zone": 44,
+    "none": 14
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Red Zone",
+   "street": "Maksima Gorkog",
+   "status": "UNRESOLVED",
+   "range": "Bulevara oslobođenja → Sutjeske"
+  },
+  {
+   "zone": "Red Zone",
+   "street": "Natoševićeva",
+   "scope": "whole street",
+   "points": 8,
+   "pct": 63,
+   "ours": {
+    "Red Zone": 5,
+    "none": 3
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Red Zone",
+   "street": "Nikolajevska",
+   "scope": "whole street",
+   "points": 4,
+   "pct": 100,
+   "ours": {
+    "Red Zone": 4
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Red Zone",
+   "street": "Nikole Pašića",
+   "scope": "whole street",
+   "points": 21,
+   "pct": 57,
+   "ours": {
+    "none": 8,
+    "Red Zone": 12,
+    "Blue Zone": 1
+   },
+   "status": "OK-MIXED"
+  },
+  {
+   "zone": "Red Zone",
+   "street": "Njegoševa",
+   "scope": "whole street",
+   "points": 36,
+   "pct": 33,
+   "ours": {
+    "Red Zone": 12,
+    "none": 23,
+    "Blue Zone": 1
+   },
+   "status": "OK-MIXED"
+  },
+  {
+   "zone": "Red Zone",
+   "street": "Pionirska",
+   "scope": "whole street",
+   "points": 19,
+   "pct": 42,
+   "ours": {
+    "Extra Zone": 4,
+    "Red Zone": 8,
+    "none": 7
+   },
+   "status": "OK-MIXED"
+  },
+  {
+   "zone": "Red Zone",
+   "street": "Svetozara Miletića",
+   "scope": "whole street",
+   "points": 47,
+   "pct": 47,
+   "ours": {
+    "Red Zone": 22,
+    "none": 24,
+    "Blue Zone": 1
+   },
+   "status": "OK-MIXED"
+  },
+  {
+   "zone": "Red Zone",
+   "street": "Sutjeska",
+   "status": "UNRESOLVED",
+   "range": "Maksima Gorkog → Radničke"
+  },
+  {
+   "zone": "Red Zone",
+   "street": "Sutjeska",
+   "scope": "whole street",
+   "points": 35,
+   "pct": 26,
+   "ours": {
+    "Blue Zone": 26,
+    "Red Zone": 9
+   },
+   "status": "OK-MIXED"
+  },
+  {
+   "zone": "Red Zone",
+   "street": "Trg Marije Trandafil",
+   "scope": "whole street",
+   "points": 21,
+   "pct": 100,
+   "ours": {
+    "Red Zone": 21
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Red Zone",
+   "street": "Trg mladenaca",
+   "scope": "whole street",
+   "points": 8,
+   "pct": 50,
+   "ours": {
+    "Extra Zone": 3,
+    "Red Zone": 4,
+    "Blue Zone": 1
+   },
+   "status": "OK-MIXED"
+  },
+  {
+   "zone": "Red Zone",
+   "street": "Trifkovićev trg",
+   "scope": "whole street",
+   "points": 15,
+   "pct": 100,
+   "ours": {
+    "Red Zone": 15
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Red Zone",
+   "street": "Hilandarska",
+   "status": "UNRESOLVED",
+   "range": "Slovačke → Masarikove"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Alberta Tome",
+   "scope": "whole street",
+   "points": 31,
+   "pct": 84,
+   "ours": {
+    "Blue Zone": 26,
+    "Red Zone": 5
+   },
+   "status": "OK-MIXED"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Aleksandra Tišme",
+   "scope": "whole street",
+   "points": 10,
+   "pct": 80,
+   "ours": {
+    "none": 2,
+    "Blue Zone": 8
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Alekse Šantića",
+   "scope": "whole street",
+   "points": 21,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 21
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Almaška",
+   "scope": "whole street",
+   "points": 15,
+   "pct": 67,
+   "ours": {
+    "Blue Zone": 10,
+    "none": 5
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Antona Čehova",
+   "scope": "whole street",
+   "points": 27,
+   "pct": 93,
+   "ours": {
+    "Blue Zone": 25,
+    "none": 2
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Arse Teodorovića",
+   "scope": "whole street",
+   "points": 14,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 14
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Arhimandrita Rajića",
+   "status": "NOT-A-STREET"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Augusta Cesarca",
+   "scope": "whole street",
+   "points": 9,
+   "pct": 56,
+   "ours": {
+    "Blue Zone": 5,
+    "none": 2,
+    "Red Zone": 2
+   },
+   "status": "OK-MIXED"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Baranjska",
+   "scope": "whole street",
+   "points": 13,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 13
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Bačka",
+   "scope": "whole street",
+   "points": 4,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 4
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Beogradski kej I-III",
+   "scope": "whole street",
+   "points": 90,
+   "pct": 54,
+   "ours": {
+    "none": 41,
+    "Blue Zone": 49
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Berislava Berića",
+   "scope": "whole street",
+   "points": 10,
+   "pct": 90,
+   "ours": {
+    "Blue Zone": 9,
+    "none": 1
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Bogdana Garabantina",
+   "scope": "whole street",
+   "points": 9,
+   "pct": 56,
+   "ours": {
+    "Blue Zone": 5,
+    "none": 4
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Bore Prodanovića",
+   "scope": "whole street",
+   "points": 14,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 14
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Branimira Ćosića",
+   "scope": "whole street",
+   "points": 34,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 34
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Branislava Nušića",
+   "scope": "whole street",
+   "points": 14,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 14
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Braće Jovandić",
+   "scope": "whole street",
+   "points": 30,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 30
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Braće Ribnikar",
+   "scope": "whole street",
+   "points": 106,
+   "pct": 88,
+   "ours": {
+    "Blue Zone": 93,
+    "Red Zone": 5,
+    "none": 8
+   },
+   "status": "OK-MIXED"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Bulevar Jaše Tomića",
+   "scope": "whole street",
+   "points": 132,
+   "pct": 14,
+   "ours": {
+    "none": 103,
+    "Red Zone": 11,
+    "Blue Zone": 18
+   },
+   "status": "OK-MIXED"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Bulevar kralja Petra Prvog IV",
+   "status": "NOT-A-STREET"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Bulevar kralja Petra Prvog IX",
+   "status": "NOT-A-STREET"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Bulevar kralja Petra Prvog VII",
+   "status": "NOT-A-STREET"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Bulevar kralja Petra Prvog VIII",
+   "status": "NOT-A-STREET"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Bulevar kralja Petra Prvog X",
+   "status": "NOT-A-STREET"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Bulevar kralja Petra Prvog XI",
+   "status": "NOT-A-STREET"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Bulevar kralja Petra Prvog XII",
+   "status": "NOT-A-STREET"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Bulevar oslobođenja IX",
+   "scope": "whole street",
+   "points": 249,
+   "pct": 16,
+   "ours": {
+    "Blue Zone": 39,
+    "Red Zone": 168,
+    "none": 42
+   },
+   "status": "OK-MIXED"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Bulevar oslobođenja VI",
+   "status": "UNRESOLVED",
+   "range": "Bulevara cara Lazara → Ulice Narodnog fronta"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Bulevar oslobođenja VII",
+   "status": "UNRESOLVED",
+   "range": "Ulice Novosadskog sajma → Ćirpanove ulice"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Bulevar oslobođenja VIII",
+   "scope": "whole street",
+   "points": 249,
+   "pct": 16,
+   "ours": {
+    "Blue Zone": 39,
+    "Red Zone": 168,
+    "none": 42
+   },
+   "status": "OK-MIXED"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Bulevar cara Lazara",
+   "scope": "whole street",
+   "points": 284,
+   "pct": 12,
+   "ours": {
+    "none": 250,
+    "Blue Zone": 34
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Valentina Vodnika",
+   "scope": "whole street",
+   "points": 11,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 11
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Vase Pelagića",
+   "scope": "whole street",
+   "points": 24,
+   "pct": 17,
+   "ours": {
+    "Red Zone": 3,
+    "none": 17,
+    "Blue Zone": 4
+   },
+   "status": "OK-MIXED"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Vase Stajića",
+   "scope": "whole street",
+   "points": 94,
+   "pct": 24,
+   "ours": {
+    "Red Zone": 6,
+    "none": 65,
+    "Blue Zone": 23
+   },
+   "status": "OK-MIXED"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Vere Pavlović",
+   "scope": "whole street",
+   "points": 14,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 14
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Vladike Platona",
+   "scope": "whole street",
+   "points": 14,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 14
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Vladimira Nikolića",
+   "scope": "whole street",
+   "points": 4,
+   "pct": 75,
+   "ours": {
+    "Blue Zone": 3,
+    "none": 1
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Vojvode Bojovića",
+   "scope": "whole street",
+   "points": 42,
+   "pct": 33,
+   "ours": {
+    "Red Zone": 3,
+    "Blue Zone": 14,
+    "none": 25
+   },
+   "status": "OK-MIXED"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Vojvode Mišića",
+   "scope": "whole street",
+   "points": 68,
+   "pct": 18,
+   "ours": {
+    "Blue Zone": 12,
+    "none": 56
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Vojvode Šupljikca",
+   "scope": "whole street",
+   "points": 7,
+   "pct": 86,
+   "ours": {
+    "Red Zone": 1,
+    "Blue Zone": 6
+   },
+   "status": "OK-MIXED"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Vojvođanska",
+   "scope": "whole street",
+   "points": 70,
+   "pct": 49,
+   "ours": {
+    "Blue Zone": 34,
+    "Red Zone": 11,
+    "none": 25
+   },
+   "status": "OK-MIXED"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Vojvođanskih brigada",
+   "scope": "whole street",
+   "points": 40,
+   "pct": 95,
+   "ours": {
+    "Blue Zone": 38,
+    "none": 1,
+    "Red Zone": 1
+   },
+   "status": "OK-MIXED"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Vuka Karadžića",
+   "scope": "whole street",
+   "points": 51,
+   "pct": 24,
+   "ours": {
+    "Blue Zone": 12,
+    "none": 39
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Gagarinova",
+   "scope": "whole street",
+   "points": 33,
+   "pct": 91,
+   "ours": {
+    "Blue Zone": 30,
+    "none": 3
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Gajeva",
+   "scope": "whole street",
+   "points": 47,
+   "pct": 28,
+   "ours": {
+    "Blue Zone": 13,
+    "Red Zone": 2,
+    "none": 32
+   },
+   "status": "OK-MIXED"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Gogoljeva",
+   "scope": "whole street",
+   "points": 37,
+   "pct": 57,
+   "ours": {
+    "Blue Zone": 21,
+    "none": 16
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Gundulićeva",
+   "scope": "whole street",
+   "points": 20,
+   "pct": 95,
+   "ours": {
+    "Blue Zone": 19,
+    "none": 1
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Danila Kiša",
+   "scope": "whole street",
+   "points": 23,
+   "pct": 91,
+   "ours": {
+    "Blue Zone": 21,
+    "Red Zone": 2
+   },
+   "status": "OK-MIXED"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Devet Jugovića",
+   "scope": "whole street",
+   "points": 25,
+   "pct": 24,
+   "ours": {
+    "Blue Zone": 6,
+    "none": 19
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Dimitrija Avramovića",
+   "scope": "whole street",
+   "points": 13,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 13
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Dimitrija Tucovića",
+   "scope": "whole street",
+   "points": 36,
+   "pct": 72,
+   "ours": {
+    "Red Zone": 10,
+    "Blue Zone": 26
+   },
+   "status": "OK-MIXED"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Doža Đerđa",
+   "scope": "whole street",
+   "points": 19,
+   "pct": 58,
+   "ours": {
+    "Blue Zone": 11,
+    "none": 8
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Dostojevskog",
+   "scope": "whole street",
+   "points": 7,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 7
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Dr Đorđa Joanovića",
+   "scope": "whole street",
+   "points": 4,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 4
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Drinska",
+   "scope": "whole street",
+   "points": 10,
+   "pct": 90,
+   "ours": {
+    "none": 1,
+    "Blue Zone": 9
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Dušana Vasiljeva I-IV",
+   "scope": "whole street",
+   "points": 20,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 20
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Đorđa Jovanovića",
+   "scope": "whole street",
+   "points": 11,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 11
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Đorđa Markovića Kodera",
+   "scope": "whole street",
+   "points": 5,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 5
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Đorđa Markovića Kodera",
+   "scope": "whole street",
+   "points": 5,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 5
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Đorđa Rajkovića",
+   "status": "UNRESOLVED",
+   "range": "Marka Miljanova → Gundulićeve"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Đurđa Brankovića",
+   "scope": "whole street",
+   "points": 6,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 6
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Episkopa Visariona",
+   "scope": "whole street",
+   "points": 18,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 18
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Žarka Vasiljevića",
+   "scope": "whole street",
+   "points": 22,
+   "pct": 91,
+   "ours": {
+    "Blue Zone": 20,
+    "Red Zone": 2
+   },
+   "status": "OK-MIXED"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Žarka Zrenjanina",
+   "scope": "whole street",
+   "points": 37,
+   "pct": 16,
+   "ours": {
+    "Extra Zone": 5,
+    "none": 26,
+    "Blue Zone": 6
+   },
+   "status": "OK-MIXED"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Žike Popovića",
+   "scope": "whole street",
+   "points": 5,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 5
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Zaharija Orfelina",
+   "scope": "whole street",
+   "points": 2,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 2
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Zemljane ćuprije",
+   "scope": "Milovana Glišića → Đorđa Rajkovića",
+   "points": 11,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 11
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Zmaj Ognjena Vuka",
+   "scope": "whole street",
+   "points": 9,
+   "pct": 44,
+   "ours": {
+    "Blue Zone": 4,
+    "Red Zone": 4,
+    "none": 1
+   },
+   "status": "OK-MIXED"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Zorana Petrovića",
+   "scope": "whole street",
+   "points": 14,
+   "pct": 64,
+   "ours": {
+    "none": 5,
+    "Blue Zone": 9
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Ilije Vučetića",
+   "scope": "whole street",
+   "points": 5,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 5
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Jaše Ignjatovića",
+   "scope": "whole street",
+   "points": 5,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 5
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Jovana Boškovića",
+   "scope": "whole street",
+   "points": 17,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 17
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Jovana Đorđevića",
+   "scope": "whole street",
+   "points": 22,
+   "pct": 82,
+   "ours": {
+    "Blue Zone": 18,
+    "none": 1,
+    "Red Zone": 2,
+    "Extra Zone": 1
+   },
+   "status": "OK-MIXED"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Jovana Hranilovića",
+   "scope": "whole street",
+   "points": 20,
+   "pct": 50,
+   "ours": {
+    "Blue Zone": 10,
+    "none": 10
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Kej žrtava racije",
+   "scope": "whole street",
+   "points": 23,
+   "pct": 48,
+   "ours": {
+    "Blue Zone": 11,
+    "none": 12
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Kisačka",
+   "scope": "whole street",
+   "points": 93,
+   "pct": 26,
+   "ours": {
+    "none": 67,
+    "Blue Zone": 24,
+    "Red Zone": 2
+   },
+   "status": "OK-MIXED"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Kozačinskog",
+   "scope": "whole street",
+   "points": 7,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 7
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Kosančić Ivana",
+   "scope": "whole street",
+   "points": 11,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 11
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Kosovska I",
+   "status": "UNRESOLVED",
+   "range": "Trga republike → Ulice Marka Miljanova"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Kosovska II",
+   "scope": "whole street",
+   "points": 33,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 33
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Kosovska III",
+   "scope": "Marka Miljanova → Jaše Ignjatovića",
+   "points": 21,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 21
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Koste Hadži mlađeg",
+   "scope": "whole street",
+   "points": 7,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 7
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Koče Kolarova – plato",
+   "status": "NOT-A-STREET"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Koče Kolarova",
+   "scope": "whole street",
+   "points": 9,
+   "pct": 89,
+   "ours": {
+    "Blue Zone": 8,
+    "none": 1
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Kraljevića Marka I-II",
+   "scope": "whole street",
+   "points": 32,
+   "pct": 78,
+   "ours": {
+    "Blue Zone": 25,
+    "Red Zone": 7
+   },
+   "status": "OK-MIXED"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Laze Kostića",
+   "scope": "whole street",
+   "points": 14,
+   "pct": 71,
+   "ours": {
+    "Blue Zone": 10,
+    "none": 2,
+    "Red Zone": 2
+   },
+   "status": "OK-MIXED"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Lasla Gala",
+   "scope": "whole street",
+   "points": 4,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 4
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Lilike Bem",
+   "scope": "whole street",
+   "points": 7,
+   "pct": 71,
+   "ours": {
+    "none": 2,
+    "Blue Zone": 5
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Lovćenska",
+   "scope": "whole street",
+   "points": 6,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 6
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Lončarska",
+   "scope": "whole street",
+   "points": 3,
+   "pct": 67,
+   "ours": {
+    "Red Zone": 1,
+    "Blue Zone": 2
+   },
+   "status": "OK-MIXED"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Lukijana Mušickog",
+   "scope": "whole street",
+   "points": 16,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 16
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Majevička",
+   "scope": "whole street",
+   "points": 16,
+   "pct": 63,
+   "ours": {
+    "Blue Zone": 10,
+    "none": 6
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Maksima Gorkog",
+   "scope": "whole street",
+   "points": 99,
+   "pct": 46,
+   "ours": {
+    "Blue Zone": 46,
+    "Red Zone": 42,
+    "none": 11
+   },
+   "status": "OK-MIXED"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Marka Miljanova",
+   "scope": "whole street",
+   "points": 36,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 36
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Marka Miljanova",
+   "scope": "whole street",
+   "points": 36,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 36
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Marka Nešića",
+   "scope": "whole street",
+   "points": 8,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 8
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Masarikova",
+   "scope": "whole street",
+   "points": 15,
+   "pct": 93,
+   "ours": {
+    "Blue Zone": 14,
+    "Red Zone": 1
+   },
+   "status": "OK-MIXED"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Matica srpska",
+   "status": "NOT-A-STREET"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Matice srpske",
+   "scope": "whole street",
+   "points": 20,
+   "pct": 95,
+   "ours": {
+    "Blue Zone": 19,
+    "Red Zone": 1
+   },
+   "status": "OK-MIXED"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Milana Rakića",
+   "scope": "Zemljane ćuprije → Marka Nešića",
+   "points": 14,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 14
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Milete Jakšića",
+   "scope": "whole street",
+   "points": 4,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 4
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Mileševska",
+   "scope": "whole street",
+   "points": 9,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 9
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Milovana Glišića",
+   "scope": "whole street",
+   "points": 8,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 8
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Miloša Bajića",
+   "scope": "whole street",
+   "points": 12,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 12
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Miroslava Antića",
+   "scope": "whole street",
+   "points": 24,
+   "pct": 88,
+   "ours": {
+    "Red Zone": 1,
+    "Blue Zone": 21,
+    "none": 2
+   },
+   "status": "OK-MIXED"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Mičurinova I",
+   "scope": "whole street",
+   "points": 45,
+   "pct": 80,
+   "ours": {
+    "Blue Zone": 36,
+    "none": 9
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Mičurinova II",
+   "scope": "whole street",
+   "points": 45,
+   "pct": 80,
+   "ours": {
+    "Blue Zone": 36,
+    "none": 9
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Mičurinova III",
+   "scope": "Ulice Novosadskog sajma → Ulice Nikole Tesle",
+   "points": 17,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 17
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Mičurinova, južni deo",
+   "status": "NOT-A-STREET"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Mičurinova, severni deo",
+   "status": "NOT-A-STREET"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Miše Dimitrijevića",
+   "scope": "whole street",
+   "points": 62,
+   "pct": 68,
+   "ours": {
+    "Blue Zone": 42,
+    "none": 20
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Nikole Tesle",
+   "scope": "whole street",
+   "points": 57,
+   "pct": 25,
+   "ours": {
+    "Blue Zone": 14,
+    "none": 43
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Novosadskog sajma",
+   "scope": "whole street",
+   "points": 68,
+   "pct": 91,
+   "ours": {
+    "Blue Zone": 62,
+    "Red Zone": 6
+   },
+   "status": "OK-MIXED"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Novosadskog sajma V – od Hajduk Veljkove do Drinske ulice",
+   "status": "NOT-A-STREET"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Ognjena Price",
+   "scope": "whole street",
+   "points": 4,
+   "pct": 75,
+   "ours": {
+    "Blue Zone": 3,
+    "Red Zone": 1
+   },
+   "status": "OK-MIXED"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Omladinskog pokreta",
+   "scope": "whole street",
+   "points": 20,
+   "pct": 90,
+   "ours": {
+    "Blue Zone": 18,
+    "none": 2
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Pavla Papa",
+   "scope": "whole street",
+   "points": 20,
+   "pct": 65,
+   "ours": {
+    "none": 2,
+    "Blue Zone": 13,
+    "Red Zone": 5
+   },
+   "status": "OK-MIXED"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Pavla Simića",
+   "scope": "whole street",
+   "points": 7,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 7
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Pavla Stamatovića",
+   "status": "UNRESOLVED",
+   "range": "Kosovske → Save Vukovića"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Paje Markovića Adamova",
+   "scope": "whole street",
+   "points": 6,
+   "pct": 17,
+   "ours": {
+    "none": 5,
+    "Blue Zone": 1
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Pariske komune",
+   "scope": "whole street",
+   "points": 26,
+   "pct": 81,
+   "ours": {
+    "none": 5,
+    "Blue Zone": 21
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Pasterova",
+   "scope": "whole street",
+   "points": 25,
+   "pct": 88,
+   "ours": {
+    "Blue Zone": 22,
+    "none": 3
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Petra Drapšina",
+   "scope": "whole street",
+   "points": 27,
+   "pct": 52,
+   "ours": {
+    "Blue Zone": 14,
+    "Red Zone": 1,
+    "none": 12
+   },
+   "status": "OK-MIXED"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Petra Kočića",
+   "scope": "whole street",
+   "points": 49,
+   "pct": 22,
+   "ours": {
+    "Blue Zone": 11,
+    "none": 38
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Pećka",
+   "scope": "whole street",
+   "points": 9,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 9
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Plato Vujadina Boškova",
+   "status": "NOT-A-STREET"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Plato uz stadion „Karađorđe”",
+   "status": "NOT-A-STREET"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Podunavskog odreda, Petrovaradin",
+   "status": "NOT-A-STREET"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Puškinova",
+   "scope": "whole street",
+   "points": 46,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 46
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Radnička",
+   "scope": "whole street",
+   "points": 98,
+   "pct": 52,
+   "ours": {
+    "Blue Zone": 51,
+    "none": 45,
+    "Red Zone": 2
+   },
+   "status": "OK-MIXED"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Radnička ulica – plato",
+   "status": "NOT-A-STREET"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Rumenačka I",
+   "scope": "whole street",
+   "points": 101,
+   "pct": 24,
+   "ours": {
+    "none": 77,
+    "Blue Zone": 24
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Rumenačka II",
+   "status": "UNRESOLVED",
+   "range": "Bulevara kralja Petra Prvog → Bulevara Jaše Tomića"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Save Vukovića",
+   "scope": "Zemljane ćuprije → Đorđa Jovanovića",
+   "points": 6,
+   "pct": 83,
+   "ours": {
+    "Blue Zone": 5,
+    "none": 1
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Save Kovačevića I-III",
+   "scope": "whole street",
+   "points": 35,
+   "pct": 43,
+   "ours": {
+    "Blue Zone": 15,
+    "none": 20
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Save Ljubojeva",
+   "scope": "whole street",
+   "points": 10,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 10
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Sestara Ninković",
+   "scope": "whole street",
+   "points": 6,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 6
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Slobodana Bajića",
+   "scope": "whole street",
+   "points": 52,
+   "pct": 35,
+   "ours": {
+    "Blue Zone": 18,
+    "none": 34
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Slovačka",
+   "scope": "whole street",
+   "points": 19,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 19
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Sonje Marinković",
+   "scope": "whole street",
+   "points": 98,
+   "pct": 17,
+   "ours": {
+    "Red Zone": 4,
+    "Blue Zone": 17,
+    "none": 77
+   },
+   "status": "OK-MIXED"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "SPENS I",
+   "status": "NOT-A-STREET"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Stevana Branovačkog",
+   "scope": "whole street",
+   "points": 18,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 18
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Stevana Milovanova",
+   "scope": "whole street",
+   "points": 13,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 13
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Stevana Mokranjca",
+   "scope": "whole street",
+   "points": 27,
+   "pct": 81,
+   "ours": {
+    "none": 5,
+    "Blue Zone": 22
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Stevana Musića",
+   "scope": "whole street",
+   "points": 17,
+   "pct": 94,
+   "ours": {
+    "Blue Zone": 16,
+    "none": 1
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Stevana Sremca",
+   "scope": "whole street",
+   "points": 8,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 8
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Sterijina",
+   "scope": "whole street",
+   "points": 22,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 22
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Stefana Stefanovića",
+   "scope": "whole street",
+   "points": 10,
+   "pct": 90,
+   "ours": {
+    "Blue Zone": 9,
+    "none": 1
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Stjepana Mitrova Ljubiše",
+   "scope": "whole street",
+   "points": 9,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 9
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Stražilovska",
+   "scope": "whole street",
+   "points": 56,
+   "pct": 61,
+   "ours": {
+    "none": 22,
+    "Blue Zone": 34
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Sutjeska II",
+   "scope": "whole street",
+   "points": 35,
+   "pct": 74,
+   "ours": {
+    "Blue Zone": 26,
+    "Red Zone": 9
+   },
+   "status": "OK-MIXED"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Takovska",
+   "scope": "whole street",
+   "points": 12,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 12
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Tekelijina",
+   "status": "UNRESOLVED",
+   "range": "Almaške → Gundulićeve"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Temerinska",
+   "status": "UNRESOLVED",
+   "range": "Kisačke → Jovana Cvijića"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Temerinska pijaca",
+   "status": "NOT-A-STREET"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Tolstojeva ulica",
+   "status": "NOT-A-STREET"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Toplice Milana",
+   "scope": "whole street",
+   "points": 6,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 6
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Trg 1. maja",
+   "scope": "whole street",
+   "points": 21,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 21
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Trg Komenskog",
+   "scope": "whole street",
+   "points": 13,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 13
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Trg neznanog junaka",
+   "scope": "whole street",
+   "points": 62,
+   "pct": 53,
+   "ours": {
+    "Red Zone": 15,
+    "Blue Zone": 33,
+    "none": 14
+   },
+   "status": "OK-MIXED"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Trg Ferenca Fehera",
+   "status": "NOT-A-STREET"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Trg carice Milice",
+   "scope": "whole street",
+   "points": 9,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 9
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Turgenjeva",
+   "scope": "whole street",
+   "points": 11,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 11
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Ćirpanova",
+   "scope": "whole street",
+   "points": 12,
+   "pct": 83,
+   "ours": {
+    "Red Zone": 1,
+    "Blue Zone": 10,
+    "none": 1
+   },
+   "status": "OK-MIXED"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Ugao Novosadskog sajma i Hajduk Veljkove",
+   "status": "NOT-A-STREET"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Uroša Predića",
+   "scope": "whole street",
+   "points": 7,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 7
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Felegi Tivadara",
+   "scope": "whole street",
+   "points": 4,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 4
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Franje Štefanovića, Petrovaradin",
+   "status": "NOT-A-STREET"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Fruškogorskog odreda, Petrovaradin",
+   "status": "NOT-A-STREET"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Hajduk Veljkova",
+   "scope": "whole street",
+   "points": 90,
+   "pct": 57,
+   "ours": {
+    "none": 17,
+    "Blue Zone": 51,
+    "White Zone": 22
+   },
+   "status": "OK-MIXED"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Hadžić Svetića",
+   "scope": "whole street",
+   "points": 11,
+   "pct": 100,
+   "ours": {
+    "Blue Zone": 11
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Šafarikova",
+   "scope": "whole street",
+   "points": 48,
+   "pct": 46,
+   "ours": {
+    "Blue Zone": 22,
+    "none": 23,
+    "Red Zone": 3
+   },
+   "status": "OK-MIXED"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Šumadijska – plato",
+   "status": "NOT-A-STREET"
+  },
+  {
+   "zone": "Blue Zone",
+   "street": "Šumadijska",
+   "scope": "whole street",
+   "points": 24,
+   "pct": 79,
+   "ours": {
+    "Blue Zone": 19,
+    "none": 5
+   },
+   "status": "OK"
+  },
+  {
+   "zone": "White Zone",
+   "street": "Železnička stanica",
+   "status": "NOT-A-STREET"
+  },
+  {
+   "zone": "White Zone",
+   "street": "Hajduk Veljkova",
+   "status": "UNRESOLVED",
+   "range": "Futoške ulice → Ulice Novosadskog sajma"
+  }
+ ],
+ "mapToList": [
+  {
+   "street": "(nije uz imenovanu ulicu)",
+   "zone": "Blue Zone",
+   "n": 11
+  },
+  {
+   "street": "trg galerija",
+   "zone": "Red Zone",
+   "n": 2,
+   "listedAs": null
+  },
+  {
+   "street": "bulevar jase tomica",
+   "zone": "Red Zone",
+   "n": 1,
+   "listedAs": "Blue Zone"
+  },
+  {
+   "street": "brace ribnikar",
+   "zone": "Red Zone",
+   "n": 1,
+   "listedAs": "Blue Zone"
+  },
+  {
+   "street": "dunavska",
+   "zone": "Blue Zone",
+   "n": 1,
+   "listedAs": "Red Zone"
+  },
+  {
+   "street": "trg dortmunda",
+   "zone": "Blue Zone",
+   "n": 1,
+   "listedAs": null
+  },
+  {
+   "street": "karadjordjeva",
+   "zone": "Blue Zone",
+   "n": 1,
+   "listedAs": null
+  },
+  {
+   "street": "skerliceva",
+   "zone": "Red Zone",
+   "n": 1,
+   "listedAs": null
+  },
+  {
+   "street": "zarka vasiljevica",
+   "zone": "Red Zone",
+   "n": 1,
+   "listedAs": "Blue Zone"
+  },
+  {
+   "street": "sonje marinkovic",
+   "zone": "Red Zone",
+   "n": 1,
+   "listedAs": "Blue Zone"
+  },
+  {
+   "street": "jovana boskovica",
+   "zone": "Red Zone",
+   "n": 1,
+   "listedAs": "Blue Zone"
+  },
+  {
+   "street": "aleja mike antica",
+   "zone": "Blue Zone",
+   "n": 1,
+   "listedAs": null
+  },
+  {
+   "street": "polita desancica",
+   "zone": "Blue Zone",
+   "n": 1,
+   "listedAs": null
+  },
+  {
+   "street": "sremska",
+   "zone": "Blue Zone",
+   "n": 1,
+   "listedAs": null
+  },
+  {
+   "street": "trg mladenaca",
+   "zone": "Blue Zone",
+   "n": 1,
+   "listedAs": "Red Zone"
+  },
+  {
+   "street": "hopovska",
+   "zone": "Blue Zone",
+   "n": 1,
+   "listedAs": null
+  },
+  {
+   "street": "futoska",
+   "zone": "Blue Zone",
+   "n": 1,
+   "listedAs": null
+  },
+  {
+   "street": "brace jovandic",
+   "zone": "Red Zone",
+   "n": 1,
+   "listedAs": "Blue Zone"
+  },
+  {
+   "street": "nikolajevska porta",
+   "zone": "Red Zone",
+   "n": 1,
+   "listedAs": null
+  },
+  {
+   "street": "ise bajica",
+   "zone": "Extra Zone",
+   "n": 1,
+   "listedAs": null
+  },
+  {
+   "street": "pionirska",
+   "zone": "Extra Zone",
+   "n": 1,
+   "listedAs": "Red Zone"
+  },
+  {
+   "street": "prolaz pavla sosbergera",
+   "zone": "Red Zone",
+   "n": 1,
+   "listedAs": null
+  },
+  {
+   "street": "laze kostica",
+   "zone": "Red Zone",
+   "n": 1,
+   "listedAs": "Blue Zone"
+  },
+  {
+   "street": "sremska",
+   "zone": "Red Zone",
+   "n": 1,
+   "listedAs": null
+  },
+  {
+   "street": "bulevar jase tomica",
+   "zone": "White Zone",
+   "n": 1,
+   "listedAs": "Blue Zone"
+  },
+  {
+   "street": "gimnazijska",
+   "zone": "Extra Zone",
+   "n": 1,
+   "listedAs": null
+  },
+  {
+   "street": "preradoviceva",
+   "zone": "Blue Zone",
+   "n": 1,
+   "listedAs": null
+  }
+ ]
+}
