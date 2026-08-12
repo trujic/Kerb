@@ -178,6 +178,15 @@ const CITIES = {
       label: 'Ima dnevnu kartu (95 RSD → 8215)',
       short: 'dnevna',
     },
+    // Residents' bays (stanarska parking mesta). Not a tariff and not a zone:
+    // the space is reserved for a permit holder whatever anyone pays, so the app
+    // fills these yellow instead of offering to charge for them.
+    residentsFlag: {
+      key: 'residents',
+      zones: ['Extra Zone', 'Red Zone', 'Blue Zone', 'White Zone'],
+      label: 'Samo za stanare (povlašćena karta)',
+      short: 'stanari',
+    },
   },
   'belgrade': {
     label: 'Beograd', center: [44.8125, 20.4612], zoom: 13,
@@ -852,10 +861,15 @@ function renderConvert(groups) {
 const drawn = L.featureGroup().addTo(map)
 
 const FLAG = CITY.perLotFlag || null
+const RES = CITY.residentsFlag || null
+const resApplies = (zone) => !!RES && RES.zones.includes(zone)
 const flagApplies = (zone) => !!FLAG && FLAG.zones.includes(zone)
 
-function styleFor(zone, flagged) {
+function styleFor(zone, flagged, residents) {
   const c = CITY.zones[zone] || '#6E7583'
+  // Residents' bays are filled yellow here exactly as the app fills them, so the
+  // sheet you trace on looks like the map a driver ends up seeing.
+  if (residents) return { color: c, fillColor: '#F5C400', fillOpacity: 0.55, weight: 2, dashArray: null }
   // Flagged lots keep the zone's colour but get a dashed, heavier edge, so a
   // glance over the sheet tells you which ones you have already marked.
   return flagged
@@ -866,8 +880,9 @@ function attach(layer, props) {
   layer.feature = { type: 'Feature', properties: {
     name: props.name || '', zone: props.zone || null, color: CITY.zones[props.zone] || null,
     ...(FLAG && props[FLAG.key] ? { [FLAG.key]: true } : {}),
+    ...(RES && props[RES.key] ? { [RES.key]: true } : {}),
   } }
-  layer.setStyle(styleFor(props.zone, FLAG && props[FLAG.key]))
+  layer.setStyle(styleFor(props.zone, FLAG && props[FLAG.key], RES && props[RES.key]))
   layer.on('click', (e) => {
     L.DomEvent.stop(e)
     if (armed >= 0) { sheetClick(e.latlng); return }
@@ -877,9 +892,9 @@ function attach(layer, props) {
   drawn.addLayer(layer)
 }
 function select(layer) {
-  if (selected) selected.setStyle(styleFor(selected.feature.properties.zone, FLAG && selected.feature.properties[FLAG.key]))
+  if (selected) selected.setStyle(styleFor(selected.feature.properties.zone, FLAG && selected.feature.properties[FLAG.key], RES && selected.feature.properties[RES.key]))
   selected = layer
-  layer.setStyle({ ...styleFor(layer.feature.properties.zone, FLAG && layer.feature.properties[FLAG.key]), weight: 4, fillOpacity: 0.4 })
+  layer.setStyle({ ...styleFor(layer.feature.properties.zone, FLAG && layer.feature.properties[FLAG.key], RES && layer.feature.properties[RES.key]), weight: 4, fillOpacity: 0.4 })
   renderSel()
 }
 function renderSel() {
@@ -899,19 +914,29 @@ function renderSel() {
     <div class="row"><input type="text" id="selname" placeholder="ime ulice / parkirališta" value="${(p.name || '').replace(/"/g, '&quot;')}"></div>
     <div class="zones" id="selzones"></div>
     ${flagRow}
+    ${resApplies(p.zone) ? `<label style="display:flex;gap:7px;align-items:flex-start;font-size:12px;margin:6px 0 2px;line-height:1.35">
+         <input type="checkbox" id="selres" ${p[RES.key] ? 'checked' : ''} style="margin-top:2px">
+         <span>${RES.label}</span>
+       </label>` : ''}
     <div class="row" style="margin-top:6px"><button class="btn" id="deldup">Obriši poligon</button></div>`
   zoneButtons(document.getElementById('selzones'), p.zone, (z) => {
     p.zone = z; p.color = CITY.zones[z]
     // Moving a lot to a zone that has no such option drops the mark with it —
     // otherwise a Red lot could quietly keep a Blue-only daily-ticket flag.
     if (FLAG && p[FLAG.key] && !flagApplies(z)) delete p[FLAG.key]
-    selected.setStyle({ ...styleFor(z, FLAG && p[FLAG.key]), weight: 4, fillOpacity: 0.4 })
+    if (RES && p[RES.key] && !resApplies(z)) delete p[RES.key]
+    selected.setStyle({ ...styleFor(z, FLAG && p[FLAG.key], RES && p[RES.key]), weight: 4, fillOpacity: 0.4 })
     persist(); renderSel()
   })
   document.getElementById('selname').oninput = (e) => { p.name = e.target.value; persist() }
   document.getElementById('selflag')?.addEventListener('change', (e) => {
     if (e.target.checked) p[FLAG.key] = true; else delete p[FLAG.key]
-    selected.setStyle({ ...styleFor(p.zone, p[FLAG.key]), weight: 4, fillOpacity: 0.4 })
+    selected.setStyle({ ...styleFor(p.zone, p[FLAG.key], RES && p[RES.key]), weight: 4, fillOpacity: 0.4 })
+    persist(); stats()
+  })
+  document.getElementById('selres')?.addEventListener('change', (e) => {
+    if (e.target.checked) p[RES.key] = true; else delete p[RES.key]
+    selected.setStyle({ ...styleFor(p.zone, FLAG && p[FLAG.key], p[RES.key]), weight: 4, fillOpacity: 0.4 })
     persist(); stats()
   })
   document.getElementById('deldup').onclick = () => { drawn.removeLayer(selected); selected = null; renderSel(); persist() }
@@ -973,7 +998,8 @@ function importFC(fc, silent) {
       for (const part of parts) {
         const z2 = inferZone(f.properties)
         attach(L.polyline(part.map(([x, y]) => [y, x])), { name: f.properties?.name || '', zone: z2,
-          ...(FLAG && f.properties?.[FLAG.key] && flagApplies(z2) ? { [FLAG.key]: true } : {}) })
+          ...(FLAG && f.properties?.[FLAG.key] && flagApplies(z2) ? { [FLAG.key]: true } : {}),
+          ...(RES && f.properties?.[RES.key] && resApplies(z2) ? { [RES.key]: true } : {}) })
         n++
       }
       continue
@@ -982,7 +1008,9 @@ function importFC(fc, silent) {
     // all rings: [outer, ...holes] — holes are real (city blocks inside street networks)
     const layer = L.polygon(f.geometry.coordinates.map(ring => ring.map(([x, y]) => [y, x])))
     const z = inferZone(f.properties)
-    attach(layer, { name: f.properties?.name || '', zone: z, ...(FLAG && f.properties?.[FLAG.key] && flagApplies(z) ? { [FLAG.key]: true } : {}) })
+    attach(layer, { name: f.properties?.name || '', zone: z,
+      ...(FLAG && f.properties?.[FLAG.key] && flagApplies(z) ? { [FLAG.key]: true } : {}),
+      ...(RES && f.properties?.[RES.key] && resApplies(z) ? { [RES.key]: true } : {}) })
     n++
   }
   if (!silent) { toast(`Uvezeno ${n} delova`); persist() }
@@ -1007,6 +1035,8 @@ function toFC() {
       if (coords.length < 2) return
       const props = { name: p.name || '', zone: p.zone, color: CITY.zones[p.zone] || null }
       if (FLAG && p[FLAG.key]) props[FLAG.key] = true
+    if (RES && p[RES.key]) props[RES.key] = true
+      if (RES && p[RES.key]) props[RES.key] = true
       features.push({ type: 'Feature', properties: props, geometry: { type: 'LineString', coordinates: coords } })
       return
     }
@@ -1020,6 +1050,7 @@ function toFC() {
     if (!rings.length) return
     const props = { name: p.name || '', zone: p.zone, color: CITY.zones[p.zone] || null }
     if (FLAG && p[FLAG.key]) props[FLAG.key] = true
+    if (RES && p[RES.key]) props[RES.key] = true
     features.push({ type: 'Feature', properties: props, geometry: { type: 'Polygon', coordinates: rings } })
   })
   return { type: 'FeatureCollection', features }
@@ -1187,9 +1218,11 @@ function stats() {
   const per = {}
   fc.features.forEach(f => { per[f.properties.zone || '—'] = (per[f.properties.zone || '—'] || 0) + 1 })
   const flagged = FLAG ? fc.features.filter(f => f.properties[FLAG.key]).length : 0
+  const resCount = RES ? fc.features.filter(f => f.properties[RES.key]).length : 0
   document.getElementById('stats').textContent =
     `${fc.features.length} delova · ` + Object.entries(per).map(([z, n]) => `${z}: ${n}`).join(' · ')
     + (FLAG ? ` · ${FLAG.short}: ${flagged}` : '')
+    + (RES ? ` · ${RES.short}: ${resCount}` : '')
 }
 function toast(msg) {
   const t = document.getElementById('toast')

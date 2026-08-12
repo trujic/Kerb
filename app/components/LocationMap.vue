@@ -171,13 +171,21 @@ watchEffect((onCleanup) => {
     // say there is a second way to pay here, and the pay card says what it costs.
     const daily = feature.properties?.daily === true
     const dash  = daily ? { dashArray: '6 4', weight: 3 } : {}
+    // Residents' bays — a permit, not a tariff. Filled yellow so they read as a
+    // different thing entirely, while the outline keeps the zone's colour at a
+    // thin 2px so you can still see which zone they sit in. Paying here buys
+    // nothing: the space is reserved whatever you send.
+    const residents = feature.properties?.residents === true
+    const stanari = residents
+      ? { fillColor: '#F5C400', fillOpacity: 0.55, weight: 2, opacity: 0.9, dashArray: undefined }
+      : {}
 
     let layer: any = null
     if (g.type === 'Polygon') {
       if (g.coordinates[0].length < 3) continue
       // all rings — holes (city blocks inside street networks) must stay unfilled
       layer = L.polygon(g.coordinates.map((ring: number[][]) => toLatLngs(ring)), {
-        color, fillColor: color, fillOpacity: 0.13, weight: 2, opacity: 0.55, ...dash,
+        color, fillColor: color, fillOpacity: 0.13, weight: 2, opacity: 0.55, ...dash, ...stanari,
       })
     } else if (g.type === 'MultiPolygon') {
       // Leaflet takes the nested array directly; each part keeps its own holes.
@@ -186,7 +194,7 @@ watchEffect((onCleanup) => {
         .map((poly: number[][][]) => poly.map((ring: number[][]) => toLatLngs(ring)))
       if (!parts.length) continue
       layer = L.polygon(parts, {
-        color, fillColor: color, fillOpacity: 0.13, weight: 2, opacity: 0.55, ...dash,
+        color, fillColor: color, fillOpacity: 0.13, weight: 2, opacity: 0.55, ...dash, ...stanari,
       })
     } else if (g.type === 'LineString') {
       layer = L.polyline(toLatLngs(g.coordinates), {
