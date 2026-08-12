@@ -217,22 +217,6 @@ const dict = {
     sr: 'Limit zone {zone} ({min} min) je pri kraju{where}. Moraš da pomeriš auto — ovde se ne može ponovo platiti.',
     en: "{zone}'s {min}-min limit is almost up{where}. You must move the car — no re-pay here.",
   },
-  // Add to home screen. The reminder line is the honest reason, not a sales
-  // pitch: on iPhone the Notification API does not exist until Kerbo is on the
-  // home screen, so a driver in Safari cannot be reminded of anything at all.
-  a2hsTitle: { sr: 'Sačuvaj Kerbo na telefon', en: 'Keep Kerbo on your phone' },
-  a2hsSub: {
-    sr: 'Otvara se kao aplikacija, bez pretraživača — i tek tako podsetnik pred istek radi na iPhone-u.',
-    en: 'Opens like an app, no browser bar — and on iPhone it is the only way the expiry reminder works.',
-  },
-  a2hsAdd: { sr: 'Dodaj', en: 'Add' },
-  a2hsHow: { sr: 'Kako?', en: 'How?' },
-  a2hsIosSteps: {
-    sr: 'Dodirni Podeli (kvadrat sa strelicom nagore) na dnu ekrana, pa izaberi „Dodaj na početni ekran".',
-    en: 'Tap Share (the square with an arrow) at the bottom, then choose "Add to Home Screen".',
-  },
-  a2hsLater: { sr: 'Ne sada', en: 'Not now' },
-
   remindTitle: { sr: 'Podsetnik pred istek', en: 'Reminder before it runs out' },
   remindOff: {
     sr: 'Javimo ti 10 minuta ranije. Radi i bez interneta.',

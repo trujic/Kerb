@@ -638,13 +638,6 @@
             <!-- Full weekly charging schedule (reference) -->
             <ParkingHours :city-id="detectedCity!.id" class="gps-hours" />
 
-            <!-- Add to home screen, but only once there is something to keep.
-                 Client-only: whether it shows at all depends on the browser and
-                 on being installed already, neither of which the server knows. -->
-            <ClientOnly>
-              <AddToHomeScreen :earned="hasParked" />
-            </ClientOnly>
-
             <!-- Fine warning -->
             <div v-if="cityDetail.fine" class="gps-fine">
               <span class="gps-fine-label">{{ t("fineIfUnpaid") }}</span>
@@ -1468,11 +1461,6 @@ const onAiScan = () => {
   showAi.value = false;
   showScan.value = true;
 };
-
-// The home-screen offer used to wait for a parking session to prove the app had
-// been worth something. With no sessions to wait for, a saved plate is the
-// nearest honest proxy: typing it is how far into the pay flow anyone gets.
-const hasParked = computed(() => !!defaultPlate.value);
 
 const relTime = (iso: string) => {
   const sr = lang.value === "sr";
