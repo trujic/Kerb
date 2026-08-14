@@ -281,7 +281,7 @@
                 class="zone-hero"
                 :class="{
                   'zone-hero--free': freeNow,
-                  'zone-hero--unsure': parkingState === 'near',
+                  'zone-hero--unsure': unsure,
                 }"
                 :style="{ borderColor: selectedZone.color }"
               >
@@ -299,7 +299,7 @@
                     <span
                       v-if="
                         selectedZone.name === likelyZoneName &&
-                        parkingState !== 'near'
+                        !unsure
                       "
                       class="zone-hero-tag"
                     >
@@ -323,18 +323,18 @@
                   <!-- Standing off the mapped edge, the guess is weak enough that
                        it leads rather than trails: a line under the price was too
                        easy to scroll past on the way to the slider. -->
-                  <div v-if="parkingState === 'near'" class="zone-unsure">
+                  <div v-if="unsure" class="zone-unsure">
                     <Icon name="alert" :size="17" />
                     <div>
                       <p class="zone-unsure-title">
                         {{
-                          nearEdge
-                            ? t("edgeTitle", { dist: formatDist(edgeDistance ?? 0) })
+                          parkingState === 'edge'
+                            ? t("edgeTitle")
                             : t("boundaryTitle", { dist: formatDist(nearest!.distanceM) })
                         }}
                       </p>
                       <p class="zone-unsure-sub">
-                        {{ nearEdge ? t("edgeSub") : t("boundarySub") }}
+                        {{ parkingState === 'edge' ? t("edgeSub") : t("boundarySub") }}
                         <strong>{{ selectedZone.name }}</strong
                         >.
                       </p>
@@ -1268,9 +1268,17 @@ const displayZones = computed(() => zoneBoundaries.value);
 // Everything between that and the far threshold is "near" — which the hero card
 // already knows how to show: no "likely yours" badge, and the edge warning leads
 // instead of trailing the price.
+// Three answers, and a fourth for "there is no paid parking around here at all":
+//
+//   on    — inside the zone with more than 5 m to its line. It is yours.
+//   edge  — within 5 m of the line, inside OR outside. The band is symmetric
+//           because a phone off by ten metres puts you on either side of it.
+//   near  — more than 5 m outside, but a zone is still close. Probably not in it;
+//           the sign decides.
+//   none  — nothing within reach; the calm "parking here is likely free" card.
 const INSIDE_MARGIN_M = 5;
 
-const parkingState = computed<"on" | "near" | "none" | null>(() => {
+const parkingState = computed<"on" | "edge" | "near" | "none" | null>(() => {
   const n = nearest.value;
   if (!n) return null;
   const acc = coords.value?.accuracy ?? 0;
@@ -1279,10 +1287,14 @@ const parkingState = computed<"on" | "near" | "none" | null>(() => {
   // Line geometry is a street centreline with no inside, and the kerb is half a
   // road width off it by construction — so those keep the distance rule.
   const here = zoneDistances.value.find((d) => d.zoneName === n.zoneName);
-  const confident = here?.line
-    ? n.distanceM <= onT
-    : !!here?.inside && here.edgeM >= INSIDE_MARGIN_M;
-  if (confident) return "on";
+  if (here?.line) {
+    // A centreline has no inside, and the kerb is half a road width off it by
+    // construction — so those keep the distance rule they were built for.
+    if (n.distanceM <= onT) return "on";
+    return n.distanceM <= nearT ? "near" : "none";
+  }
+  if (here && here.edgeM <= INSIDE_MARGIN_M) return "edge";
+  if (here?.inside) return "on";
   if (n.distanceM <= nearT) return "near";
   return "none";
 });
@@ -1291,15 +1303,9 @@ const parkingState = computed<"on" | "near" | "none" | null>(() => {
 // entirely, and it has to say so: "you are not on the zone" is simply false when
 // you are, and a driver who reads that while parked correctly stops believing
 // the next warning too.
-const nearEdge = computed(() => {
-  if (parkingState.value !== "near") return false;
-  const n = nearest.value;
-  return !!zoneDistances.value.find((d) => d.zoneName === n?.zoneName)?.inside;
-});
-const edgeDistance = computed(() => {
-  const n = nearest.value;
-  return zoneDistances.value.find((d) => d.zoneName === n?.zoneName)?.edgeM ?? null;
-});
+const unsure = computed(
+  () => parkingState.value === "edge" || parkingState.value === "near",
+);
 
 // No paid parking where the user stands (with geometry to back it) — the wizard
 // yields to a calm "you're fine here" card; zones would only contradict it.
@@ -1320,7 +1326,7 @@ const zoneColor = (name: string) =>
 // name match only when boundary geometry isn't loaded.
 const activeSuggestedName = computed<string | null>(() => {
   if (nearest.value) {
-    return parkingState.value === "on" || parkingState.value === "near"
+    return parkingState.value !== "none"
       ? nearest.value.zoneName
       : null;
   }
@@ -1472,7 +1478,7 @@ const nearestSignArrow = computed(() => {
 const leadSignPoint = ref<{ lat: number; lng: number } | null>(null);
 const highlightPoint = computed(() => {
   if (leadSignPoint.value) return leadSignPoint.value;
-  return parkingState.value === "near" || parkingState.value === "none"
+  return parkingState.value !== "on"
     ? nearest.value?.point ?? null
     : null;
 });

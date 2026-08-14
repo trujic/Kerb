@@ -75,20 +75,21 @@ const dict = {
   // Inside the zone, near its line. The polygons are drawn a little wider than
   // the bays they cover, so being just inside one is not proof of anything.
   edgeTitle: {
-    sr: 'Blizu si ivice zone — {dist} do granice',
-    en: "You're near the edge of the zone — {dist} to the line",
+    sr: 'Na granici zone si',
+    en: "You're on the zone boundary",
   },
   edgeSub: {
     sr: 'Granica je nacrtana šire nego što je na ulici. Plati ovu zonu samo ako na tabli piše',
     en: 'The line is drawn wider than the kerb. Only pay this zone if the sign says',
   },
+  // More than a car length outside the line: probably not in this zone at all.
   boundaryTitle: {
-    sr: 'Nisi na zoni — {dist} od najbliže',
-    en: "You're not on the zone — {dist} from the nearest",
+    sr: 'Verovatno nisi u zoni — {dist} do najbliže',
+    en: "You're probably not in a zone — {dist} to the nearest",
   },
   boundarySub: {
-    sr: 'GPS ne može da potvrdi koja je tvoja. Plati ovu samo ako na tabli piše',
-    en: "GPS can't tell which one is yours. Only pay this one if the sign says",
+    sr: 'Potraži znak. Plati ovu zonu samo ako na tabli piše',
+    en: 'Look for a sign. Only pay this zone if it says',
   },
   alreadyRunning: {
     sr: 'Parking u ovoj zoni ti već teče',
