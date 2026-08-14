@@ -37,6 +37,8 @@ export interface ZoneDistance {
   /** Distance to the zone as a place to park: 0 anywhere inside it. */
   distanceM: number
   inside: boolean
+  /** Line geometry has no inside — a street centreline, not an area. */
+  line: boolean
   streetName: string
 }
 
@@ -95,11 +97,11 @@ export const useNearestParking = (
     // Only `dist` was measured before: stepping inside a polygon set it to 0 and
     // skipped the edge entirely, so the whole interior read as maximum confidence
     // — the middle of a block and half a metre from the line, identical.
-    const perZone = new Map<string, { dist: number; edge: number; inside: boolean; street: string }>()
-    const note = (zone: string, dist: number, edge: number, inside: boolean, street: string) => {
+    const perZone = new Map<string, { dist: number; edge: number; inside: boolean; line: boolean; street: string }>()
+    const note = (zone: string, dist: number, edge: number, inside: boolean, line: boolean, street: string) => {
       const seen = perZone.get(zone)
-      if (!seen) { perZone.set(zone, { dist, edge, inside, street }); return }
-      if (dist < seen.dist) { seen.dist = dist; seen.street = street }
+      if (!seen) { perZone.set(zone, { dist, edge, inside, line, street }); return }
+      if (dist < seen.dist) { seen.dist = dist; seen.street = street; seen.line = line }
       if (edge < seen.edge) seen.edge = edge
       seen.inside = seen.inside || inside
     }
@@ -138,7 +140,7 @@ export const useNearestParking = (
               const n = (i + 1) % ring.length
               const r = closestOnSegment(ring[i][0], ring[i][1], ring[n][0], ring[n][1])
               if (!inside && (!best || r.dist < best.dist)) best = { dist: r.dist, cx: r.cx, cy: r.cy, zone, street, daily }
-              note(zone, inside ? 0 : r.dist, r.dist, inside, street)
+              note(zone, inside ? 0 : r.dist, r.dist, inside, false, street)
             }
           }
         }
@@ -157,14 +159,15 @@ export const useNearestParking = (
           if (!best || r.dist < best.dist) {
             best = { dist: r.dist, cx: r.cx, cy: r.cy, zone, street, daily }
           }
-          note(zone, r.dist, r.dist, false, street)
+          note(zone, r.dist, r.dist, false, true, street)
         }
       }
     }
 
     const byZone: ZoneDistance[] = [...perZone.entries()]
       .map(([zoneName, v]) => ({
-        zoneName, distanceM: v.dist, edgeM: v.edge, inside: v.inside, streetName: v.street,
+        zoneName, distanceM: v.dist, edgeM: v.edge, inside: v.inside, line: v.line,
+        streetName: v.street,
       }))
       .sort((a, b) => a.distanceM - b.distanceM)
 

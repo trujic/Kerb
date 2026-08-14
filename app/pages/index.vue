@@ -328,13 +328,13 @@
                     <div>
                       <p class="zone-unsure-title">
                         {{
-                          t("boundaryTitle", {
-                            dist: formatDist(nearest!.distanceM),
-                          })
+                          nearEdge
+                            ? t("edgeTitle", { dist: formatDist(edgeDistance ?? 0) })
+                            : t("boundaryTitle", { dist: formatDist(nearest!.distanceM) })
                         }}
                       </p>
                       <p class="zone-unsure-sub">
-                        {{ t("boundarySub") }}
+                        {{ nearEdge ? t("edgeSub") : t("boundarySub") }}
                         <strong>{{ selectedZone.name }}</strong
                         >.
                       </p>
@@ -1256,15 +1256,49 @@ const mapApprox = computed(() => dashTier.value === "cadastre_approx");
 const displayZones = computed(() => zoneBoundaries.value);
 
 // on  = standing on a paid street · near = just off one · none = no paid parking
+// "on" used to mean within 25 m of a zone, which let the app claim a zone while
+// the blue dot sat visibly outside its polygon — a driver on Modene was told
+// "Extra Zone, likely yours" from a good ten metres beyond the orange.
+//
+// Being confident now takes being INSIDE, with room to spare. The polygons are
+// already drawn a little wider than the bays they cover, so five metres of margin
+// is not much to ask, and it is roughly one parking space: closer to the line
+// than that and a phone can put you on the other side of it.
+//
+// Everything between that and the far threshold is "near" — which the hero card
+// already knows how to show: no "likely yours" badge, and the edge warning leads
+// instead of trailing the price.
+const INSIDE_MARGIN_M = 5;
+
 const parkingState = computed<"on" | "near" | "none" | null>(() => {
   const n = nearest.value;
   if (!n) return null;
   const acc = coords.value?.accuracy ?? 0;
-  const onT = Math.min(Math.max(25, acc), 60); // widen when GPS is imprecise
+  const onT = Math.min(Math.max(25, acc), 60);
   const nearT = Math.max(75, onT + 50);
-  if (n.distanceM <= onT) return "on";
+  // Line geometry is a street centreline with no inside, and the kerb is half a
+  // road width off it by construction — so those keep the distance rule.
+  const here = zoneDistances.value.find((d) => d.zoneName === n.zoneName);
+  const confident = here?.line
+    ? n.distanceM <= onT
+    : !!here?.inside && here.edgeM >= INSIDE_MARGIN_M;
+  if (confident) return "on";
   if (n.distanceM <= nearT) return "near";
   return "none";
+});
+
+// Inside the zone but close to its line. Different from standing off the zone
+// entirely, and it has to say so: "you are not on the zone" is simply false when
+// you are, and a driver who reads that while parked correctly stops believing
+// the next warning too.
+const nearEdge = computed(() => {
+  if (parkingState.value !== "near") return false;
+  const n = nearest.value;
+  return !!zoneDistances.value.find((d) => d.zoneName === n?.zoneName)?.inside;
+});
+const edgeDistance = computed(() => {
+  const n = nearest.value;
+  return zoneDistances.value.find((d) => d.zoneName === n?.zoneName)?.edgeM ?? null;
 });
 
 // No paid parking where the user stands (with geometry to back it) — the wizard

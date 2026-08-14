@@ -72,6 +72,16 @@ const dict = {
   },
   likelyYours: { sr: 'verovatno tvoja', en: 'likely yours' },
   noLimit: { sr: 'Bez limita', en: 'No limit' },
+  // Inside the zone, near its line. The polygons are drawn a little wider than
+  // the bays they cover, so being just inside one is not proof of anything.
+  edgeTitle: {
+    sr: 'Blizu si ivice zone — {dist} do granice',
+    en: "You're near the edge of the zone — {dist} to the line",
+  },
+  edgeSub: {
+    sr: 'Granica je nacrtana šire nego što je na ulici. Plati ovu zonu samo ako na tabli piše',
+    en: 'The line is drawn wider than the kerb. Only pay this zone if the sign says',
+  },
   boundaryTitle: {
     sr: 'Nisi na zoni — {dist} od najbliže',
     en: "You're not on the zone — {dist} from the nearest",
