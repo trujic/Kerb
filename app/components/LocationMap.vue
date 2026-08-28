@@ -40,9 +40,17 @@ const props = defineProps<{
   compassPrompt?: boolean // show a one-tap "Enable compass" chip (iOS first-time)
   hideUser?: boolean      // static city-overview map: no user marker, fit to zones
   labels?: boolean        // show permanent street/zone labels (e.g. on the locked preview)
+  // The city's zone records (name, colour, price, rules, daily ticket…), so a
+  // tapped polygon can say what it costs rather than only what it is called.
+  zoneMeta?: any[]
+  cityId?: string | null  // which city's charging schedule the popup should read
+  // Whether the zone popup offers a pay button. Off by default: the button only
+  // makes sense where the parent runs the pay flow (the dashboard), not on the
+  // city guide's reference map, where it would lead nowhere.
+  payable?: boolean
 }>()
 
-const emit = defineEmits<{ compassTap: []; enableCompass: [] }>()
+const emit = defineEmits<{ compassTap: []; enableCompass: []; payZone: [zone: string] }>()
 
 // When interactive, the map follows the user until they drag; then a
 // recenter button re-arms follow. Non-interactive maps always follow.
@@ -165,7 +173,8 @@ watchEffect((onCleanup) => {
     const g = feature.geometry
     if (!g) continue
     const color = (feature.properties?.color ?? '#3B82F6').trim()
-    const name  = feature.properties?.name ?? ''
+    const name  = feature.properties?.name ?? ''   // the street, where a city has one
+    const zoneName = (feature.properties?.zone ?? '').trim() // the tariff identity
     // Lots that sell the zone's daily ticket get a dashed outline. Not a colour
     // of their own — they are still that zone, at that hourly rate; the dashes
     // say there is a second way to pay here, and the pay card says what it costs.
@@ -215,7 +224,18 @@ watchEffect((onCleanup) => {
       layer.bindTooltip(name, wantsPermanent && labelCarrier.get(name) === feature
         ? { permanent: true, direction: 'center', className: 'zone-label' }
         : { sticky: true, className: 'zone-tooltip' })
+
+      // Only where a tap can mean "tell me about this". On the locked preview a
+      // tap is the compass gesture, and a popup would eat it.
     }
+
+    // The popup keys off `zone`, not `name`. They are different things: `name` is
+    // the street a polygon sits on and Novi Sad's 267 polygons all carry "" for it,
+    // while `zone` ("Blue Zone") is the identity that joins to the tariff. Binding
+    // this inside the `if (name)` above meant every Novi Sad and Niš polygon was
+    // silently unclickable.
+    if (props.interactive && zoneName)
+      layer.bindPopup(zonePopup(zoneName, name, color, residents), { className: 'lm-pop-wrap', closeButton: true })
     layers.push(layer)
   }
 
@@ -277,6 +297,60 @@ watchEffect((onCleanup) => {
 })
 
 // Relative "last confirmed" age, e.g. "today", "yesterday", "5 days ago".
+const { lang, t } = useLang()
+
+/**
+ * What a zone polygon says when you tap it.
+ *
+ * The label on the map is the zone's name and nothing more, which is the one
+ * thing a driver standing on it can already read off the sign. Everything they
+ * actually want — the rate, whether it is charging right now, how long they may
+ * stay — the app already knows and was not showing. Returned as a function so
+ * Leaflet re-renders it at open time; "free at 21:00" must not be answered from
+ * whenever the layer happened to be built.
+ */
+const zonePopup = (zoneName: string, street: string, color: string, residents: boolean) => () => {
+  const z = props.zoneMeta?.find((m: any) => m?.name === zoneName)
+  const rate = z ? rateLabel(readTariff(z)) : null
+  const max  = z ? maxStayFor(z) : null
+  const st   = statusAt(Date.now(), getSchedule(props.cityId ?? undefined, zoneName))
+  const desc = st ? describeStatus(st, t, (d: number) => dayAbbrFor(d, lang.value)) : null
+
+  const rows: string[] = []
+  if (street) rows.push(`<div class="lm-pop-row lm-pop-street">${esc(street)}</div>`)
+  if (desc) rows.push(
+    `<div class="lm-pop-row"><span class="lm-pop-dot" style="background:${st!.paid ? '#EF4444' : '#16A34A'}"></span>` +
+    `<span><strong>${esc(desc.label)}</strong> · ${esc(desc.detail)}</span></div>`)
+  if (max) rows.push(`<div class="lm-pop-row">${esc(t('zoneMaxStay', { n: max }))}</div>`)
+  if (z?.daily_amount) rows.push(`<div class="lm-pop-row">${esc(t('zoneDaily', {
+    amount: formatMoney(Number(z.daily_amount), z.price_currency ?? null),
+  }))}</div>`)
+  if (residents) rows.push(`<div class="lm-pop-rules">${esc(t('zoneResidents'))}</div>`)
+  else if (z?.rules) rows.push(`<div class="lm-pop-rules">${esc(String(z.rules))}</div>`)
+  if (!rows.length) rows.push(`<div class="lm-pop-row">${esc(t('zoneNoData'))}</div>`)
+
+  const el = document.createElement('div')
+  el.className = 'lm-pop'
+  el.innerHTML =
+    `<div class="lm-pop-head"><span class="lm-pop-zone" style="color:${color}">${esc(zoneName)}</span>` +
+    `<span class="lm-pop-price">${esc(rate ?? t('zoneNoRate'))}</span></div>` +
+    `<div class="lm-pop-body">${rows.join('')}</div>`
+
+  // The button hands the zone to the pay flow — it does not pay. Tapping a polygon
+  // is a guess about geometry, not the sign, and the wizard is where the plate and
+  // the slide still stand between that guess and a billed SMS. Withheld where
+  // paying buys nothing: a residents' bay, or a zone with no way to pay at all.
+  if (props.payable && z && !residents && payActionFor(z).kind !== 'none') {
+    const btn = document.createElement('button')
+    btn.type = 'button'
+    btn.className = 'lm-pop-pay'
+    btn.textContent = t('zonePayBtn')
+    btn.addEventListener('click', () => emit('payZone', zoneName))
+    el.appendChild(btn)
+  }
+  return el
+}
+
 const relAge = (iso?: string): string => {
   if (!iso) return ''
   const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000)
@@ -372,10 +446,38 @@ onMounted(async () => {
     mapEl.value?.classList.add('lm-labels')
   }
 
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-    subdomains: 'abcd',
+  // Base tiles. CARTO's keyless Positron ended: basemaps.cartocdn.com now answers
+  // every anonymous request with a PNG that reads "API KEY REQUIRED", so the map
+  // rendered as a grid of watermarks rather than failing outright.
+  //
+  // OSM Srbija (tiles.openstreetmap.rs) replaces it inside Serbia. It is the local
+  // community's server, explicitly free to embed, refreshed daily, and — the reason
+  // it is worth the switch — it carries the imported address register, so house
+  // numbers are legible at z18. That is what zone boundaries are actually written
+  // in: "Žarka Vasiljevića 2–10".
+  //
+  // It only renders the region, though, and Kerb also ships Thessaloniki and NYC.
+  // So tiles fully inside Serbia come from Novi Sad; everything else falls back to
+  // global OSM. Whole-tile containment, not centre, so no tile is half-rendered.
+  const RS = { south: 41.7, west: 18.7, north: 46.3, east: 23.2 }
+
+  const KerbTiles = L.TileLayer.extend({
+    getTileUrl(coords: any) {
+      const b = (this as any)._tileCoordsToBounds(coords)
+      const inRS = b.getSouth() >= RS.south && b.getNorth() <= RS.north
+                && b.getWest()  >= RS.west  && b.getEast()  <= RS.east
+      return inRS
+        ? `https://tiles.openstreetmap.rs/lat/${coords.z}/${coords.x}/${coords.y}.png`
+        : `https://tile.openstreetmap.org/${coords.z}/${coords.x}/${coords.y}.png`
+    },
+  })
+
+  new (KerbTiles as any)('', {
+    // OSM Srbija stops at z18. maxNativeZoom lets Leaflet upscale that last level
+    // instead of requesting a z19 tile that would 404 into a hole in the map.
+    maxNativeZoom: 18,
     maxZoom: 19,
-    attribution: '&copy; OpenStreetMap &copy; CARTO',
+    attribution: '&copy; <a href="https://openstreetmap.rs">OpenStreetMap Srbija</a>, &copy; OpenStreetMap contributors',
   }).addTo(map)
 
   // Static city-overview map: no user, just the zone geometry fitted to view.
@@ -418,6 +520,14 @@ onMounted(async () => {
 </script>
 
 <style>
+/* The base map is standard OSM cartography, which is much louder than the CARTO
+   Positron it replaced. Desaturating the tile pane pushes it back down into a
+   background — everything Kerb draws sits in the overlay panes above and keeps
+   its real colour. */
+.location-map .leaflet-tile-pane {
+  filter: grayscale(0.75) saturate(0.8) brightness(1.1) contrast(0.88);
+}
+
 /* Permanent street/zone labels — hidden until the map is zoomed in (lm-labels). */
 .leaflet-tooltip.zone-label {
   background: rgba(255, 255, 255, 0.82);
@@ -473,12 +583,29 @@ onMounted(async () => {
 }
 /* Sign popup */
 .lm-pop-wrap .leaflet-popup-content-wrapper { border-radius: 12px; padding: 0; overflow: hidden; }
-.lm-pop-wrap .leaflet-popup-content { margin: 0; width: 180px !important; }
+.lm-pop-wrap .leaflet-popup-content { margin: 0; width: 208px !important; }
 .lm-pop-img { display: block; width: 100%; height: 110px; object-fit: cover; }
-.lm-pop-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 11px 2px; }
+/* Right padding clears Leaflet's × , which is absolutely positioned in the same
+   corner and was sitting on top of the rate. */
+.lm-pop-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 9px 26px 2px 11px; }
 .lm-pop-zone { font-size: 13px; font-weight: 700; font-family: var(--font-mono, monospace); }
 .lm-pop-price { font-size: 13px; font-weight: 700; color: #374151; font-family: var(--font-mono, monospace); }
 .lm-pop-age { padding: 0 11px 10px; font-size: 11px; color: #6b7280; }
+
+/* Zone popup body — the rate sits in the head next to the name; these are the
+   lines under it. Kept to one fact per row: a driver reads this at the kerb. */
+.lm-pop-body { padding: 4px 11px 10px; display: flex; flex-direction: column; gap: 4px; }
+.lm-pop-row { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: #374151; line-height: 1.35; }
+.lm-pop-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; }
+.lm-pop-street { font-weight: 600; color: #1f2937; }
+.lm-pop-pay {
+  display: block; width: calc(100% - 22px); margin: 0 11px 11px;
+  padding: 8px 10px; border: none; border-radius: 9px; cursor: pointer;
+  background: #F5C400; color: #16181D;
+  font-family: var(--font-mono, monospace); font-size: 12px; font-weight: 700;
+}
+.lm-pop-pay:active { transform: scale(0.98); }
+.lm-pop-rules { margin-top: 2px; font-size: 10.5px; color: #6b7280; line-height: 1.4; }
 .lm-dot {
   position: relative;
   width: 60px;

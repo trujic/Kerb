@@ -302,6 +302,14 @@ const dict = {
   freeAt: { sr: 'Besplatno od {time}', en: 'Free at {time}' },
   free: { sr: 'Besplatno', en: 'Free' },
 
+  // Zone popup on the map — what a tapped polygon says about itself
+  zoneNoRate: { sr: 'Cena nije objavljena', en: 'No published rate' },
+  zoneMaxStay: { sr: 'Najduže {n} min', en: 'Max stay {n} min' },
+  zoneDaily: { sr: 'Dnevna karta {amount}', en: 'Day ticket {amount}' },
+  zoneNoData: { sr: 'Nema podataka o ovoj zoni', en: 'Nothing known about this zone' },
+  zonePayBtn: { sr: 'Plati ovu zonu →', en: 'Pay this zone →' },
+  zoneResidents: { sr: 'Mesto za stanare — plaćanje ovde ništa ne kupuje', en: 'Residents\u2019 bay — paying here buys nothing' },
+
   // Ask AI panel
   aiPanelTitle: { sr: 'Parkiranje u {city}, jednostavno', en: 'Parking in {city}, simply' },
   aiPaidNow: { sr: 'Sada se plaća', en: 'You pay right now' },

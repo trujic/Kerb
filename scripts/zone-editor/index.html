@@ -275,8 +275,27 @@ citySel.onchange = () => {
 
 // ── map ──
 const map = L.map('map', { zoomControl: true }).setView(CITY.center, CITY.zoom)
-L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-  maxZoom: 20, attribution: '© OpenStreetMap © CARTO',
+// CARTO's keyless tiles now return an "API KEY REQUIRED" watermark, so the base
+// map here is OSM Srbija — which matters more in the editor than in the app: it
+// renders the imported address register, so kućni brojevi are readable while
+// tracing. Parking servis publishes zones as "ulica + raspon brojeva", and this
+// is where you read that range off the map. Outside Serbia, global OSM.
+const RS = { south: 41.7, west: 18.7, north: 46.3, east: 23.2 }
+const KerbTiles = L.TileLayer.extend({
+  getTileUrl(coords) {
+    const b = this._tileCoordsToBounds(coords)
+    const inRS = b.getSouth() >= RS.south && b.getNorth() <= RS.north
+              && b.getWest()  >= RS.west  && b.getEast()  <= RS.east
+    return inRS
+      ? `https://tiles.openstreetmap.rs/lat/${coords.z}/${coords.x}/${coords.y}.png`
+      : `https://tile.openstreetmap.org/${coords.z}/${coords.x}/${coords.y}.png`
+  },
+})
+// OSM Srbija stops at z18; upscale past that rather than 404 into a hole. Tracing
+// happens at z19–20, where an upscaled tile is blurry but still correctly placed.
+new KerbTiles('', {
+  maxNativeZoom: 18, maxZoom: 20,
+  attribution: '© <a href="https://openstreetmap.rs">OpenStreetMap Srbija</a>, © OpenStreetMap contributors',
 }).addTo(map)
 
 // ── state (per city) ──

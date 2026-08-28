@@ -278,6 +278,58 @@ export interface ParkingStatus {
 
 export interface ScheduleRow { label: string; value: string; free: boolean }
 
+/** Weekday abbreviation in the reader's language. 0 = Sunday. */
+export const dayAbbrFor = (d: number, lang: string) =>
+  (lang === 'sr' ? DAY_ABBR_SR[d] : DAY_ABBR[d])
+
+/** Charging state, stripped of language. See `describeStatus` for the words. */
+export interface ZoneStatus {
+  paid: boolean
+  kind: 'paid' | 'before-window' | 'after-window' | 'free-today'
+  at: string | null      // pivotal HH:MM — free-at when paid, charge-start when free
+  nextDay: number | null // weekday `at` belongs to, when it is not today
+}
+
+/**
+ * Is this schedule charging at `ms`, and what is the next thing to happen?
+ *
+ * Pulled out of the composable so it can answer for many zones at once. The map
+ * popup asks about whichever polygon was tapped, which may be any zone in the
+ * city and not the one the driver is standing in — a composable, being one call
+ * per setup, cannot do that.
+ */
+export const statusAt = (ms: number, s: CitySchedule | null): ZoneStatus | null => {
+  if (!s) return null
+  const c = cityPartsAt(ms, s.timezone)
+  const today = s.days[c.day]
+
+  if (!today) {
+    const nxt = nextChargingDayFrom(c.day, s)
+    return { paid: false, kind: 'free-today', at: nxt?.window.start ?? null, nextDay: nxt?.day ?? null }
+  }
+  if (c.minutes < toMinutes(today.start))
+    return { paid: false, kind: 'before-window', at: today.start, nextDay: null }
+  if (c.minutes >= toMinutes(today.end)) {
+    const nxt = nextChargingDayFrom(c.day, s)
+    return { paid: false, kind: 'after-window', at: nxt?.window.start ?? null, nextDay: nxt?.day ?? null }
+  }
+  return { paid: true, kind: 'paid', at: today.end, nextDay: null }
+}
+
+/** The localized pill + line for a `ZoneStatus`. */
+export const describeStatus = (
+  z: ZoneStatus,
+  t: (k: any, p?: Record<string, string | number>) => string,
+  dayAbbr: (d: number) => string,
+): { label: string; detail: string } => {
+  const label = z.paid ? t('paidNowPill') : t('freeNowPill')
+  if (z.kind === 'paid') return { label, detail: t('freeAt', { time: z.at! }) }
+  if (z.kind === 'before-window') return { label, detail: t('chargingFrom', { time: z.at! }) }
+  if (z.nextDay != null && z.at)
+    return { label, detail: t('chargingResumesDay', { day: dayAbbr(z.nextDay), time: z.at }) }
+  return { label, detail: z.kind === 'free-today' ? t('freeToday') : t('freeNowPill') }
+}
+
 export const useParkingHours = (
   cityId: MaybeRefOrGetter<string | null | undefined>,
   zoneName?: MaybeRefOrGetter<string | null | undefined>,
@@ -330,57 +382,10 @@ export const useParkingHours = (
   }
 
   const status = computed<ParkingStatus | null>(() => {
-    const s = schedule.value
-    const c = cityNow.value
-    if (!s || !c) return null
-
-    const today = s.days[c.day]
-
-    // Free all day today (e.g. Sunday)
-    if (!today) {
-      const nxt = nextChargingDay(c.day)
-      return {
-        paid: false,
-        label: t('freeNowPill'),
-        detail: nxt
-          ? t('chargingResumesDay', { day: dayAbbr(nxt.day), time: nxt.window.start })
-          : t('freeToday'),
-        kind: 'free-today',
-        at: nxt?.window.start ?? null,
-      }
-    }
-
-    const start = toMinutes(today.start)
-    const end = toMinutes(today.end)
-
-    if (c.minutes < start) {
-      return {
-        paid: false,
-        label: t('freeNowPill'),
-        detail: t('chargingFrom', { time: today.start }),
-        kind: 'before-window',
-        at: today.start,
-      }
-    }
-    if (c.minutes >= end) {
-      const nxt = nextChargingDay(c.day)
-      return {
-        paid: false,
-        label: t('freeNowPill'),
-        detail: nxt
-          ? t('chargingResumesDay', { day: dayAbbr(nxt.day), time: nxt.window.start })
-          : t('freeNowPill'),
-        kind: 'after-window',
-        at: nxt?.window.start ?? null,
-      }
-    }
-    return {
-      paid: true,
-      label: t('paidNowPill'),
-      detail: t('freeAt', { time: today.end }),
-      kind: 'paid',
-      at: today.end,
-    }
+    const z = statusAt(now.value.getTime(), schedule.value)
+    if (!z) return null
+    const { label, detail } = describeStatus(z, t, dayAbbr)
+    return { paid: z.paid, label, detail, kind: z.kind, at: z.at }
   })
 
   const paidNow = computed<boolean | null>(() => status.value?.paid ?? null)

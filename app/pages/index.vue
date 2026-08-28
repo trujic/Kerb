@@ -74,6 +74,10 @@
                   :highlight="searchPin ? null : highlightPoint"
                   :pin="searchPin"
                   :signs="signReports"
+                  :zone-meta="allZones"
+                  :city-id="detectedCity?.id ?? expectCityId"
+                  payable
+                  @pay-zone="onPayZone"
                   :compass-prompt="compassPrompt"
                   fill
                   interactive
@@ -1309,8 +1313,23 @@ const unsure = computed(
 
 // No paid parking where the user stands (with geometry to back it) — the wizard
 // yields to a calm "you're fine here" card; zones would only contradict it.
+// Once the user explicitly taps/scans/AI-picks a zone, stop auto-following the
+// likely guess. Before that, the selection must track likelyZoneName — otherwise
+// the early fallback (first zone, while GPS is still resolving) sticks and the
+// open card disagrees with the "likely yours" tag.
+const userPickedZone = ref(false);
+
+// GPS says you are standing outside every zone — the answer IS the screen, and
+// the pay wizard is replaced wholesale.
+//
+// Unless the user has said otherwise. Tapping a zone on the map and choosing to
+// pay it is exactly the case GPS gets wrong: parked inside the zone, placed 145 m
+// out of it. An explicit pick outranks the guess here for the same reason a
+// scanned sign does. The watch below hands control back to GPS the moment it has
+// something new to say, so this cannot strand someone on a pay card in a street
+// where parking is free.
 const noZoneHere = computed(
-  () => parkingState.value === "none" && !!nearest.value
+  () => parkingState.value === "none" && !!nearest.value && !userPickedZone.value
 );
 
 const formatDist = (m: number) => {
@@ -1387,15 +1406,19 @@ const selectedZone = computed(
 // only mislabelled as a fresh payment. With skip-confirm on it is a single tap,
 // and Kerb cannot see whether the SMS landed, so the only thing standing between
 // the user and a second billed message is not offering the button twice.
-// Once the user explicitly taps/scans/AI-picks a zone, stop auto-following the
-// likely guess. Before that, the selection must track likelyZoneName — otherwise
-// the early fallback (first zone, while GPS is still resolving) sticks and the
-// open card disagrees with the "likely yours" tag.
-const userPickedZone = ref(false);
 const selectZone = (name: string) => {
   selectedZoneName.value = name;
   userPickedZone.value = true;
   wrongZone.value = false; // picking from the escape hatch promotes it to the hero
+};
+
+// Tapping a zone on the map and hitting Pay is the same act as picking one from
+// the "Wrong zone?" list — a spatial version of the escape hatch. It selects and
+// closes the map; the plate and the slide are still ahead, so nothing is billed
+// on the strength of where a finger landed on a polygon.
+const onPayZone = (name: string) => {
+  selectZone(name);
+  mapExpanded.value = false;
 };
 
 // Follow the likely zone until the user picks; afterwards only repair invalid picks.
@@ -1404,7 +1427,14 @@ const selectZone = (name: string) => {
 // the user. While unresolved, null keeps the wizard on its "checking" line instead.
 watch(
   [likelyZoneName, allZones, geoResolved],
-  () => {
+  (cur, prev) => {
+    // Driving into a different zone — or out of one — is new information, and it
+    // retires whatever the user picked earlier. Without this, one tap on the map
+    // would pin the wizard to that zone for the rest of the session, still
+    // offering to charge for it in a street that turns out to be free.
+    // `prev` is undefined on the immediate run, which is not a change.
+    if (prev && cur[0] !== prev[0]) userPickedZone.value = false;
+
     const valid = allZones.value.some(
       (z: any) => z.name === selectedZoneName.value
     );

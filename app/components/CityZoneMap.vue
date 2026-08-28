@@ -19,6 +19,8 @@
             :lng="center.lng"
             :zones="geo"
             :height="300"
+            :zone-meta="zones"
+            :city-id="cityId"
             interactive
             hide-user
           />
