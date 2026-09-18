@@ -20,7 +20,7 @@ export default defineEventHandler(async (event) => {
     seesSession: !!user,
     userError,
     youAre: user ? { id, email: (user as any).email, idField: user.id ? 'id' : (user as any).sub ? 'sub' : 'none' } : null,
-    verdict: !allowed.length ? 'RELAY_USER_IDS is empty on the server — restart the dev server'
+    verdict: !allowed.length ? 'RELAY_USER_IDS is empty in this environment — set it, then redeploy (a running build never picks it up) or restart the dev server'
       : !user ? 'The server cannot see your session — are you logged in in this browser?'
       : id && allowed.includes(id) ? 'You are a relay'
       : 'Logged in, but this user id is not in RELAY_USER_IDS',
