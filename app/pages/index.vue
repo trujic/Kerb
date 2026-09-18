@@ -614,6 +614,18 @@
               <span class="ai-cta-arrow">→</span>
             </button>
 
+            <!-- Pay for me — the one case the pay surface above cannot serve:
+                 a driver whose phone physically cannot send the message. Last
+                 of the tools, because for most people here it is not the job. -->
+            <NuxtLink to="/pay-for-me" class="ai-cta pfm-cta">
+              <span class="ai-cta-icon"><Icon name="car" :size="20" /></span>
+              <span class="ai-cta-text">
+                <span class="ai-cta-title">{{ t("payForMeTitle") }}</span>
+                <span class="ai-cta-sub">{{ t("payForMeSub") }}</span>
+              </span>
+              <span class="ai-cta-arrow">→</span>
+            </NuxtLink>
+
             <!-- Nearest confirmed sign — lead the user to verified ground truth -->
             <button
               v-if="nearestSign"
@@ -3282,6 +3294,11 @@ h2 {
   border-radius: var(--r-md);
 }
 /* Scan-the-sign CTA */
+.pfm-cta {
+  text-decoration: none;
+  color: inherit;
+}
+
 .scan-cta {
   display: flex;
   align-items: center;

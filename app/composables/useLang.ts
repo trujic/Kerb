@@ -190,6 +190,14 @@ const dict = {
   findLabel: { sr: 'Proveri tačnu zonu', en: 'Pin the exact zone' },
   scanTitle: { sr: 'Skeniraj tablu', en: 'Scan the sign' },
   scanSub: { sr: 'Pročitaj zonu sa table, potvrdi na mapi, pa plati', en: 'Read the zone off the sign, confirm it on the map, then pay' },
+
+  // A visitor whose phone cannot send the payment at all. Worded so a local
+  // reads the first three words and knows it is not for them.
+  payForMeTitle: { sr: 'Nemaš srpski broj?', en: 'No Serbian SIM?' },
+  payForMeSub: {
+    sr: 'Neko sa domaćim brojem pošalje uplatu za tvoju tablicu',
+    en: 'Someone with a local number sends the payment for your plate',
+  },
   aiTitle: { sr: 'Prvi put ovde? Kako radi parkiranje', en: 'New here? How parking works' },
   aiSub: { sr: 'Kada se plaća, koje su zone i kako — jednostavnim rečima', en: 'When you pay, the zones, and how — in plain language' },
   nearestSign: { sr: 'Najbliža potvrđena tabla · {dist}', en: 'Nearest confirmed sign · {dist}' },
