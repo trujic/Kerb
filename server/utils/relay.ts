@@ -105,19 +105,35 @@ const sendToRelays = async (
 // sixty-minute zone, and this one stops anything that skips the client. A limit
 // enforced only in the interface is a suggestion.
 export const maxStayMinutes = (zone: any): number | null => {
+  // `max_minutes` is not in this schema today; kept for the day it is, since a
+  // structured cap should always beat one parsed out of a sentence.
   if (zone?.max_minutes != null) return Number(zone.max_minutes)
   const m = /max\s*(\d+)\s*min/i.exec(String(zone?.rules ?? ''))
   return m ? Number(m[1]) : null
 }
 
-/** The zone as the registry has it, or null when we do not know this zone. */
+/** The zone as the registry has it, or null when we do not know this zone.
+ *
+ *  The column list is deliberately short and deliberately checked. An earlier
+ *  version asked for `max_minutes`, which this schema does not have; PostgREST
+ *  answered with an error, the error was discarded, and every caller received a
+ *  null zone — so the relay console lost its send button and the passer-by page
+ *  showed a payment with no number and no price, with nothing anywhere saying
+ *  why. A lookup that cannot find a zone is information; a lookup that failed is
+ *  a fault, and the two must not arrive looking the same. */
 export const lookupZone = async (city: string, zone: string) => {
-  const { data } = await relayDb()
+  const { data, error } = await relayDb()
     .from('zones')
-    .select('name, rules, price, sms_shortcode, max_minutes, daily_amount, daily_target')
+    .select('name, rules, price, sms_shortcode, daily_amount, daily_target')
     .eq('city_id', city)
     .eq('name', zone)
     .maybeSingle()
+
+  if (error) {
+    console.error('[relay] zone lookup failed:', city, zone, error.message)
+    throw createError({ statusCode: 500, statusMessage: `Zone lookup failed: ${error.message}` })
+  }
+  if (!data) console.warn('[relay] no such zone in registry:', city, zone)
   return data
 }
 
