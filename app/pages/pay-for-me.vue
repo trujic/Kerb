@@ -127,9 +127,11 @@
           and give them the cash — it explains the rest in Serbian.
         </p>
         <div class="pb-box">
-          <span class="pb-url">kerb.rs/s/</span><span class="pb-code">{{ req.code }}</span>
+          <img v-if="qr" :src="qr" class="pb-qr" alt="" width="180" height="180">
+          <p class="pb-or">or type</p>
+          <p class="pb-typed"><span class="pb-url">{{ shortHost }}/s/</span><span class="pb-code">{{ req.code }}</span></p>
         </div>
-        <p class="pb-hint">They open that address on their own phone.</p>
+        <p class="pb-hint">Their camera opens it. Nothing to install.</p>
       </section>
 
       <button class="ghost" @click="reset">New request</button>
@@ -218,6 +220,29 @@ const sub = computed(() => ({
   failed:    'It could not be paid. Use one of the options below.',
   unknown:   'A message went out but no confirmation came back. Treat the car as unpaid until you have checked.',
 }[req.value?.state as string] ?? ''))
+
+// The link the stranger opens. Built from wherever this page is actually being
+// served, because a hardcoded domain is a dead end the moment it is wrong — and
+// the person typing it has no way to guess what was meant.
+const qr = ref<string | null>(null)
+const shortHost = computed(() =>
+  import.meta.client ? location.host.replace(/^www\./, '') : '')
+
+const makeQr = async (code: string) => {
+  if (!import.meta.client || qr.value) return
+  try {
+    const QRCode: any = await import('qrcode')
+    qr.value = await QRCode.toDataURL(`${location.origin}/s/${code}`, {
+      margin: 1, width: 360,
+      // High correction, because this is read off a phone screen held at an
+      // angle, in sun, by someone who will not try twice.
+      errorCorrectionLevel: 'H',
+      color: { dark: '#16181C', light: '#FFFFFF' },
+    })
+  } catch { /* the typed address below still works */ }
+}
+
+watch(() => req.value?.code, (c) => { if (c) makeQr(c) }, { immediate: true })
 
 let poll: ReturnType<typeof setInterval> | null = null
 let tick: ReturnType<typeof setInterval> | null = null
@@ -353,10 +378,14 @@ dd { margin: 0; font-weight: 600; }
   border: 2px solid var(--accent, #f5c400); background: var(--accent-bg, #fff6d1); }
 .passerby h2 { font-size: 1.02rem; margin: 0 0 4px; }
 .pb-sub { font-size: .9rem; color: var(--ink-2, #555); margin: 0 0 14px; }
-.pb-box { text-align: center; padding: 14px 8px; background: var(--card, #fff);
-  border-radius: 10px; font-family: ui-monospace, monospace; }
-.pb-url { font-size: 1.15rem; color: var(--ink-2, #555); }
-.pb-code { font-size: 1.9rem; font-weight: 700; letter-spacing: .12em; }
+.pb-box { text-align: center; padding: 16px 8px; background: #fff;
+  border-radius: 10px; }
+.pb-qr { display: block; margin: 0 auto; border-radius: 6px; }
+.pb-or { margin: 12px 0 2px; font-size: .78rem; text-transform: uppercase;
+  letter-spacing: .12em; color: #78808a; }
+.pb-typed { margin: 0; font-family: ui-monospace, monospace; }
+.pb-url { font-size: 1.05rem; color: #555; }
+.pb-code { font-size: 1.7rem; font-weight: 700; letter-spacing: .12em; color: #16181c; }
 .pb-hint { text-align: center; font-size: .82rem; color: var(--ink-3, #78808a); margin: 10px 0 0; }
 .fallback ul { margin: 0; padding-left: 1.1em; color: var(--ink-2, #555); font-size: .92rem; }
 .fallback li { margin-bottom: 6px; }
