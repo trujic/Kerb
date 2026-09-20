@@ -43,10 +43,18 @@
       <div class="durations">
         <button
           v-for="d in durations" :key="d.min" type="button"
-          class="dur" :class="{ on: minutes === d.min }"
+          class="dur" :class="{ on: minutes === d.min, out: overCap(d.min) }"
+          :disabled="overCap(d.min)"
           @click="minutes = d.min"
         >{{ d.label }}</button>
       </div>
+      <!-- Greyed out with the reason attached, never removed: a driver standing
+           in Extra Zone must learn that four hours is impossible there, not
+           silently be offered a shorter list. -->
+      <p v-if="maxStay" class="cap-note">
+        {{ selectedZone?.name }} allows a maximum stay of {{ maxStay }} minutes.
+        Longer is not expensive here — it is not permitted.
+      </p>
 
       <p v-if="error" class="err">{{ error }}</p>
 
@@ -85,12 +93,29 @@
       <!-- Always reachable once the wait stops being short, and always after a
            failure or an unclear outcome. -->
       <div v-if="showFallback" class="fallback">
-        <h2>Pay it yourself instead</h2>
-        <ul>
-          <li>Buy a daily ticket at any kiosk selling parking cards — cash works.</li>
-          <li>Install the operator's app (<strong>nSpark</strong>); it takes foreign cards.</li>
-          <li>Ask your host — a local number can send it in ten seconds.</li>
-        </ul>
+        <h2>{{ waiting ? 'Don’t keep waiting' : 'Pay it yourself instead' }}</h2>
+        <p class="fb-lead">
+          {{ waiting
+            ? 'Nobody has picked this up yet. Charging does not pause while you wait, so use one of these now.'
+            : 'These work without us, and without a Serbian number.' }}
+        </p>
+        <ol class="fb-list">
+          <li>
+            <strong>A kiosk near you</strong> — ask for a daily parking card
+            (<em>dnevna parking karta</em>) for your zone. Cash works, no phone needed.
+          </li>
+          <li>
+            <strong>The operator’s own app</strong> — nSpark takes foreign cards.
+            <a href="https://play.google.com/store/apps/details?id=rs.parkingns.nspark" target="_blank" rel="noopener">Android</a>
+            ·
+            <a href="https://apps.apple.com/rs/app/nspark/id6505144660" target="_blank" rel="noopener">iPhone</a>
+          </li>
+          <li>
+            <strong>Ask anyone with a local number</strong> — your host, the
+            reception, a neighbour. It takes them ten seconds and costs the
+            price of the parking.
+          </li>
+        </ol>
       </div>
 
       <button class="ghost" @click="reset">New request</button>
@@ -124,9 +149,28 @@ const durations = [
   { min: 480, label: 'All day' },
 ]
 
-const canSend = computed(() => plate.value.trim().length >= 4 && !!zone.value)
+const canSend = computed(() =>
+  plate.value.trim().length >= 4 && !!zone.value && !overCap(minutes.value))
+
+// Charging does not pause while a request sits unclaimed. Two minutes is the
+// point at which telling somebody to keep waiting stops being help.
+const WAIT_LIMIT_MS = 120_000
 
 const selectedZone = computed(() => zones.value.find((z) => z.name === zone.value))
+
+// The zone's own limit, read from the registry's rules. Null means unlimited.
+const maxStay = computed<number | null>(() => {
+  const z: any = selectedZone.value
+  if (!z) return null
+  if (z.max_minutes != null) return Number(z.max_minutes)
+  const m = /max\s*(\d+)\s*min/i.exec(String(z.rules ?? ''))
+  return m ? Number(m[1]) : null
+})
+
+const overCap = (mins: number) => maxStay.value != null && mins > maxStay.value
+
+// If the chosen zone cannot hold the chosen duration, fall back to what it can.
+watch(maxStay, (cap) => { if (cap != null && minutes.value > cap) minutes.value = cap })
 
 const waiting = computed(() => req.value?.state === 'pending' || req.value?.state === 'working')
 
@@ -143,7 +187,7 @@ const elapsedLabel = computed(() => {
 // thing to tell a person standing in a charged bay.
 const showFallback = computed(() =>
   !req.value ? false
-    : ['failed', 'unknown'].includes(req.value.state) || (waiting.value && elapsedMs.value > 120_000))
+    : ['failed', 'unknown'].includes(req.value.state) || (waiting.value && elapsedMs.value > WAIT_LIMIT_MS))
 
 const headline = computed(() => ({
   pending:   'Finding someone…',
@@ -154,7 +198,7 @@ const headline = computed(() => ({
 }[req.value?.state as string] ?? 'Sent'))
 
 const sub = computed(() => ({
-  pending:   'Your request is with people who have a local number.',
+  pending:   'Your request is with people who have a local number. If nobody answers within two minutes, use one of the options below.',
   working:   'They have opened it. This usually takes under a minute.',
   confirmed: 'The operator’s own message is below — that is your receipt.',
   failed:    'It could not be paid. Use one of the options below.',
@@ -253,6 +297,12 @@ h1 { font-size: 1.5rem; margin: 0 0 4px; letter-spacing: -.01em; }
 .dur { padding: 10px 14px; border: 1.5px solid var(--line, #e3e6ea); border-radius: 999px;
   background: transparent; cursor: pointer; font: inherit; color: inherit; }
 .dur.on { border-color: var(--blue, #1a66d6); color: var(--blue, #1a66d6); font-weight: 600; }
+.dur.out { opacity: .38; text-decoration: line-through; cursor: not-allowed; }
+.cap-note { font-size: .85rem; color: var(--amber, #b45309); margin: 10px 0 0; }
+.fb-lead { font-size: .92rem; color: var(--ink-2, #555); margin: 0 0 10px; }
+.fb-list { margin: 0; padding-left: 1.2em; font-size: .92rem; color: var(--ink-2, #555); }
+.fb-list li { margin-bottom: 10px; }
+.fb-list a { color: var(--blue, #1a66d6); }
 
 .go { width: 100%; margin-top: 22px; padding: 15px; border: 0; border-radius: 12px;
   background: var(--accent, #f5c400); color: var(--on-accent, #16181c);

@@ -98,3 +98,25 @@ const sendToRelays = async (
   }))
   return { sent }
 }
+
+// ── WHAT THE ZONE ALLOWS ─────────────────────────────────────────────────────
+// Mirrors `maxStayFor` in app/composables/useTariff.ts. It is repeated here on
+// purpose: the client's version stops a person asking for two hours in a
+// sixty-minute zone, and this one stops anything that skips the client. A limit
+// enforced only in the interface is a suggestion.
+export const maxStayMinutes = (zone: any): number | null => {
+  if (zone?.max_minutes != null) return Number(zone.max_minutes)
+  const m = /max\s*(\d+)\s*min/i.exec(String(zone?.rules ?? ''))
+  return m ? Number(m[1]) : null
+}
+
+/** The zone as the registry has it, or null when we do not know this zone. */
+export const lookupZone = async (city: string, zone: string) => {
+  const { data } = await relayDb()
+    .from('zones')
+    .select('name, rules, price, sms_shortcode, max_minutes, daily_amount')
+    .eq('city_id', city)
+    .eq('name', zone)
+    .maybeSingle()
+  return data
+}

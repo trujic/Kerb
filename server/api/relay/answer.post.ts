@@ -35,8 +35,33 @@ export default defineEventHandler(async (event) => {
   }
 
   const reply = (body?.reply ?? '').trim()
-  if (action === 'confirmed' && !reply) {
-    throw createError({ statusCode: 400, statusMessage: 'Confirmed needs the operator reply' })
+
+  // ── THE ONE CHECK THAT SURVIVES A DISHONEST RELAY ──────────────────────────
+  // The composer is editable, so whoever sends the message can change the plate
+  // or drop to a cheaper zone and still tell the guest it is paid. The operator
+  // does not lie: its reply names the vehicle it actually charged for. So a
+  // request may only be closed as paid when that reply mentions this plate.
+  //
+  // This does not catch everything — a relay could pay a shorter time than
+  // asked — but it catches the case that ends in a fine, which is the one the
+  // guest cannot check for themselves and cannot recover from.
+  if (action === 'confirmed') {
+    if (!reply) {
+      throw createError({ statusCode: 400, statusMessage: 'Confirmed needs the operator reply' })
+    }
+    const { data: job } = await db
+      .from('relay_requests')
+      .select('plate')
+      .eq('id', id)
+      .single()
+    const plate = String(job?.plate ?? '')
+    const norm = (v: string) => v.toUpperCase().replace(/[^A-Z0-9ČĆŽŠĐ]/g, '')
+    if (plate && !norm(reply).includes(norm(plate))) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: `That reply does not mention ${plate}. If the operator answered about another vehicle, close this as failed.`,
+      })
+    }
   }
 
   const { error } = await db

@@ -6,7 +6,7 @@
 // The row records what we TOLD them it would cost, not what was charged. Those
 // are different numbers and conflating them is how a receipt becomes fiction.
 
-import { relayDb, notifyRelays } from '~~/server/utils/relay'
+import { relayDb, notifyRelays, lookupZone, maxStayMinutes } from '~~/server/utils/relay'
 
 const PLATE_RE = /^[A-Z0-9ČĆŽŠĐ\- ]{4,12}$/i
 
@@ -23,6 +23,23 @@ export default defineEventHandler(async (event) => {
 
   const minutes = Number.isFinite(Number(body?.minutes)) ? Math.max(15, Math.min(1440, Number(body!.minutes))) : 60
   const city = String(body?.city ?? 'novi-sad')
+
+  // The zone decides how long anyone may stay, and it decides it here rather
+  // than in the browser. Extra Zone in Novi Sad caps at sixty minutes and the
+  // cap is not a price — you cannot buy your way past it, and a request for two
+  // hours there is not expensive, it is impossible.
+  const zoneRow = await lookupZone(city, zone)
+  const cap = maxStayMinutes(zoneRow)
+  if (cap != null && minutes > cap) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: `${zone} allows a maximum stay of ${cap} minutes. Ask for ${cap} min or less.`,
+    })
+  }
+
+  // The shortcode comes from the registry, never from the caller. Otherwise the
+  // page that asks could choose where the money goes.
+  const shortcode = zoneRow?.sms_shortcode ?? null
 
   const token = crypto.randomUUID().replace(/-/g, '')
   const db = relayDb()
@@ -42,7 +59,7 @@ export default defineEventHandler(async (event) => {
     .from('relay_requests')
     .insert({
       city, plate, zone,
-      shortcode: body?.shortcode ?? null,
+      shortcode,
       minutes,
       price_text: body?.priceText ?? null,
       lat: body?.lat ?? null,
