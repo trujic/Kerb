@@ -18,6 +18,23 @@
       <button class="refresh" :disabled="loading" @click="load">↻</button>
     </header>
 
+    <!-- Notifications live here, not on a settings page. This is the one screen
+         whose whole value depends on being told, and an installed PWA has no
+         address bar to reach an unlinked page with. -->
+    <div class="notif" :class="{ off: !pushEnabled }">
+      <Icon name="bell" :size="15" />
+      <span class="notif-text">
+        <template v-if="pushEnabled">Notifications on — a request will buzz this device.</template>
+        <template v-else-if="pushSupported">Turn on notifications so a request reaches you.</template>
+        <template v-else>{{ pushWhy }}</template>
+      </span>
+      <button v-if="pushSupported" class="notif-btn" :disabled="pushBusy" @click="togglePush">
+        {{ pushBusy ? '…' : pushEnabled ? 'Off' : 'Enable' }}
+      </button>
+    </div>
+
+    <p v-if="pushError" class="denied">{{ pushError }}</p>
+
     <p v-if="denied" class="denied">
       This account is not a relay. Add its user id to <code>RELAY_USER_IDS</code>.
     </p>
@@ -86,6 +103,24 @@ const replies = reactive<Record<string, string>>({})
 const loading = ref(false)
 const denied = ref(false)
 const now = ref(Date.now())
+
+const {
+  supported: pushSupported, enabled: pushEnabled, busy: pushBusy, error: pushError,
+  enable: enablePush, disable: disablePush,
+} = usePushNotifications()
+
+const togglePush = () => (pushEnabled.value ? disablePush() : enablePush())
+
+// Same reasoning as the reminders panel: name the reason rather than show
+// nothing, because on iPhone the fix is two taps and the user cannot guess it.
+const pushWhy = computed(() => {
+  if (!import.meta.client) return ''
+  const iOS = /iP(hone|ad|od)/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && (navigator as any).maxTouchPoints > 1)
+  if (iOS) return 'On iPhone, add Kerb to the Home Screen first — Share → Add to Home Screen — then open it from there.'
+  if (!window.isSecureContext) return 'Notifications need https. This page is not on a secure origin.'
+  return 'This browser cannot show notifications.'
+})
 
 const load = async () => {
   loading.value = true
@@ -163,6 +198,15 @@ h1 { font-size: 1.4rem; margin: 0; }
   border-radius: 8px; width: 34px; height: 34px; cursor: pointer; font-size: 1rem; color: inherit; }
 .denied, .empty { color: var(--ink-3, #78808a); padding: 20px 0; }
 code { font-family: ui-monospace, monospace; font-size: .9em; }
+
+.notif { display: flex; align-items: center; gap: 10px; padding: 11px 13px; margin-bottom: 14px;
+  border: 1.5px solid var(--line, #e3e6ea); border-radius: 10px; background: var(--card, #fff); }
+.notif.off { border-color: var(--amber, #b45309); }
+.notif-text { flex: 1; font-size: .88rem; color: var(--ink-2, #555); line-height: 1.35; }
+.notif-btn { padding: 8px 14px; border: 1.5px solid var(--blue, #1a66d6); border-radius: 8px;
+  background: transparent; color: var(--blue, #1a66d6); font: inherit; font-weight: 600;
+  font-size: .85rem; cursor: pointer; white-space: nowrap; }
+.notif-btn:disabled { opacity: .5; cursor: not-allowed; }
 
 .job { border: 1.5px solid var(--line, #e3e6ea); border-radius: 12px; padding: 14px; margin-bottom: 12px;
   background: var(--card, #fff); }
