@@ -42,7 +42,11 @@
     <p v-else-if="!open.length && !loading" class="empty">Nothing waiting.</p>
 
     <!-- ── OPEN ─────────────────────────────────────────────────────────────── -->
-    <article v-for="r in open" :key="r.id" class="job" :class="{ working: r.state === 'working' }">
+    <article
+      v-for="r in ordered" :key="r.id"
+      class="job" :class="{ working: r.state === 'working', pinned: r.id === focusId }"
+    >
+      <p v-if="r.id === focusId" class="pinned-label">From the notification</p>
       <div class="head">
         <span class="plate">{{ r.plate }}</span>
         <span class="age" :class="{ old: age(r) > 120 }">{{ ageLabel(r) }}</span>
@@ -122,6 +126,18 @@ const pushWhy = computed(() => {
   return 'This browser cannot show notifications.'
 })
 
+const route = useRoute()
+const focusId = ref<string | null>(null)
+let autoFired = false
+
+// The job named in the notification sits first, so the relay never scrolls to
+// find what just buzzed.
+const ordered = computed(() => {
+  if (!focusId.value) return open.value
+  const hit = open.value.filter((r: any) => r.id === focusId.value)
+  return [...hit, ...open.value.filter((r: any) => r.id !== focusId.value)]
+})
+
 const load = async () => {
   loading.value = true
   try {
@@ -176,8 +192,21 @@ const answer = async (r: any, action: 'confirmed' | 'failed' | 'unknown') => {
 let poll: ReturnType<typeof setInterval> | null = null
 let tick: ReturnType<typeof setInterval> | null = null
 
+// `?go=sms` comes only from the notification's own action button, which is an
+// explicit choice to send. It fires once: a reload must never re-send a payment.
+const maybeAutoFire = () => {
+  if (autoFired || route.query.go !== 'sms' || !focusId.value) return
+  const job = open.value.find((r: any) => r.id === focusId.value)
+  if (!job?.shortcode) return
+  autoFired = true
+  sendSms(job)
+}
+
+watch(open, maybeAutoFire)
+
 onMounted(() => {
-  load()
+  focusId.value = (route.query.job as string) || null
+  load().then(maybeAutoFire)
   poll = setInterval(load, 5000)
   tick = setInterval(() => { now.value = Date.now() }, 1000)
 })
@@ -211,6 +240,9 @@ code { font-family: ui-monospace, monospace; font-size: .9em; }
 .job { border: 1.5px solid var(--line, #e3e6ea); border-radius: 12px; padding: 14px; margin-bottom: 12px;
   background: var(--card, #fff); }
 .job.working { border-color: var(--blue, #1a66d6); }
+.job.pinned { border-color: var(--accent, #f5c400); border-width: 2.5px; }
+.pinned-label { margin: 0 0 8px; font-size: .68rem; text-transform: uppercase;
+  letter-spacing: .12em; color: var(--ink-3, #78808a); }
 .head { display: flex; align-items: baseline; gap: 10px; }
 .plate { font-family: ui-monospace, monospace; font-size: 1.25rem; font-weight: 700; letter-spacing: .04em; }
 .age { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--ink-3, #78808a); font-size: .9rem; }

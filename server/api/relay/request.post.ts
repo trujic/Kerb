@@ -60,10 +60,16 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 500, statusMessage: hint })
   }
 
+  // The body tap pins the job at the top of the console with its send button
+  // primed; the action button, where the platform draws one, opens the composer
+  // outright. Sending a payment for a stranger's plate is worth one deliberate
+  // tap, so only the explicit button skips it.
   await notifyRelays(
     `Plati parking · ${plate}`,
     `${zone} · ${minutes} min${body?.priceText ? ` · ${body.priceText}` : ''}`,
-    '/relay',
+    `/relay?job=${data.id}`,
+    [{ action: 'sms', title: 'Pošalji SMS' }, { action: 'open', title: 'Otvori' }],
+    { sms: `/relay?job=${data.id}&go=sms`, open: '/relay' },
   )
 
   return { ok: true, id: data.id, token }

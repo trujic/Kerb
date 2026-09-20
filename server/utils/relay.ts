@@ -48,16 +48,24 @@ const vapidSubject = (): string => {
  *  never throws. A silent phone is a slower answer; a thrown error here would
  *  mean the guest's request itself failed, after the row was already written —
  *  a request nobody can see and nobody can follow. Notifying is not the job. */
-export const notifyRelays = async (title: string, body: string, url: string) => {
+export interface PushAction { action: string; title: string }
+
+export const notifyRelays = async (
+  title: string, body: string, url: string,
+  actions: PushAction[] = [], actionUrls: Record<string, string> = {},
+) => {
   try {
-    return await sendToRelays(title, body, url)
+    return await sendToRelays(title, body, url, actions, actionUrls)
   } catch (e: any) {
     console.error('[relay] push failed, request stands:', e?.message ?? e)
     return { sent: 0, reason: 'push failed' }
   }
 }
 
-const sendToRelays = async (title: string, body: string, url: string) => {
+const sendToRelays = async (
+  title: string, body: string, url: string,
+  actions: PushAction[], actionUrls: Record<string, string>,
+) => {
   const pub = process.env.VAPID_PUBLIC_KEY
   const priv = process.env.VAPID_PRIVATE_KEY
   const ids = relayUserIds()
@@ -77,7 +85,7 @@ const sendToRelays = async (title: string, body: string, url: string) => {
     try {
       await webpush.sendNotification(
         { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
-        JSON.stringify({ title, body, url, tag: 'kerb-relay' }),
+        JSON.stringify({ title, body, url, actions, actionUrls, tag: 'kerb-relay' }),
       )
       sent++
     } catch (e: any) {

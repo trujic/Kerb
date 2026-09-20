@@ -216,7 +216,11 @@ self.addEventListener('push', (event) => {
     badge: '/icon-192.png',
     tag: data.tag || 'parking-reminder', // collapse repeats for the same session
     renotify: true,
-    data: { url: data.url || '/sessions' },
+    // Buttons on the notification itself, where the platform draws them —
+    // Android and desktop do, iOS does not, so the body tap must also land
+    // somewhere useful rather than assuming a button was available.
+    actions: Array.isArray(data.actions) ? data.actions.slice(0, 2) : [],
+    data: { url: data.url || '/', actionUrls: data.actionUrls || {} },
   }
 
   event.waitUntil((async () => {
@@ -237,7 +241,11 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close()
-  const url = event.notification.data?.url || '/sessions'
+  const d = event.notification.data || {}
+  // A tapped button carries its own destination; the body falls back to the
+  // notification's own url. `/sessions` is no longer linked anywhere, so a
+  // stale default would have opened a page with no way back.
+  const url = (event.action && d.actionUrls?.[event.action]) || d.url || '/'
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
       for (const c of clients) {
