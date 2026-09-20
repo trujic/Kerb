@@ -7,6 +7,7 @@
 // are different numbers and conflating them is how a receipt becomes fiction.
 
 import { relayDb, notifyRelays, lookupZone, maxStayMinutes, shortCode } from '~~/server/utils/relay'
+import { walletFor, balanceOf, feeOn, feePercent } from '~~/server/utils/wallet'
 
 const PLATE_RE = /^[A-Z0-9ČĆŽŠĐ\- ]{4,12}$/i
 
@@ -41,6 +42,34 @@ export default defineEventHandler(async (event) => {
   // page that asks could choose where the money goes.
   const shortcode = zoneRow?.sms_shortcode ?? null
 
+  // What this will cost, before anyone is asked to do anything. Null where the
+  // tariff is progressive — then we cannot quote, and we do not pretend to.
+  const hours = Math.max(1, Math.ceil(minutes / 60))
+  const unit = zoneRow?.price_amount != null && zoneRow?.price_minutes
+    ? Number(zoneRow.price_amount) * (60 / Number(zoneRow.price_minutes))
+    : null
+  const daily = zoneRow?.daily_amount != null ? Number(zoneRow.daily_amount) : null
+  const parkingRsd = unit == null ? null
+    : Math.round(daily != null && hours > 1 && daily < unit * hours ? daily : unit * hours)
+  const fee = parkingRsd == null ? null : feeOn(parkingRsd)
+
+  // Money in before money out. A visitor who leaves the country cannot be
+  // invoiced, so an empty balance is refused here rather than discovered later.
+  const walletToken = String(body?.walletToken ?? '').trim()
+  if (parkingRsd != null && walletToken) {
+    const wid = await walletFor(walletToken)
+    const bal = wid ? await balanceOf(wid) : 0
+    if (bal < parkingRsd + (fee ?? 0)) {
+      throw createError({
+        statusCode: 402,
+        statusMessage: `Top up first — this costs ${parkingRsd} + ${fee} RSD and the balance is ${bal}.`,
+      })
+    }
+  }
+
+  // Two different lifetimes, so two different tokens: this one addresses one
+  // payment and is unique per row, while the wallet token follows the visitor
+  // across their whole stay and repeats on every request they make.
   const token = crypto.randomUUID().replace(/-/g, '')
   const db = relayDb()
 
@@ -61,11 +90,12 @@ export default defineEventHandler(async (event) => {
       city, plate, zone,
       shortcode,
       minutes,
-      price_text: body?.priceText ?? null,
+      price_text: parkingRsd != null ? `${parkingRsd} RSD + ${fee} fee` : (body?.priceText ?? null),
       lat: body?.lat ?? null,
       lng: body?.lng ?? null,
       note: body?.note ?? null,
       guest_token: token,
+      wallet_token: walletToken || null,
     })
     .select('id')
     .single()
@@ -89,5 +119,5 @@ export default defineEventHandler(async (event) => {
     { sms: `/relay?job=${data.id}&go=sms`, open: '/relay' },
   )
 
-  return { ok: true, id: data.id, token, code: shortCode(token) }
+  return { ok: true, id: data.id, token, code: shortCode(token), parkingRsd, fee, feePercent: feePercent() }
 })

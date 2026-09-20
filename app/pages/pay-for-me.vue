@@ -16,7 +16,12 @@
     <!-- ── ASKING ─────────────────────────────────────────────────────────── -->
     <section v-if="!token" class="card">
       <h1>Pay for me</h1>
-      <p class="sub">No Serbian SIM? Someone local sends the payment for your plate.</p>
+      <p class="sub">No Serbian SIM? We send the payment for your plate.</p>
+
+      <div class="bal" :class="{ empty: balance <= 0 }">
+        <span>Balance</span>
+        <b>{{ balance }} RSD</b>
+      </div>
 
       <label class="lbl">1 · Your plate</label>
       <PlateInput v-model="plate" placeholder="B-MK-1234" />
@@ -55,6 +60,20 @@
         {{ selectedZone?.name }} allows a maximum stay of {{ maxStay }} minutes.
         Longer is not expensive here — it is not permitted.
       </p>
+
+      <!-- The fee is named before anything is asked for, not after it is done.
+           A charge discovered at the end is a complaint; the same charge shown
+           beforehand is a price. -->
+      <div v-if="quote" class="quote">
+        <div class="q-row"><span>Parking</span><b>{{ quote.parking }} RSD</b></div>
+        <div class="q-row"><span>Kerb ({{ feePercent }}%)</span><b>{{ quote.fee }} RSD</b></div>
+        <div class="q-row total"><span>Total</span><b>{{ quote.parking + quote.fee }} RSD</b></div>
+      </div>
+
+      <div v-if="quote && balance < quote.parking + quote.fee" class="short">
+        <p><strong>Not enough balance.</strong> Ask your host to top you up — cash is fine.</p>
+        <p class="short-code">Show them this code: <b>{{ walletCode }}</b></p>
+      </div>
 
       <p v-if="error" class="err">{{ error }}</p>
 
@@ -143,6 +162,7 @@
 <script setup lang="ts">
 const CITY = 'novi-sad'
 const STORE_KEY = 'kerb_relay_token'
+const WALLET_KEY = 'kerb_wallet_token'
 
 const { getCity } = useCity()
 
@@ -155,6 +175,31 @@ const sending = ref(false)
 const error = ref('')
 
 const token = ref<string | null>(null)
+const walletToken = ref<string>('')
+const balance = ref(0)
+const feePercent = ref(15)
+
+// Short, readable, and the only thing a host needs in order to credit cash to
+// the right visitor. Same alphabet as the passer-by code, for the same reason.
+const walletCode = computed(() => {
+  const ALPHABET = '23456789ABCDEFGHJKLMNPQRSTVWXYZ'
+  const t = walletToken.value
+  if (!t) return ''
+  let out = ''
+  for (let i = 0; i < 4; i++) out += ALPHABET[parseInt(t.slice(i * 2, i * 2 + 2), 16) % ALPHABET.length]
+  return out
+})
+
+const loadWallet = async () => {
+  if (!walletToken.value) return
+  try {
+    const w = await $fetch<{ balance: number; feePercent: number }>('/api/wallet/status', {
+      query: { token: walletToken.value },
+    })
+    balance.value = w.balance
+    feePercent.value = w.feePercent
+  } catch { /* an unreachable balance is shown as it was, never as zero */ }
+}
 const req = ref<any>(null)
 const now = ref(Date.now())
 
@@ -174,6 +219,17 @@ const canSend = computed(() =>
 const WAIT_LIMIT_MS = 120_000
 
 const selectedZone = computed(() => zones.value.find((z) => z.name === zone.value))
+
+// The same arithmetic the server will do, so the screen and the refusal agree.
+const quote = computed<{ parking: number; fee: number } | null>(() => {
+  const z: any = selectedZone.value
+  if (!z?.price_amount || !z?.price_minutes) return null
+  const hours = Math.max(1, Math.ceil(minutes.value / 60))
+  const unit = Number(z.price_amount) * (60 / Number(z.price_minutes))
+  const daily = z.daily_amount != null ? Number(z.daily_amount) : null
+  const parking = Math.round(daily != null && hours > 1 && daily < unit * hours ? daily : unit * hours)
+  return { parking, fee: Math.round(parking * (feePercent.value / 100)) }
+})
 
 // The zone's own limit, read from the registry's rules. Null means unlimited.
 const maxStay = computed<number | null>(() => {
@@ -270,7 +326,7 @@ const refresh = async () => {
   if (!token.value) return
   try {
     req.value = await $fetch('/api/relay/status', { query: { token: token.value } })
-    if (!waiting.value && poll) { clearInterval(poll); poll = null }
+    if (!waiting.value && poll) { clearInterval(poll); poll = null; loadWallet() }
   } catch { /* keep the last known state rather than blanking the screen */ }
 }
 
@@ -283,6 +339,7 @@ const send = async () => {
       method: 'POST',
       body: {
         city: CITY,
+        walletToken: walletToken.value,
         plate: plate.value,
         zone: zone.value,
         shortcode: selectedZone.value?.sms_shortcode ?? null,
@@ -292,6 +349,7 @@ const send = async () => {
     })
     token.value = res.token
     localStorage.setItem(STORE_KEY, res.token)
+    await loadWallet()
     await refresh()
     poll = setInterval(refresh, 3000)
   } catch (e: any) {
@@ -310,6 +368,16 @@ const reset = () => {
 
 onMounted(async () => {
   tick = setInterval(() => { now.value = Date.now() }, 1000)
+
+  // The wallet is made on this device the first time the page opens, so a host
+  // can load it before the visitor has asked for anything at all.
+  let w = localStorage.getItem(WALLET_KEY)
+  if (!w) {
+    w = (crypto.randomUUID?.() ?? String(Date.now())).replace(/-/g, '')
+    localStorage.setItem(WALLET_KEY, w)
+  }
+  walletToken.value = w
+  await loadWallet()
 
   const saved = localStorage.getItem(STORE_KEY)
   if (saved) {
@@ -338,6 +406,23 @@ useHead({ title: 'Pay for me · Kerb' })
 .card { background: var(--card, #fff); border: 1px solid var(--line, #e3e6ea); border-radius: 14px; padding: 20px; }
 h1 { font-size: 1.5rem; margin: 0 0 4px; letter-spacing: -.01em; }
 .sub { color: var(--ink-2, #555); margin: 0 0 18px; }
+.bal { display: flex; justify-content: space-between; align-items: baseline;
+  padding: 12px 14px; border-radius: 10px; background: var(--surface-2, #f0f2f4); margin-bottom: 4px; }
+.bal span { color: var(--ink-3, #78808a); font-size: .85rem; }
+.bal b { font-family: ui-monospace, monospace; font-size: 1.2rem; }
+.bal.empty b { color: var(--amber, #b45309); }
+
+.quote { margin-top: 20px; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--line, #e3e6ea); }
+.q-row { display: flex; justify-content: space-between; padding: 5px 0; font-size: .95rem; color: var(--ink-2, #555); }
+.q-row.total { border-top: 1px solid var(--line, #e3e6ea); margin-top: 5px; padding-top: 9px;
+  color: var(--ink, #16181c); font-weight: 600; }
+
+.short { margin-top: 14px; padding: 14px; border-radius: 10px;
+  border: 2px solid var(--amber, #b45309); background: var(--amber-bg, #fbeee0); }
+.short p { margin: 0 0 6px; font-size: .92rem; }
+.short-code { margin: 0; }
+.short-code b { font-family: ui-monospace, monospace; font-size: 1.5rem; letter-spacing: .1em; }
+
 .lbl { display: block; font-size: .72rem; text-transform: uppercase; letter-spacing: .12em; color: var(--ink-3, #78808a); margin: 18px 0 8px; }
 .muted { color: var(--ink-3, #78808a); }
 

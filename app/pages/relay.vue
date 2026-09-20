@@ -35,6 +35,21 @@
 
     <p v-if="pushError" class="denied">{{ pushError }}</p>
 
+    <!-- Cash comes in at a doorway, not through a payment gateway. Whoever took
+         it records it here, and the balance is loaded before the guest asks for
+         anything — which is the only order that works when they leave on Sunday. -->
+    <details class="topup">
+      <summary>Record a top-up</summary>
+      <div class="tu-row">
+        <input v-model="tuCode" class="tu-in" placeholder="Code" maxlength="4" autocapitalize="characters">
+        <input v-model.number="tuAmount" class="tu-in" type="number" placeholder="RSD" min="1">
+        <button class="tu-btn" :disabled="!tuCode || !tuAmount || tuBusy" @click="doTopup">
+          {{ tuBusy ? '…' : 'Add' }}
+        </button>
+      </div>
+      <p v-if="tuMsg" class="tu-msg">{{ tuMsg }}</p>
+    </details>
+
     <p v-if="denied" class="denied">
       This account is not a relay. Add its user id to <code>RELAY_USER_IDS</code>.
     </p>
@@ -138,6 +153,29 @@ const ordered = computed(() => {
   return [...hit, ...open.value.filter((r: any) => r.id !== focusId.value)]
 })
 
+const tuCode = ref('')
+const tuAmount = ref<number | null>(null)
+const tuBusy = ref(false)
+const tuMsg = ref('')
+
+const doTopup = async () => {
+  tuBusy.value = true
+  tuMsg.value = ''
+  try {
+    const r = await $fetch<{ balance: number }>('/api/wallet/topup', {
+      method: 'POST',
+      body: { code: tuCode.value.toUpperCase(), amount: tuAmount.value, note: 'cash' },
+    })
+    tuMsg.value = `Added. Balance is now ${r.balance} RSD.`
+    tuCode.value = ''
+    tuAmount.value = null
+  } catch (e: any) {
+    tuMsg.value = e?.statusMessage || e?.data?.statusMessage || 'Could not record that.'
+  } finally {
+    tuBusy.value = false
+  }
+}
+
 const load = async () => {
   loading.value = true
   try {
@@ -236,6 +274,17 @@ code { font-family: ui-monospace, monospace; font-size: .9em; }
   background: transparent; color: var(--blue, #1a66d6); font: inherit; font-weight: 600;
   font-size: .85rem; cursor: pointer; white-space: nowrap; }
 .notif-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+.topup { margin-bottom: 14px; padding: 10px 13px; border: 1px solid var(--line, #e3e6ea);
+  border-radius: 10px; background: var(--card, #fff); }
+.topup summary { cursor: pointer; font-size: .88rem; color: var(--ink-2, #555); }
+.tu-row { display: flex; gap: 8px; margin-top: 10px; }
+.tu-in { flex: 1; min-width: 0; padding: 10px; border: 1.5px solid var(--line, #e3e6ea);
+  border-radius: 8px; font: inherit; font-family: ui-monospace, monospace; background: var(--surface-2, #f0f2f4); color: inherit; }
+.tu-btn { padding: 10px 18px; border: 0; border-radius: 8px; background: var(--accent, #f5c400);
+  color: var(--on-accent, #16181c); font: inherit; font-weight: 700; cursor: pointer; }
+.tu-btn:disabled { opacity: .45; cursor: not-allowed; }
+.tu-msg { margin: 8px 0 0; font-size: .85rem; color: var(--ink-2, #555); }
 
 .job { border: 1.5px solid var(--line, #e3e6ea); border-radius: 12px; padding: 14px; margin-bottom: 12px;
   background: var(--card, #fff); }

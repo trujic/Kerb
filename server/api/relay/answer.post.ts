@@ -7,6 +7,7 @@
 // the only thing worth anything if they are fined anyway.
 
 import { relayDb, requireRelay } from '~~/server/utils/relay'
+import { chargeForRequest } from '~~/server/utils/wallet'
 
 const CLOSING = ['confirmed', 'failed', 'unknown'] as const
 
@@ -61,6 +62,20 @@ export default defineEventHandler(async (event) => {
         statusCode: 400,
         statusMessage: `That reply does not mention ${plate}. If the operator answered about another vehicle, close this as failed.`,
       })
+    }
+  }
+
+  // The wallet moves only on a confirmed payment. A failed or unknown outcome
+  // costs the guest nothing, because nothing was bought on their behalf.
+  if (action === 'confirmed') {
+    const { data: full } = await db
+      .from('relay_requests')
+      .select('wallet_token, price_text, plate, zone')
+      .eq('id', id)
+      .single()
+    const quoted = Number(/^(\d+)/.exec(String(full?.price_text ?? ''))?.[1])
+    if (full?.wallet_token && Number.isFinite(quoted) && quoted > 0) {
+      await chargeForRequest(full.wallet_token, id, quoted, `${full.zone} · ${full.plate}`)
     }
   }
 
