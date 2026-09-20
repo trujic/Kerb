@@ -15,6 +15,11 @@
           @click="toggle"
         >{{ lang === 'sr' ? 'EN' : 'SR' }}</button>
         <template v-if="user">
+          <!-- Only a relay sees this, and only because an installed PWA has no
+               address bar: an unlinked page is an unreachable one. -->
+          <NuxtLink v-if="isRelay" to="/relay" class="nav-relay" title="Relay console">
+            Relay<span v-if="waiting" class="nav-relay-dot">{{ waiting }}</span>
+          </NuxtLink>
           <NuxtLink to="/profile" class="nav-avatar" :title="displayName">
             {{ initials }}
           </NuxtLink>
@@ -38,7 +43,11 @@
       <Icon name="city" :size="20" />
       <span>Cities</span>
     </NuxtLink>
-    <NuxtLink to="/contribute" class="tabbar-item" :class="{ on: route.path.startsWith('/contribute') }">
+    <NuxtLink v-if="isRelay" to="/relay" class="tabbar-item" :class="{ on: route.path.startsWith('/relay') }">
+      <Icon name="bell" :size="20" />
+      <span>Relay<template v-if="waiting"> ({{ waiting }})</template></span>
+    </NuxtLink>
+    <NuxtLink v-else to="/contribute" class="tabbar-item" :class="{ on: route.path.startsWith('/contribute') }">
       <Icon name="plus" :size="20" />
       <span>Contribute</span>
     </NuxtLink>
@@ -51,6 +60,27 @@
 
 <script setup lang="ts">
 const { user } = useAuth()
+
+// Whether this account may see the relay console is a server-side fact (an env
+// list), so it is asked for rather than inferred. One request per signed-in
+// session; nobody else is charged for it.
+const isRelay = ref(false)
+const waiting = ref(0)
+
+const checkRelay = async () => {
+  if (!user.value) { isRelay.value = false; waiting.value = 0; return }
+  try {
+    const me = await $fetch<{ verdict: string }>('/api/relay/whoami')
+    isRelay.value = me.verdict === 'You are a relay'
+    if (isRelay.value) {
+      const q = await $fetch<{ open: any[] }>('/api/relay/queue')
+      waiting.value = q.open.length
+    }
+  } catch { isRelay.value = false }
+}
+
+onMounted(checkRelay)
+watch(user, checkRelay)
 const route = useRoute()
 const { lang, toggle } = useLang()
 
@@ -89,6 +119,17 @@ const initials = computed(() => {
   letter-spacing: 0.5px;
   color: var(--text);
 }
+.nav-relay {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border-radius: 8px; font-size: .88rem; font-weight: 600;
+  border: 1.5px solid var(--blue, #1a66d6); color: var(--blue, #1a66d6); text-decoration: none;
+}
+.nav-relay-dot {
+  min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px;
+  background: var(--amber, #b45309); color: #fff; font-size: .72rem;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+
 .nav-links {
   display: flex;
   gap: 28px;
