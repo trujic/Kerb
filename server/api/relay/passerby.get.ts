@@ -35,7 +35,16 @@ export default defineEventHandler(async (event) => {
 
   const perHour = Math.max(1, Math.ceil((job.minutes ?? 60) / 60))
 
+  // What this actually costs the person being asked. Null when the tariff is not
+  // a plain per-hour number (Niš Red doubles into the second hour) — and a blank
+  // is right there, because a stranger must not be told a total we guessed.
+  const unit = zone?.price_amount != null && zone?.price_minutes
+    ? Number(zone.price_amount) * (60 / Number(zone.price_minutes))
+    : null
+  const total = daily ? daily.amount : (unit != null ? Math.round(unit * perHour) : null)
+
   return {
+    total,
     plate: job.plate,
     zone: job.zone,
     minutes: job.minutes,

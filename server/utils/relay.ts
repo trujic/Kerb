@@ -124,7 +124,7 @@ export const maxStayMinutes = (zone: any): number | null => {
 export const lookupZone = async (city: string, zone: string) => {
   const { data, error } = await relayDb()
     .from('zones')
-    .select('name, rules, price, sms_shortcode, daily_amount, daily_target')
+    .select('name, rules, price, price_amount, price_minutes, sms_shortcode, daily_amount, daily_target')
     .eq('city_id', city)
     .eq('name', zone)
     .maybeSingle()

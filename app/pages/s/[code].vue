@@ -41,7 +41,10 @@
         Дневна карта — једна порука покрива цео дан.
       </p>
 
-      <p class="money">Возач вам враћа новац одмах, на лицу места.</p>
+      <p class="money">
+        Возач вам враћа одмах, на лицу места —
+        <b>{{ d.total ? d.total + ' динара' : 'колико кошта' }}</b><span v-if="coin">, или {{ coin }}</span>.
+      </p>
 
       <p class="foot">
         Порука се наплаћује са вашег броја, као и свако плаћање паркинга SMS-ом.
@@ -65,6 +68,17 @@ const costLabel = computed(() => {
   if (!d.value) return ''
   if (useDaily.value) return `${d.value.daily.amount} RSD (дневна)`
   return d.value.price ? `${d.value.price}${d.value.repeat > 1 ? ` × ${d.value.repeat}` : ''}` : '—'
+})
+
+// A visitor who has no Serbian SIM very often has no Serbian cash either, but
+// almost always has a euro coin. Naming one removes the change-making problem
+// from a favour that is supposed to take ten seconds.
+const coin = computed(() => {
+  const t = d.value?.total
+  if (t == null) return null
+  if (t <= 110) return 'кованица од 1 €'
+  if (t <= 230) return 'кованица од 2 €'
+  return null
 })
 
 const send = () => {

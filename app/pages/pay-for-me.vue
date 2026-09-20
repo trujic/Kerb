@@ -120,11 +120,12 @@
       <!-- Shown to a stranger, so it is theirs to read, not the guest's: the
            address and the code are large because they will be typed by someone
            holding their own phone at arm's length. -->
-      <section v-if="req?.code && waiting" class="passerby">
+      <section v-if="req?.code && waiting && favourSized" class="passerby">
         <h2>Ask someone next to you</h2>
         <p class="pb-sub">
-          Anyone with a Serbian number can send it in ten seconds. Show them this,
-          and give them the cash — it explains the rest in Serbian.
+          Anyone with a Serbian number can send it in ten seconds. Show them this
+          and hand them the coins — a €1 coin covers it, and the page explains
+          the rest to them in Serbian.
         </p>
         <div class="pb-box">
           <img v-if="qr" :src="qr" class="pb-qr" alt="" width="180" height="180">
@@ -227,6 +228,24 @@ const sub = computed(() => ({
 const qr = ref<string | null>(null)
 const shortHost = computed(() =>
   import.meta.client ? location.host.replace(/^www\./, '') : '')
+
+// Asking a stranger to front money stops being a favour somewhere above a
+// couple of hundred dinars. Nobody hands eight euros to a person holding a QR
+// code, and offering it anyway would waste the one fallback that works when the
+// others have already failed. Above the line, the kiosk is the honest answer.
+const FAVOUR_LIMIT_RSD = 250
+
+const favourSized = computed(() => {
+  const z: any = selectedZone.value
+  const per = z?.price_amount != null && z?.price_minutes
+    ? Number(z.price_amount) * (60 / Number(z.price_minutes))
+    : null
+  if (per == null) return true            // unknown tariff: let them decide
+  const hours = Math.max(1, Math.ceil((req.value?.minutes ?? minutes.value) / 60))
+  const daily = z?.daily_amount != null ? Number(z.daily_amount) : null
+  const total = daily != null && hours > 1 ? daily : per * hours
+  return total <= FAVOUR_LIMIT_RSD
+})
 
 const makeQr = async (code: string) => {
   if (!import.meta.client || qr.value) return
