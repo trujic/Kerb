@@ -111,12 +111,26 @@
             <a href="https://apps.apple.com/rs/app/nspark/id6505144660" target="_blank" rel="noopener">iPhone</a>
           </li>
           <li>
-            <strong>Ask anyone with a local number</strong> — your host, the
-            reception, a neighbour. It takes them ten seconds and costs the
-            price of the parking.
+            <strong>Ask anyone standing near you.</strong> Show them this screen —
+            it explains the favour in Serbian, and their phone does the rest.
           </li>
         </ol>
       </div>
+
+      <!-- Shown to a stranger, so it is theirs to read, not the guest's: the
+           address and the code are large because they will be typed by someone
+           holding their own phone at arm's length. -->
+      <section v-if="req?.code && waiting" class="passerby">
+        <h2>Ask someone next to you</h2>
+        <p class="pb-sub">
+          Anyone with a Serbian number can send it in ten seconds. Show them this,
+          and give them the cash — it explains the rest in Serbian.
+        </p>
+        <div class="pb-box">
+          <span class="pb-url">kerb.rs/s/</span><span class="pb-code">{{ req.code }}</span>
+        </div>
+        <p class="pb-hint">They open that address on their own phone.</p>
+      </section>
 
       <button class="ghost" @click="reset">New request</button>
     </section>
@@ -335,6 +349,15 @@ dd { margin: 0; font-weight: 600; }
 
 .fallback { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line, #e3e6ea); }
 .fallback h2 { font-size: .95rem; margin: 0 0 8px; }
+.passerby { margin-top: 22px; padding: 18px; border-radius: 12px;
+  border: 2px solid var(--accent, #f5c400); background: var(--accent-bg, #fff6d1); }
+.passerby h2 { font-size: 1.02rem; margin: 0 0 4px; }
+.pb-sub { font-size: .9rem; color: var(--ink-2, #555); margin: 0 0 14px; }
+.pb-box { text-align: center; padding: 14px 8px; background: var(--card, #fff);
+  border-radius: 10px; font-family: ui-monospace, monospace; }
+.pb-url { font-size: 1.15rem; color: var(--ink-2, #555); }
+.pb-code { font-size: 1.9rem; font-weight: 700; letter-spacing: .12em; }
+.pb-hint { text-align: center; font-size: .82rem; color: var(--ink-3, #78808a); margin: 10px 0 0; }
 .fallback ul { margin: 0; padding-left: 1.1em; color: var(--ink-2, #555); font-size: .92rem; }
 .fallback li { margin-bottom: 6px; }
 </style>

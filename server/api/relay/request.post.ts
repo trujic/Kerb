@@ -6,7 +6,7 @@
 // The row records what we TOLD them it would cost, not what was charged. Those
 // are different numbers and conflating them is how a receipt becomes fiction.
 
-import { relayDb, notifyRelays, lookupZone, maxStayMinutes } from '~~/server/utils/relay'
+import { relayDb, notifyRelays, lookupZone, maxStayMinutes, shortCode } from '~~/server/utils/relay'
 
 const PLATE_RE = /^[A-Z0-9ČĆŽŠĐ\- ]{4,12}$/i
 
@@ -53,7 +53,7 @@ export default defineEventHandler(async (event) => {
     .in('state', ['pending', 'working'])
     .order('created_at', { ascending: false })
     .limit(1)
-  if (open?.length) return { ok: true, token: open[0].guest_token, deduped: true }
+  if (open?.length) return { ok: true, token: open[0].guest_token, code: shortCode(open[0].guest_token), deduped: true }
 
   const { data, error } = await db
     .from('relay_requests')
@@ -89,5 +89,5 @@ export default defineEventHandler(async (event) => {
     { sms: `/relay?job=${data.id}&go=sms`, open: '/relay' },
   )
 
-  return { ok: true, id: data.id, token }
+  return { ok: true, id: data.id, token, code: shortCode(token) }
 })

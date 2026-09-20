@@ -4,7 +4,7 @@
 // relay's identity are deliberately not in the payload: the guest is owed an
 // answer, not a name.
 
-import { relayDb } from '~~/server/utils/relay'
+import { relayDb, shortCode } from '~~/server/utils/relay'
 
 export default defineEventHandler(async (event) => {
   const token = String(getQuery(event).token ?? '')
@@ -12,10 +12,11 @@ export default defineEventHandler(async (event) => {
 
   const { data, error } = await relayDb()
     .from('relay_requests')
-    .select('plate, zone, minutes, price_text, state, created_at, claimed_at, answered_at, operator_reply, outcome_note')
+    .select('plate, zone, minutes, price_text, state, created_at, claimed_at, answered_at, operator_reply, outcome_note, guest_token')
     .eq('guest_token', token)
     .single()
 
   if (error || !data) throw createError({ statusCode: 404, statusMessage: 'Not found' })
-  return data
+  const { guest_token, ...rest } = data as any
+  return { ...rest, code: shortCode(guest_token) }
 })

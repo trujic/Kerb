@@ -114,9 +114,20 @@ export const maxStayMinutes = (zone: any): number | null => {
 export const lookupZone = async (city: string, zone: string) => {
   const { data } = await relayDb()
     .from('zones')
-    .select('name, rules, price, sms_shortcode, max_minutes, daily_amount')
+    .select('name, rules, price, sms_shortcode, max_minutes, daily_amount, daily_target')
     .eq('city_id', city)
     .eq('name', zone)
     .maybeSingle()
   return data
+}
+
+/** Six characters a stranger can read off a screen and type without asking how
+ *  to spell it: no O/0, no I/1, no U (which a Serbian speaker may read as V). */
+export const shortCode = (token: string): string => {
+  const ALPHABET = '23456789ABCDEFGHJKLMNPQRSTVWXYZ'
+  let out = ''
+  for (let i = 0; i < 4; i++) {
+    out += ALPHABET[parseInt(token.slice(i * 2, i * 2 + 2), 16) % ALPHABET.length]
+  }
+  return out
 }
