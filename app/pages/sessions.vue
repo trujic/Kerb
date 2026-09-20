@@ -9,6 +9,19 @@
         <NuxtLink to="/" class="btn-ghost">← Dashboard</NuxtLink>
       </div>
 
+      <!-- Why this can be absent, said out loud: on iOS, Safari exposes no
+           PushManager at all until the site is installed to the Home Screen, so
+           the section used to vanish with no explanation and no way to tell a
+           missing feature from a broken one. -->
+      <section v-if="!pushSupported && !pushError" class="reminders-wrap">
+        <div class="reminders">
+          <div class="rem-text">
+            <p class="rem-title"><Icon name="bell" :size="14" /> Expiry reminders</p>
+            <p class="rem-sub">{{ pushUnavailableWhy }}</p>
+          </div>
+        </div>
+      </section>
+
       <!-- Reminders + connected devices -->
       <section v-if="pushSupported || pushError" class="reminders-wrap">
         <div class="reminders">
@@ -128,6 +141,18 @@ const {
 } = usePushNotifications()
 
 const toggleReminders = () => (pushEnabled.value ? disablePush() : enablePush())
+
+// Reminders need a service worker and a PushManager. On an iPhone the second
+// only exists once the site is on the Home Screen — a real and fixable reason,
+// not a failure, so say which it is rather than showing nothing.
+const pushUnavailableWhy = computed(() => {
+  if (!import.meta.client) return ''
+  const iOS = /iP(hone|ad|od)/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && (navigator as any).maxTouchPoints > 1)
+  if (iOS) return 'On iPhone, reminders work once Kerb is added to the Home Screen — Share → Add to Home Screen, then open it from there.'
+  if (!window.isSecureContext) return 'Reminders need a secure connection (https). This page is not on one.'
+  return 'This browser does not support notifications.'
+})
 
 const reminderSub = computed(() => {
   if (pushError.value) return pushError.value
