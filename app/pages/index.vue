@@ -66,7 +66,7 @@
               </div>
               <!-- Payment density. Off by default: it is the weakest claim on the
                    map, so it never greets anyone unasked. -->
-              <div class="map-fs-tools">
+              <div v-if="showHeatTool" class="map-fs-tools">
                 <button
                   class="heat-toggle"
                   type="button"
@@ -245,8 +245,11 @@
             <div v-if="!user" class="pay-step">
               <PlateInput v-model="guestPlate" />
               <span class="zone-plate-hint">
-                {{ t("plateHint") }} ·
-                <NuxtLink to="/login">{{ t("plateSync") }}</NuxtLink>
+                <template v-if="guestPlate.trim()"
+                  >{{ t("plateHint") }} ·
+                  <NuxtLink to="/login">{{ t("plateSync") }}</NuxtLink></template
+                >
+                <template v-else>{{ t("plateHintEmpty") }}</template>
               </span>
             </div>
             <div v-else-if="!defaultPlate" class="pay-step">
@@ -277,7 +280,7 @@
                 <div v-for="z in tiedZones" :key="z.name" class="bnd-zone">
                   <div class="bnd-zone-head" :style="{ borderColor: z.color }">
                     <span class="bnd-zone-dot" :style="{ background: z.color }" />
-                    <span class="bnd-zone-name">{{ z.name }}</span>
+                    <span class="bnd-zone-name">{{ zoneLabel(z.name) }}</span>
                     <span class="bnd-zone-price">{{ z.price }}</span>
                     <span v-if="zoneLimits[z.name]?.label" class="bnd-zone-limit">
                       {{ zoneLimits[z.name]!.label }}
@@ -314,7 +317,7 @@
                   }"
                 >
                   <span class="zone-hero-id">
-                    <span class="zone-hero-name">{{ selectedZone.name }}</span>
+                    <span class="zone-hero-name">{{ zoneLabel(selectedZone.name) }}</span>
                     <!-- Off the edge it is not "likely yours" — the badge would
                          be arguing with the warning right underneath it. -->
                     <span
@@ -364,7 +367,7 @@
                       </p>
                       <p v-else class="zone-unsure-sub">
                         {{ parkingState === 'edge' ? t("edgeSub") : t("boundarySub") }}
-                        <strong>{{ selectedZone.name }}</strong
+                        <strong>{{ zoneLabel(selectedZone.name) }}</strong
                         >.
                       </p>
                     </div>
@@ -399,6 +402,22 @@
                     <summary>{{ t("ruleDetails") }}</summary>
                     <p>{{ zoneLimits[selectedZone.name]!.note }}</p>
                   </details>
+                  <!-- The answer's last line: what not paying costs, and where
+                       every number above was read and when. The source is the
+                       only visible difference between a checked answer and a
+                       confident one, so it sits on the card, not a scroll away. -->
+                  <p v-if="ifUnpaidText || sourceInfo" class="zone-hero-foot">
+                    <span v-if="ifUnpaidText">{{
+                      t("ifUnpaidLine", { what: ifUnpaidText })
+                    }}</span>
+                    <a
+                      v-if="sourceInfo"
+                      :href="sourceInfo.url"
+                      target="_blank"
+                      rel="noopener"
+                      >{{ sourceInfo.text }}</a
+                    >
+                  </p>
                 </div>
               </div>
             </div>
@@ -505,11 +524,11 @@
                   @click="pay(selectedZone)"
                 >
                   <span v-if="defaultPlate"
-                    >{{ t("payZone", { zone: selectedZone.name }) }} ·
+                    >{{ t("payZone", { zone: zoneLabel(selectedZone.name) }) }} ·
                     {{ defaultPlate }}</span
                   >
                   <span v-else>{{
-                    t("payZone", { zone: selectedZone.name })
+                    t("payZone", { zone: zoneLabel(selectedZone.name) })
                   }}</span>
                   <span v-if="payAction?.label" class="zone-act-arrow"
                     >→ {{ payAction.label }}</span
@@ -567,14 +586,22 @@
 
             <!-- The one escape hatch, after the primary action: every other zone + tools -->
             <template v-if="selectedZone">
-              <button
-                type="button"
-                class="zone-wrong"
-                @click="wrongZone = !wrongZone"
-              >
-                <Icon name="sign" :size="15" /> {{ t("wrongZone") }}
-                <span class="zone-wrong-chev">{{ wrongZone ? "▴" : "▾" }}</span>
-              </button>
+              <!-- Scan leads the row: the sign is the one answer better than
+                   ours, and it used to sit a scroll below the fold. -->
+              <div class="zone-next">
+                <button type="button" class="zone-scan" @click="showScan = true">
+                  <Icon name="camera" :size="16" /> {{ t("scanShort") }}
+                </button>
+                <button
+                  type="button"
+                  class="zone-wrong"
+                  :aria-expanded="wrongZone"
+                  @click="wrongZone = !wrongZone"
+                >
+                  <Icon name="sign" :size="15" /> {{ t("otherZones") }}
+                  <span class="zone-wrong-chev">{{ wrongZone ? "▴" : "▾" }}</span>
+                </button>
+              </div>
               <div v-if="wrongZone" class="zone-alt">
                 <button
                   v-for="zone in altZones"
@@ -587,7 +614,7 @@
                     class="zone-alt-stripe"
                     :style="{ background: zone.color }"
                   />
-                  <span class="zone-alt-name">{{ zone.name }}</span>
+                  <span class="zone-alt-name">{{ zoneLabel(zone.name) }}</span>
                   <span
                     v-if="zoneLimits[zone.name]?.cap"
                     class="zone-alt-limit"
@@ -599,13 +626,6 @@
                   }}</span>
                 </button>
                 <div class="zone-alt-tools">
-                  <button
-                    type="button"
-                    class="zone-alt-tool"
-                    @click="showScan = true"
-                  >
-                    <Icon name="camera" :size="15" /> {{ t("scanTitle") }}
-                  </button>
                   <button
                     type="button"
                     class="zone-alt-tool"
@@ -631,19 +651,8 @@
           </div>
 
           <div class="below-section">
-            <p class="section-label">{{ t("findLabel") }}</p>
-
-            <!-- Scan the sign — the sign is ground truth: read it, confirm, pin it, pay -->
-            <button type="button" class="scan-cta" @click="showScan = true">
-              <span class="scan-cta-icon"
-                ><Icon name="camera" :size="22"
-              /></span>
-              <span class="scan-cta-text">
-                <span class="scan-cta-title">{{ t("scanTitle") }}</span>
-                <span class="scan-cta-sub">{{ t("scanSub") }}</span>
-              </span>
-              <span class="scan-cta-arrow">→</span>
-            </button>
+            <!-- Scanning the sign moved up under the slide, where the decision is
+                 made; a second copy down here only made the page longer. -->
 
             <!-- Ask AI — geometry + registry decide, never a remembered guess -->
             <button type="button" class="ai-cta" @click="showAi = true">
@@ -658,7 +667,7 @@
             <!-- Pay for me — the one case the pay surface above cannot serve:
                  a driver whose phone physically cannot send the message. Last
                  of the tools, because for most people here it is not the job. -->
-            <NuxtLink to="/pay-for-me" class="ai-cta pfm-cta">
+            <NuxtLink v-if="relayPublic" to="/pay-for-me" class="ai-cta pfm-cta">
               <span class="ai-cta-icon"><Icon name="car" :size="20" /></span>
               <span class="ai-cta-text">
                 <span class="ai-cta-title">{{ t("payForMeTitle") }}</span>
@@ -699,7 +708,7 @@
                     :style="{
                       color: nearestSign.report.zone_color || 'var(--text2)',
                     }"
-                    >{{ nearestSign.report.zone_name }}</span
+                    >{{ zoneLabel(nearestSign.report.zone_name) }}</span
                   >
                   ·
                   {{
@@ -720,9 +729,14 @@
             <ParkingHours :city-id="detectedCity!.id" class="gps-hours" />
 
             <!-- Fine warning -->
-            <div v-if="cityDetail.fine" class="gps-fine">
-              <span class="gps-fine-label">{{ t("fineIfUnpaid") }}</span>
-              <span class="gps-fine-amount">{{ cityDetail.fine }}</span>
+            <div v-if="copy || cityDetail.fine" class="gps-fine">
+              <div class="gps-fine-row">
+                <span class="gps-fine-label">{{ t("fineIfUnpaid") }}</span>
+                <span class="gps-fine-amount">{{
+                  copy ? capFirst(copy.ifUnpaid[lang]) : cityDetail.fine
+                }}</span>
+              </div>
+              <p v-if="copy" class="gps-fine-more">{{ copy.ifUnpaidMore[lang] }}</p>
             </div>
 
           </div>
@@ -831,27 +845,22 @@
           </div>
           <div v-else-if="gpsError" class="gps-error fade-up-3">
             <p class="gps-error-text">{{ gpsError }}</p>
-            <!-- Unsupported city → AI orientation so the app is still useful here -->
-            <button
-              v-if="unsupportedCity"
-              type="button"
-              class="gps-ai-help"
-              @click="showCityHelp = true"
-            >
-              <Icon name="ai" :size="15" /> Ask AI how parking works in
-              {{ unsupportedCity }} →
-            </button>
+            <!-- A city we do not cover: say so, show no numbers, and hand over
+                 the operator's own site when we know it. An AI-written summary
+                 used to stand here; unverified prices are exactly what Kerb
+                 exists not to show. -->
+            <template v-if="unsupportedCity">
+              <p class="gps-error-sub">{{ t("uncoveredSub") }}</p>
+              <a
+                v-if="unsupportedUrl"
+                :href="unsupportedUrl"
+                target="_blank"
+                rel="noopener"
+                class="gps-ai-help"
+                >{{ t("uncoveredOfficial") }}</a
+              >
+            </template>
           </div>
-
-          <ClientOnly>
-            <CityHelp
-              v-if="showCityHelp && unsupportedCity"
-              :city="unsupportedCity"
-              :lat="coords?.lat ?? null"
-              :lng="coords?.lng ?? null"
-              @close="showCityHelp = false"
-            />
-          </ClientOnly>
 
           <!-- Search -->
           <div class="search-outer fade-up-3">
@@ -909,9 +918,9 @@
 
           <!-- Meta stats -->
           <div class="hero-meta fade-up-3">
-            <span v-for="(s, i) in stats" :key="s.label">
+            <span v-for="(s, i) in stats" :key="i">
               <span v-if="i > 0" class="meta-sep">·</span>
-              <strong>{{ s.val }}</strong> {{ s.label }}
+              <strong v-if="s.val">{{ s.val }}</strong> {{ s.label }}
             </span>
           </div>
         </div>
@@ -921,7 +930,7 @@
     <!-- ── CITY STRIP + CITIES + HOW IT WORKS + CTA (hidden in GPS mode: the city is known) ── -->
     <div v-if="!gpsMode" class="mkt" :class="{ 'mkt-off': gpsSkeleton }">
       <!-- ── CITY STRIP ── -->
-      <div v-if="stripItems.length" class="city-strip">
+      <div v-if="stripItems.length >= 3" class="city-strip">
         <div class="city-strip-track">
           <span
             v-for="(item, i) in stripItems.concat(stripItems)"
@@ -941,17 +950,17 @@
         <div class="container">
           <div class="section-header reveal">
             <div>
-              <p class="section-label">Featured cities</p>
-              <h2>Find your city</h2>
+              <p class="section-label">{{ t("citiesLabel") }}</p>
+              <h2>{{ t("citiesTitle") }}</h2>
             </div>
-            <NuxtLink to="/cities" class="view-all">View all cities →</NuxtLink>
+            <NuxtLink to="/cities" class="view-all">{{ t("citiesAll") }}</NuxtLink>
           </div>
 
           <div v-if="pending" class="cities-grid">
-            <div v-for="i in 6" :key="i" class="skeleton" />
+            <div v-for="i in 2" :key="i" class="skeleton" />
           </div>
           <div v-else-if="error" class="error-msg">
-            Failed to load cities. Please refresh.
+            {{ t("citiesFail") }}
           </div>
           <div v-else class="cities-grid">
             <CityCard
@@ -968,12 +977,9 @@
       <section id="how" class="section-how">
         <div class="container">
           <div class="reveal">
-            <p class="section-label">How it works</p>
-            <h2>Three steps, no guessing.</h2>
-            <p class="section-sub">
-              No account needed. No app to install. Just the rules for your
-              city, when you need them.
-            </p>
+            <p class="section-label">{{ t("howLabel") }}</p>
+            <h2>{{ t("howTitle") }}</h2>
+            <p class="section-sub">{{ t("howSub") }}</p>
           </div>
           <div class="steps reveal">
             <div v-for="step in steps" :key="step.num" class="step">
@@ -990,20 +996,17 @@
         <div class="container">
           <div class="cta-inner reveal">
             <div>
-              <p class="section-label">Open guide</p>
-              <h2>Know before you park.</h2>
-              <p class="cta-sub">
-                No more Reddit threads. No more guessing from a sign you can't
-                fully read. No more fines from the wrong zone.
-              </p>
+              <p class="section-label">{{ t("ctaLabel") }}</p>
+              <h2>{{ t("ctaTitle") }}</h2>
+              <p class="cta-sub">{{ t("ctaSub") }}</p>
             </div>
             <div class="cta-actions">
               <button class="btn-primary" @click="scrollToTop">
-                Search your city →
+                {{ t("ctaSearch") }}
               </button>
-              <NuxtLink to="/contribute" class="btn-ghost"
-                >Contribute info</NuxtLink
-              >
+              <NuxtLink to="/contribute" class="btn-ghost">{{
+                t("ctaContribute")
+              }}</NuxtLink>
             </div>
           </div>
         </div>
@@ -1015,7 +1018,15 @@
 <script setup lang="ts">
 const { getCities, searchCities, getCity } = useCity();
 const { user, getProfile } = useAuth();
-const { t, lang } = useLang();
+const { t, lang, zoneLabel } = useLang();
+const { public: pub } = useRuntimeConfig();
+// Pay-for-me needs a person on call and holds guests' money; off until both are
+// settled (runtimeConfig.public.relayPublic).
+const relayPublic = !!pub.relayPublic;
+// Payment density is synthesised until real pings are stored; a simulated layer
+// has no place in front of the public, labelled or not.
+const showHeatTool = false;
+const capFirst = (s: string) => (s ? s[0]!.toUpperCase() + s.slice(1) : s);
 
 // Day labels come from useParkingHours as canonical EN tokens; translate at render.
 const DAY_SR: Record<string, string> = {
@@ -1043,6 +1054,7 @@ const {
   gpsDenied,
   suggestedZoneName,
   unsupportedCity,
+  unsupportedUrl,
   startTracking,
   stopTracking,
 } = useGPS();
@@ -1054,7 +1066,6 @@ const {
 // placeholders in the exact slots) until the real data populates it in place.
 const EXPECT_GPS_KEY = "kerb_expect_gps_city";
 const expectCityId = ref<string | null>(null);
-const showCityHelp = ref(false); // AI orientation panel for cities we don't cover yet
 const {
   heading,
   attached: compassAttached,
@@ -1524,7 +1535,7 @@ const limitOf = (rules?: string | null) => {
     return {
       cap: false,
       maxMin: null,
-      label: "No time limit",
+      label: t("noLimit"),
       note: rules.slice(free[0].length).trim(),
     };
   return { cap: false, maxMin: null, label: "", note: rules };
@@ -1532,8 +1543,38 @@ const limitOf = (rules?: string | null) => {
 // Parsed limit per zone, keyed by name — drives the inline chip + the fine print.
 const zoneLimits = computed<Record<string, ReturnType<typeof limitOf>>>(() => {
   const m: Record<string, ReturnType<typeof limitOf>> = {};
-  for (const z of allZones.value) m[z.name] = limitOf(z.rules);
+  for (const z of allZones.value) {
+    const l = limitOf(z.rules);
+    // The checked copy, in the reader's language, replaces the registry's
+    // English prose; the cap itself still comes from the registry row.
+    const note = copy.value?.zoneNotes[z.name]?.[lang.value];
+    m[z.name] = l && note ? { ...l, note: fillFromZone(note, z) } : l;
+  }
   return m;
+});
+
+// The checked, bilingual copy for this city (app/utils/cityCopy.ts), if any.
+const copy = computed(() => cityCopy(cityDetail.value?.id));
+const ifUnpaidText = computed(() => copy.value?.ifUnpaid[lang.value] ?? null);
+const sourceInfo = computed(() => {
+  const c = copy.value;
+  if (c)
+    return {
+      url: c.source.url,
+      text: t("sourceLine", {
+        source: c.source.name,
+        date: fmtCheckedOn(c.checkedOn, lang.value),
+      }),
+    };
+  const url: string | undefined = cityDetail.value?.official_url;
+  if (!url) return null;
+  return {
+    url,
+    text: t("sourceLine", {
+      source: url.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, ""),
+      date: cityDetail.value?.last_updated ?? "",
+    }),
+  };
 });
 
 // "Wrong zone?" escape hatch — every zone except the hero, plus scan/AI tools.
@@ -1548,6 +1589,17 @@ const selectedZone = computed(
   () =>
     allZones.value.find((z: any) => z.name === selectedZoneName.value) ?? null
 );
+// Counted once per visit: the moment the driver was first shown an answer, and
+// which kind — a zone, or the refusal to pick one at a boundary.
+let zoneCounted = false;
+watch(selectedZone, (z) => {
+  if (!z || zoneCounted) return;
+  zoneCounted = true;
+  track("Zone shown", {
+    city: detectedCity.value?.id ?? "unknown",
+    answer: atBoundary.value ? "boundary" : parkingState.value ?? "unknown",
+  });
+});
 
 // A session already running in the zone on screen. Paying again here is not a
 // new parking — it is the same "one more hour" the session card's Extend sends,
@@ -1704,7 +1756,14 @@ const pay = (zone: any) => {
     );
 
   const a = payActionFor(zone, { plate: defaultPlate.value });
-  if (a.actionable) openPayAction(a);
+  if (a.actionable) {
+    track("SMS opened", {
+      city: detectedCity.value?.id ?? "unknown",
+      zone: zone?.name ?? "unknown",
+      boundary: atBoundary.value,
+    });
+    openPayAction(a);
+  }
 };
 
 // A searched address drops a pin on the expanded map, the same way a scanned
@@ -1972,6 +2031,13 @@ if (import.meta.dev && import.meta.client && "BroadcastChannel" in window) {
 // A new confirmed scan: pin it immediately and make it the selected pay zone.
 const onSignSubmitted = (report: any) => {
   signReports.value = [report, ...signReports.value];
+  track("Sign scanned", { city: report?.city_id ?? "unknown" });
+  // Let the server compare the sign with the registry and wake whoever keeps the
+  // map if they disagree. Fire-and-forget: the driver's answer never waits on it.
+  if (report?.id)
+    $fetch("/api/sign-alert", { method: "POST", body: { id: report.id } }).catch(
+      () => {}
+    );
   if (allZones.value.some((z: any) => z.name === report.zone_name)) {
     selectZone(report.zone_name);
   }
@@ -2084,19 +2150,23 @@ const goToFirstResult = async () => {
 
 const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
 
-// Honest stats only — derived from the cities we actually have, never invented.
+// Honest stats only — the cities we publish and the date their rules were last
+// checked. A count ("1 city · 1 country") says less than the name and the date.
 const stats = computed(() => {
   const list = (cities.value ?? []) as any[];
-  const countries = new Set(list.map((c) => c.country)).size;
-  const out = [
-    { val: String(list.length), label: list.length === 1 ? "city" : "cities" },
-  ];
-  if (countries)
+  const out: { val: string; label: string }[] = list.map((c) => ({
+    val: c.name,
+    label: "",
+  }));
+  const checked = list
+    .map((c) => cityCopy(c.id)?.checkedOn)
+    .filter(Boolean)
+    .sort()[0];
+  if (checked)
     out.push({
-      val: String(countries),
-      label: countries === 1 ? "country" : "countries",
+      val: "",
+      label: t("statVerified", { date: fmtCheckedOn(checked, lang.value) }),
     });
-  out.push({ val: "Serbia", label: "first" });
   return out;
 });
 
@@ -2108,23 +2178,12 @@ const stripItems = computed(() =>
   }))
 );
 
-const steps = [
-  {
-    num: "01",
-    title: "Search your city",
-    body: "Type any city. Instantly see how parking works — zones, prices, hours, and payment methods.",
-  },
-  {
-    num: "02",
-    title: "Read the rules",
-    body: "Clear, structured information. No legal jargon. Exactly what you need to park without stress.",
-  },
-  {
-    num: "03",
-    title: "Pay the right way",
-    body: "Each city guide tells you exactly how to pay — SMS, app, meter, or card. Confirm with local signage.",
-  },
-];
+// A real sequence, so the numbers carry information.
+const steps = computed(() => [
+  { num: "01", title: t("how1Title"), body: t("how1Body") },
+  { num: "02", title: t("how2Title"), body: t("how2Body") },
+  { num: "03", title: t("how3Title"), body: t("how3Body") },
+]);
 
 onMounted(() => {
   // Guest-first: detect the city for everyone, logged in or not.
@@ -2142,6 +2201,13 @@ onMounted(() => {
   ensureServiceWorker();
   detectCity();
 
+  // Reveal only what is still below the fold. Content used to be hidden until an
+  // observer fired, so link previews, crawlers and any screenshot that did not
+  // scroll got a blank page; now it is visible by default and only an element
+  // the reader has not reached yet is armed to fade in.
+  const reduceMotion = window.matchMedia?.(
+    "(prefers-reduced-motion: reduce)"
+  ).matches;
   const obs = new IntersectionObserver(
     (entries) => {
       entries.forEach((e) => {
@@ -2153,7 +2219,12 @@ onMounted(() => {
     },
     { threshold: 0.08 }
   );
-  document.querySelectorAll(".reveal").forEach((el) => obs.observe(el));
+  document.querySelectorAll(".reveal").forEach((el) => {
+    if (reduceMotion || el.getBoundingClientRect().top < window.innerHeight)
+      return;
+    el.classList.add("reveal-armed");
+    obs.observe(el);
+  });
 });
 
 // Pre-hydration switch: the homepage is prerendered as the marketing hero, but a
@@ -2169,15 +2240,16 @@ useHead({
   ],
 });
 
+const siteUrl = String(pub.siteUrl || "").replace(/\/$/, "");
 useSeoMeta({
-  title: "Kerb — park · pay · zero fines",
+  title: "Kerb — ulično parkiranje, konačno jasno",
   description:
-    "AI-assisted street parking for Serbia. Find your zone, pay by SMS, never learn what a zone is.",
-  ogTitle: "Kerb — park · pay · zero fines",
+    "Zona, cena, do kad si pokriven i kako se plaća u Novom Sadu — iz zvaničnih izvora, sa datumom provere. Tabla pored auta ima poslednju reč.",
+  ogTitle: "Kerb — ulično parkiranje, konačno jasno",
   ogDescription:
-    "AI-assisted street parking for Serbia. Find your zone, pay by SMS, never learn what a zone is.",
-  ogUrl: "https://kerbo.netlify.app/",
-  ogImage: "https://kerbo.netlify.app/icon-512.png",
+    "Zona, cena, do kad si pokriven i kako se plaća u Novom Sadu — iz zvaničnih izvora, sa datumom provere.",
+  ogUrl: `${siteUrl}/`,
+  ogImage: `${siteUrl}/icon-512.png`,
   ogType: "website",
   twitterCard: "summary",
 });
@@ -2244,9 +2316,17 @@ h1 {
   max-width: 560px;
 }
 .gps-error-text {
-  margin-bottom: 10px;
+  margin-bottom: 6px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+.gps-error-sub {
+  margin: 0 0 12px;
+  line-height: 1.5;
 }
 .gps-ai-help {
+  text-decoration: none;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -3115,6 +3195,26 @@ h2 {
 .zone-hero-body .zone-pick-approx {
   margin-top: 10px;
 }
+/* Consequence + provenance: two short facts on one quiet line, wrapping on
+   narrow phones. 13px with --text2 keeps AA in sunlight; the link is the source. */
+.zone-hero-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  margin: 10px 0 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text2);
+}
+.zone-hero-foot a {
+  color: var(--text2);
+  text-decoration: underline;
+  text-decoration-color: var(--border2);
+  text-underline-offset: 3px;
+}
+.zone-hero-foot a:hover {
+  color: var(--blue);
+}
 
 /* Off the mapped edge: calm the card so its confidence matches the evidence,
    and let the warning lead the body instead of trailing the price. */
@@ -3152,13 +3252,48 @@ h2 {
   font-weight: 700;
 }
 
+/* Scan the sign + the other zones, side by side under the slide */
+.zone-next {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.zone-next > * {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.zone-scan {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 12px 14px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  background: var(--bg2);
+  border: 1.5px solid var(--border2);
+  border-radius: var(--r-md);
+  cursor: pointer;
+  transition: border-color 150ms var(--ease-out);
+}
+.zone-scan:hover {
+  border-color: var(--text2);
+}
+.zone-scan:focus-visible,
+.zone-wrong:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
 /* The one escape hatch — wrong zone opens every alternative + the tools */
 .zone-wrong {
   display: flex;
   align-items: center;
   gap: 9px;
   width: 100%;
-  margin-top: 10px;
+  min-height: 48px;
   padding: 13px 14px;
   font-family: inherit;
   font-size: 13.5px;
@@ -3928,13 +4063,22 @@ h2 {
 
 /* Fine warning */
 .gps-fine {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   background: var(--red-bg);
   border: 1px solid var(--red-border);
   border-radius: var(--r-md);
   padding: 10px 14px;
+}
+.gps-fine-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.gps-fine-more {
+  margin: 8px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text2);
 }
 .gps-fine-label {
   font-size: 12px;
@@ -3944,10 +4088,10 @@ h2 {
   letter-spacing: 0.5px;
 }
 .gps-fine-amount {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--red);
-  font-family: var(--font-mono);
+  text-align: right;
 }
 
 /* Detecting state */

@@ -114,12 +114,15 @@ h1, .display { font-family: var(--font-display); font-weight: 400; }
 }
 
 /* ── ANIMATIONS ─────────────────────────────────────────────────────────────── */
-.reveal {
+/* Visible by default. Only an element still below the fold gets .reveal-armed
+   (from the page's script) and fades in when reached — so crawlers, previews and
+   no-JS readers never meet an empty section. */
+.reveal-armed {
   opacity: 0;
   transform: translateY(14px);
   transition: opacity 450ms var(--ease-out), transform 450ms var(--ease-out);
 }
-.reveal.visible { opacity: 1; transform: none; }
+.reveal-armed.visible { opacity: 1; transform: none; }
 
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(10px); }
