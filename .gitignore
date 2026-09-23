@@ -26,3 +26,6 @@ logs
 
 # Audit working files — re-fetched by scripts/audit-novisad-zones.mjs --refresh
 scripts/.audit-cache/
+
+# Python bytecode from the geometry build scripts
+__pycache__/
