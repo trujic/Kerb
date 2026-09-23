@@ -41,6 +41,7 @@ const CITY_BOX: Record<string, [number, number, number, number]> = {
 }
 
 export const useAddressSearch = () => {
+  const { isLive } = useLiveCities()
   const results = ref<AddressHit[]>([])
   const pending = ref(false)
   const error = ref<string | null>(null)
@@ -84,7 +85,10 @@ export const useAddressSearch = () => {
         )
         const lat = Number(h.lat)
         const lng = Number(h.lon)
-        return { label, detail, lat, lng, cityId: cityIdAt(lat, lng) }
+        // A city we have geometry for but have not published answers as
+        // "not covered" — the map may be right, the prices are unchecked.
+        const inCity = cityIdAt(lat, lng)
+        return { label, detail, lat, lng, cityId: isLive(inCity) ? inCity : null }
       })
       // Covered cities first (we can actually answer for those), then the city
       // you are in, then everything else in the order Nominatim ranked it.

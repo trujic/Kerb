@@ -1,7 +1,7 @@
 {
-  "name": "Kerbo — park · pay · zero fines",
-  "short_name": "Kerbo",
-  "description": "AI-assisted street parking for Serbia. Find your zone, pay by SMS, never learn what a zone is.",
+  "name": "Kerb",
+  "short_name": "Kerb",
+  "description": "Zona, cena i kako se plaća parking u Novom Sadu — iz zvaničnih izvora. Tabla pored auta ima poslednju reč.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#F2F3F5",

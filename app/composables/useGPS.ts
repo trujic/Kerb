@@ -47,6 +47,8 @@ const fetchWithTimeout = (url: string, opts: RequestInit, ms: number): Promise<R
 
 export const useGPS = () => {
   const supabase = useSupabaseClient()
+  const { isLive } = useLiveCities()
+  const { t, cityName } = useLang()
 
   const detectedCity = ref<{ id: string; name: string; country: string; flag: string } | null>(null)
   const coords = ref<{ lat: number; lng: number; accuracy: number } | null>(null)
@@ -55,12 +57,15 @@ export const useGPS = () => {
   const gpsDenied = ref(false) // permission denied / no geolocation at all — GPS won't work on this device
   const suggestedZoneName = ref<string | null>(null)
   const detectedStreet = ref<string | null>(null) // reverse-geocoded street at detection
-  const unsupportedCity = ref<string | null>(null) // detected a city we have no data for (→ AI help)
+  const unsupportedCity = ref<string | null>(null) // detected a city we have no data for
+  // The operator's own site, when we know the city but have not verified it —
+  // the honest thing to hand over instead of our unchecked numbers.
+  const unsupportedUrl = ref<string | null>(null)
 
   const detectCity = async () => {
     if (!import.meta.client) return null
     if (!navigator.geolocation) {
-      gpsError.value = 'Geolocation not supported by your browser.'
+      gpsError.value = t('gpsNoSupport')
       gpsDenied.value = true
       return null
     }
@@ -70,6 +75,7 @@ export const useGPS = () => {
     gpsDenied.value = false
     suggestedZoneName.value = null
     unsupportedCity.value = null
+    unsupportedUrl.value = null
 
     try {
       const position = await new Promise<GeolocationPosition>((resolve, reject) => {
@@ -90,9 +96,9 @@ export const useGPS = () => {
         ),
       ])
     } catch (e: any) {
-      if (e?.code === 1) { gpsError.value = 'Location access denied. Enable it in browser settings.'; gpsDenied.value = true }
-      else if (e?.code === 3 || e?.message === 'detect-timeout') gpsError.value = 'Location request timed out.'
-      else gpsError.value = 'Could not detect location.'
+      if (e?.code === 1) { gpsError.value = t('gpsDenied'); gpsDenied.value = true }
+      else if (e?.code === 3 || e?.message === 'detect-timeout') gpsError.value = t('gpsTimeout')
+      else gpsError.value = t('gpsFail')
       return null
     } finally {
       detecting.value = false
@@ -123,7 +129,7 @@ export const useGPS = () => {
         .filter(Boolean) as string[]
 
       if (!candidates.length) {
-        gpsError.value = 'Could not determine your city.'
+        gpsError.value = t('gpsNoCity')
         return null
       }
 
@@ -149,7 +155,7 @@ export const useGPS = () => {
       // Ten rows — one fetch beats a query per candidate.
       const { data: cities } = await supabase
         .from('cities')
-        .select('id, name, country, flag')
+        .select('id, name, country, flag, official_url')
 
       let data: any = null
       for (const c of candidates) {
@@ -158,8 +164,17 @@ export const useGPS = () => {
       }
       const rawCity = transliterate(candidates[0]!)
 
+      // Known but unpublished: name it, link the operator, show no numbers.
+      if (data && !isLive(data.id)) {
+        unsupportedCity.value = cityName(data.id, data.name)
+        gpsError.value = t('uncoveredTitle', { city: unsupportedCity.value })
+        unsupportedUrl.value = data.official_url ?? null
+        return null
+      }
+
       if (data) {
-        detectedCity.value = data
+        const { official_url: _url, ...row } = data
+        detectedCity.value = row
 
         // Look up suggested parking zone from the detected street
         if (rawStreet) {
@@ -191,8 +206,8 @@ export const useGPS = () => {
         return data
       }
 
-      gpsError.value = `You appear to be in ${rawCity}, but we don't have parking data for it yet.`
       unsupportedCity.value = transliterate(rawCity)
+      gpsError.value = t('uncoveredTitle', { city: unsupportedCity.value })
       return null
     } catch (e: any) {
       // Reverse geocoding needs the network, and offline is exactly when a driver
@@ -204,7 +219,7 @@ export const useGPS = () => {
         detectedCity.value = offlineCity
         return offlineCity
       }
-      gpsError.value = e?.name === 'AbortError' ? 'Location lookup timed out.' : 'Could not detect location.'
+      gpsError.value = e?.name === 'AbortError' ? t('gpsTimeout') : t('gpsFail')
       return null
     }
   }
@@ -212,7 +227,7 @@ export const useGPS = () => {
   /** Place a coordinate in a covered city without the network, using what we kept. */
   const cityFromCache = async (lat: number, lng: number) => {
     const id = cityIdAt(lat, lng)
-    if (!id) return null
+    if (!id || !isLive(id)) return null
     const cached = await loadCity(id)
     if (!cached?.geojson?.features?.length) return null
     return cached.city ?? { id, name: id, country: '', flag: '' }
@@ -243,5 +258,5 @@ export const useGPS = () => {
     }
   }
 
-  return { detectCity, detectedCity, detectedStreet, coords, detecting, gpsError, gpsDenied, suggestedZoneName, unsupportedCity, startTracking, stopTracking }
+  return { detectCity, detectedCity, detectedStreet, coords, detecting, gpsError, gpsDenied, suggestedZoneName, unsupportedCity, unsupportedUrl, startTracking, stopTracking }
 }

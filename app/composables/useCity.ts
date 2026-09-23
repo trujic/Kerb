@@ -10,6 +10,7 @@ export interface CityListItem {
 
 export const useCity = () => {
   const supabase = useSupabaseClient()
+  const { isLive } = useLiveCities()
 
   // Fetch all cities for the homepage grid
   const getCities = async () => {
@@ -28,19 +29,21 @@ export const useCity = () => {
 
     if (error) throw error
     // Drafts sit alongside the real list in dev so the grid shows what the card
-    // will look like — badge, tags and all — before anything is published.
+    // will look like — badge, tags and all — before anything is published. The
+    // live-city gate applies to them too, so localhost shows what the public sees.
+    let list: any[] = data ?? []
     if (import.meta.dev) {
       const drafts = await Promise.all(draftCityIds().map((id) => draftCity(id)))
-      const extra = drafts.filter((d) => d && !data?.some((c: any) => c.id === d.id))
-      if (extra.length) return [...(data ?? []), ...extra].sort((a: any, b: any) => a.name.localeCompare(b.name))
+      const extra = drafts.filter((d) => d && !list.some((c: any) => c.id === d.id))
+      if (extra.length) list = [...list, ...extra].sort((a: any, b: any) => a.name.localeCompare(b.name))
     }
-    return data
+    return list.filter((c: any) => isLive(c.id))
   }
 
   // Fetch one city with all related data for the detail page
   const getCity = async (id: string) => {
     const draft = await draftCity(id)
-    if (draft) return draft
+    if (draft) return { ...draft, live: isLive(id) }
     const { data, error } = await supabase
       .from('cities')
       .select(`
@@ -59,6 +62,9 @@ export const useCity = () => {
 
     // Sort related arrays by sort_order
     if (data) {
+      // Unpublished cities still resolve — the page needs the name and the
+      // operator's link to say "not covered yet" — but callers must check this.
+      data.live = isLive(data.id)
       data.zones           = data.zones?.sort((a: any, b: any) => a.sort_order - b.sort_order)
       data.payment_methods = data.payment_methods?.sort((a: any, b: any) => a.sort_order - b.sort_order)
       data.tips            = data.tips?.sort((a: any, b: any) => a.sort_order - b.sort_order)
@@ -73,10 +79,10 @@ export const useCity = () => {
       .from('cities')
       .select('id, name, country, flag')
       .or(`name.ilike.*${query}*,country.ilike.*${query}*`)
-      .limit(6)
+      .limit(20)
 
     if (error) throw error
-    return data
+    return (data ?? []).filter((c: any) => isLive(c.id)).slice(0, 6)
   }
 
   // Street → zone lookup (registry tier). Returns matches for a typed street name.

@@ -2,8 +2,8 @@
   <div>
     <div class="back-bar">
       <div class="container back-bar-inner">
-        <NuxtLink to="/" class="back-link">← All cities</NuxtLink>
-        <span v-if="status" class="live-chip" :class="status.paid ? 'is-paid' : 'is-free'">
+        <NuxtLink to="/cities" class="back-link">{{ t('backCities') }}</NuxtLink>
+        <span v-if="status && city?.live !== false" class="live-chip" :class="status.paid ? 'is-paid' : 'is-free'">
           <span class="live-dot" />{{ status.label }}<span class="live-detail"> · {{ status.detail }}</span>
         </span>
       </div>
@@ -14,11 +14,23 @@
     </div>
 
     <div v-else-if="error || !city" class="error-wrap container">
-      <h2>City not found</h2>
-      <p>We don't have data for this city yet.</p>
-      <NuxtLink to="/contribute" class="btn-primary" style="display:inline-block;margin-top:16px">
-        Add this city →
-      </NuxtLink>
+      <h2>{{ t('cityNotFound') }}</h2>
+      <p>{{ t('cityNotFoundSub') }}</p>
+    </div>
+
+    <!-- Known, not published: its numbers are unchecked, so none are shown. The
+         operator's own site is the honest thing to hand over. -->
+    <div v-else-if="city.live === false" class="error-wrap container">
+      <h2>{{ t('uncoveredTitle', { city: cityName(city.id, city.name) }) }}</h2>
+      <p>{{ t('uncoveredSub') }}</p>
+      <a
+        v-if="city.official_url"
+        :href="city.official_url"
+        target="_blank"
+        rel="noopener"
+        class="btn-primary"
+        style="display:inline-block;margin-top:16px"
+      >{{ t('uncoveredOfficial') }}</a>
     </div>
 
     <template v-else>
@@ -28,23 +40,25 @@
           <div class="hero-top">
             <div>
               <div class="city-flag fade-up">{{ city.flag }}</div>
-              <h1 class="city-title fade-up-2">{{ city.name }}</h1>
-              <p class="city-country fade-up-2">{{ city.country }} · Street parking guide</p>
+              <h1 class="city-title fade-up-2">{{ cityName(city.id, city.name) }}</h1>
+              <p class="city-country fade-up-2">{{ t('cityGuide') }}</p>
             </div>
             <div class="hero-badges fade-up-3">
               <div class="status-badge" :class="city.verified ? 'verified' : 'unverified'">
-                {{ city.verified ? '✓ Verified' : '⚠ Community data' }}
+                {{ city.verified ? t('cityVerified') : t('cityCommunity') }}
                 <span v-if="city.verified_by"> · {{ city.verified_by }}</span>
               </div>
               <div class="date-badge" :class="{ stale: isStale }">
-                {{ isStale ? '⚠ ' : '' }}Updated {{ city.last_updated }}
+                {{ isStale ? '⚠ ' : '' }}{{ checkedLabel }}
               </div>
             </div>
           </div>
 
-          <p class="city-overview fade-up-3">{{ city.overview }}</p>
+          <p class="city-overview fade-up-3">{{ copy?.overview[lang] ?? city.overview }}</p>
 
-          <div class="tag-row fade-up-3">
+          <!-- The registry's tags are English shorthand; the checked overview
+               above already says all of it. -->
+          <div v-if="!copy" class="tag-row fade-up-3">
             <span v-for="tag in city.tags" :key="tag.id" class="tag">{{ tag.label }}</span>
           </div>
         </div>
@@ -55,10 +69,8 @@
         <div class="container">
           <svg class="disc-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
           <span>
-            Last confirmed <strong>{{ city.last_updated }}</strong>.
-            Parking rules change — always double-check with
-            <a v-if="city.official_url" :href="city.official_url" target="_blank" rel="noopener" class="disc-link">the official source ↗</a><span v-else>official local signage</span>
-            before you park.
+            {{ t('cityDisclaimer', { date: checkedDate }) }}
+            <a :href="sourceUrl" target="_blank" rel="noopener" class="disc-link">{{ t('cityOfficialSource') }}</a>.
           </span>
         </div>
       </div>
@@ -127,16 +139,16 @@
 
             <!-- Zones -->
             <div class="info-block">
-              <p class="section-label">Parking zones</p>
+              <p class="section-label">{{ t('cityZones') }}</p>
               <div class="zone-list">
                 <div v-for="zone in city.zones" :key="zone.id" class="zone-card">
                   <div class="zone-stripe" :style="{ background: zone.color }" />
                   <div class="zone-body">
                     <div class="zone-top">
-                      <span class="zone-name">{{ zone.name }}</span>
+                      <span class="zone-name">{{ zoneLabel(zone.name) }}</span>
                       <span class="zone-price">{{ zone.price }}</span>
                     </div>
-                    <p class="zone-rules">{{ zone.rules }}</p>
+                    <p class="zone-rules">{{ zoneRules(zone) }}</p>
                     <!-- Same pay ritual as the dashboard: the slide IS the sign check -->
                     <div v-if="zone.sms_shortcode" class="zone-pay-slide">
                       <SlideToConfirm
@@ -158,33 +170,53 @@
 
             <!-- Payment -->
             <div class="info-block">
-              <p class="section-label">How to pay</p>
+              <p class="section-label">{{ t('cityHowPay') }}</p>
               <div class="payment-chips">
-                <div v-for="pm in city.payment_methods" :key="pm.id" class="payment-chip">
-                  {{ pm.label }}
-                </div>
+                <template v-if="copy">
+                  <div v-for="(pm, i) in copy.payMethods" :key="i" class="payment-chip">{{ pm[lang] }}</div>
+                </template>
+                <template v-else>
+                  <div v-for="pm in city.payment_methods" :key="pm.id" class="payment-chip">{{ pm.label }}</div>
+                </template>
               </div>
               <!-- Not every city pays by SMS. New York has no shortcode at all,
                    and a box headed "SMS" over text saying so reads as a mistake —
                    so the heading follows the city, and the receipt line only
                    appears where there is actually a reply to keep. -->
-              <div v-if="city.sms_instructions" class="sms-box">
-                <p class="sms-label">Step by step — {{ usesSms ? 'SMS' : 'paying here' }}</p>
-                <p>{{ city.sms_instructions }}</p>
-                <p v-if="usesSms" class="sms-receipt">
-                  The operator's reply SMS is your official receipt — keep it.
-                </p>
+              <div v-if="copy || city.sms_instructions" class="sms-box">
+                <p class="sms-label">{{ usesSms ? t('cityStepSms') : t('cityStepOther') }}</p>
+                <p>{{ copy?.smsHowTo[lang] ?? city.sms_instructions }}</p>
+                <!-- The numbers come from the zone rows, never restated in prose. -->
+                <ul v-if="copy && usesSms" class="sms-codes">
+                  <li v-for="zone in city.zones.filter((z: any) => z.sms_shortcode)" :key="zone.id">
+                    <span class="sms-dot" :style="{ background: zone.color }" />
+                    {{ zoneLabel(zone.name) }} <b>{{ zone.sms_shortcode }}</b>
+                  </li>
+                  <li v-if="dailyCode">
+                    <span class="sms-dot sms-dot-daily" />
+                    {{ t('cityDailyCode') }} <b>{{ dailyCode }}</b>
+                  </li>
+                </ul>
+                <p v-if="usesSms" class="sms-receipt">{{ t('sentBody2') }}</p>
               </div>
             </div>
 
             <!-- Tips -->
             <div class="info-block">
-              <p class="section-label">Local tips</p>
+              <p class="section-label">{{ t('cityTips') }}</p>
               <div class="tips-list">
-                <div v-for="tip in city.tips" :key="tip.id" class="tip-row">
-                  <span class="tip-icon">{{ tip.icon }}</span>
-                  <span class="tip-text">{{ tip.text }}</span>
-                </div>
+                <template v-if="copy">
+                  <div v-for="(tip, i) in copy.tips" :key="i" class="tip-row">
+                    <span class="tip-icon"><Icon :name="tip.icon" :size="16" /></span>
+                    <span class="tip-text">{{ tip.text[lang] }}</span>
+                  </div>
+                </template>
+                <template v-else>
+                  <div v-for="tip in city.tips" :key="tip.id" class="tip-row">
+                    <span class="tip-icon">{{ tip.icon }}</span>
+                    <span class="tip-text">{{ tip.text }}</span>
+                  </div>
+                </template>
               </div>
             </div>
           </div>
@@ -196,28 +228,26 @@
 
             <!-- Fine -->
             <div class="sidebar-card">
-              <p class="section-label">Fine if unpaid</p>
-              <div class="fine-amount">{{ city.fine }}</div>
-              <p class="fine-note">Towing is also active — check local signage for current fine amounts.</p>
+              <p class="section-label">{{ t('fineIfUnpaid') }}</p>
+              <div class="fine-amount">{{ copy ? capFirst(copy.ifUnpaid[lang]) : city.fine }}</div>
+              <p class="fine-note">{{ copy ? copy.ifUnpaidMore[lang] : t('cityTowNote') }}</p>
             </div>
 
             <!-- Official source -->
             <div v-if="city.official_url" class="sidebar-card official-card">
-              <p class="section-label">Verify before you park</p>
-              <p class="official-desc">
-                This guide is a reference, not a guarantee. Confirm current rules on the official city parking website.
-              </p>
-              <a :href="city.official_url" target="_blank" rel="noopener" class="btn-primary official-btn">
-                Official source ↗
+              <p class="section-label">{{ t('cityVerifyTitle') }}</p>
+              <p class="official-desc">{{ t('cityVerifySub') }}</p>
+              <a :href="sourceUrl" target="_blank" rel="noopener" class="btn-primary official-btn">
+                {{ t('cityOfficialBtn') }}
               </a>
             </div>
 
             <!-- Contribute -->
             <div class="sidebar-card contrib-card">
-              <p class="contrib-title">Know something we got wrong?</p>
-              <p class="contrib-sub">Rules change. Help keep this guide accurate for the next traveler.</p>
+              <p class="contrib-title">{{ t('cityContribTitle') }}</p>
+              <p class="contrib-sub">{{ t('cityContribSub') }}</p>
               <NuxtLink to="/contribute" class="btn-ghost" style="display:block;text-align:center;width:100%">
-                Suggest a correction
+                {{ t('cityContribBtn') }}
               </NuxtLink>
             </div>
           </div>
@@ -268,7 +298,26 @@ const isStale = computed(() => {
   return Date.now() - d.getTime() > 365 * 86_400_000
 })
 
-const { t } = useLang()
+const { t, lang, zoneLabel, cityName } = useLang()
+
+// The checked, bilingual copy for this city, when there is one (utils/cityCopy.ts).
+const copy = computed(() => cityCopy(city.value?.id))
+const capFirst = (s: string) => (s ? s[0]!.toUpperCase() + s.slice(1) : s)
+const checkedDate = computed(() =>
+  copy.value ? fmtCheckedOn(copy.value.checkedOn, lang.value) : (city.value?.last_updated ?? ''),
+)
+const checkedLabel = computed(() =>
+  copy.value ? t('cityChecked', { date: checkedDate.value }) : t('cityUpdated', { date: checkedDate.value }),
+)
+const sourceUrl = computed(() => copy.value?.source.url ?? city.value?.official_url ?? '#')
+const zoneRules = (zone: any) => {
+  const note = copy.value?.zoneNotes[zone.name]?.[lang.value]
+  return note ? fillFromZone(note, zone) : zone.rules
+}
+// The daily ticket's own shortcode, from whichever zone row carries it.
+const dailyCode = computed(
+  () => (city.value?.zones ?? []).find((z: any) => z.daily_target)?.daily_target ?? null,
+)
 
 // Guest plate (saved on device) prefills the SMS body, matching the home flow.
 const GUEST_PLATE_KEY = 'kerb_guest_plate'
@@ -278,12 +327,15 @@ onMounted(() => {
 })
 const payZone = (zone: any) => openSms(smsHref(zone.sms_shortcode, guestPlate.value))
 
-const SITE = 'https://kerbo.netlify.app'
-const ogTitle = computed(() =>
-  city.value ? `${city.value.name} parking — zones, prices, SMS · Kerb` : 'City not found · Kerb',
-)
+const SITE = String(useRuntimeConfig().public.siteUrl || '').replace(/\/$/, '')
+const ogTitle = computed(() => {
+  if (!city.value) return `${t('cityNotFound')} · Kerb`
+  return lang.value === 'sr'
+    ? `Parking u ${city.value.name} — zone, cene, SMS · Kerb`
+    : `${city.value.name} parking — zones, prices, SMS · Kerb`
+})
 const ogDesc = computed(() =>
-  city.value?.overview ?? 'Street parking guide — zones, prices and how to pay.',
+  copy.value?.overview[lang.value] ?? city.value?.overview ?? t('cityGuide'),
 )
 useSeoMeta({
   title: ogTitle,
@@ -367,7 +419,9 @@ useSeoMeta({
   animation: spin 0.7s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
-.error-wrap { padding: 80px 0; }
+/* Vertical only: the .container on the same element owns the side gutter. */
+.error-wrap { padding-top: 64px; padding-bottom: 64px; max-width: 60ch; }
+.error-wrap h2 { text-wrap: balance; }
 
 /* Hero */
 .city-hero {
@@ -560,7 +614,19 @@ useSeoMeta({
   align-items: flex-start;
 }
 .tip-row:last-child { border-bottom: none; }
-.tip-icon { font-size: 15px; flex-shrink: 0; padding-top: 2px; }
+.tip-icon { font-size: 15px; flex-shrink: 0; padding-top: 2px; color: var(--text2); }
+.sms-codes {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 6px 14px;
+}
+.sms-codes li { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.sms-codes b { font-family: var(--font-mono); margin-left: auto; }
+.sms-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.sms-dot-daily { background: transparent; border: 2px solid var(--text2); }
 .tip-text { font-size: 13px; color: var(--muted); line-height: 1.55; }
 
 /* Sidebar */
