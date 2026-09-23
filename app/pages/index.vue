@@ -14,7 +14,7 @@
               :height="130"
               :zones="displayZones"
               :highlight="highlightPoint"
-              :pin="searchPin"
+              :pin="searchPin ?? pickedZonePin"
               :signs="signReports"
               :compass-prompt="compassPrompt"
               labels
@@ -64,6 +64,22 @@
                   ✕
                 </button>
               </div>
+              <!-- Payment density. Off by default: it is the weakest claim on the
+                   map, so it never greets anyone unasked. -->
+              <div class="map-fs-tools">
+                <button
+                  class="heat-toggle"
+                  type="button"
+                  :aria-pressed="showHeat"
+                  @click="toggleHeat"
+                >
+                  <span class="heat-swatch" aria-hidden="true"></span>
+                  Gde se plaća
+                </button>
+                <span v-if="showHeat && payHeatDemo" class="heat-demo">
+                  simulirano — još nema pravih uplata
+                </span>
+              </div>
               <div class="map-fs-body">
                 <LocationMap
                   :lat="coords!.lat"
@@ -72,8 +88,9 @@
                   :heading="heading"
                   :zones="searchZones ?? displayZones"
                   :highlight="searchPin ? null : highlightPoint"
-                  :pin="searchPin"
+                  :pin="searchPin ?? pickedZonePin"
                   :signs="signReports"
+                  :heat="showHeat ? payCells : undefined"
                   :zone-meta="allZones"
                   :city-id="detectedCity?.id ?? expectCityId"
                   payable
@@ -285,7 +302,7 @@
                 class="zone-hero"
                 :class="{
                   'zone-hero--free': freeNow,
-                  'zone-hero--unsure': unsure,
+                  'zone-hero--unsure': showUnsureBox,
                 }"
                 :style="{ borderColor: selectedZone.color }"
               >
@@ -327,7 +344,7 @@
                   <!-- Standing off the mapped edge, the guess is weak enough that
                        it leads rather than trails: a line under the price was too
                        easy to scroll past on the way to the slider. -->
-                  <div v-if="unsure" class="zone-unsure">
+                  <div v-if="showUnsureBox" class="zone-unsure">
                     <Icon name="alert" :size="17" />
                     <div>
                       <p class="zone-unsure-title">
@@ -337,15 +354,39 @@
                             : t("boundaryTitle", { dist: formatDist(nearest!.distanceM) })
                         }}
                       </p>
-                      <p class="zone-unsure-sub">
+                      <!-- Where we can name the neighbouring zone and the distance
+                           to it, say that instead of the generic line. "Plati ovu
+                           zonu samo ako na tabli piše Blue Zone" is true but
+                           vague; "Red Zone počinje 34 m odavde" tells the driver
+                           which way to look. -->
+                      <p v-if="claimNeighbourLine" class="zone-unsure-sub">
+                        {{ claimNeighbourLine }}
+                      </p>
+                      <p v-else class="zone-unsure-sub">
                         {{ parkingState === 'edge' ? t("edgeSub") : t("boundarySub") }}
                         <strong>{{ selectedZone.name }}</strong
                         >.
                       </p>
                     </div>
                   </div>
-                  <p class="zone-hero-check">
-                    <Icon name="sign" :size="14" /> {{ t("heroCheckSign") }}
+                  <!-- The caveat is no longer permanent. It appears only when a
+                       DIFFERENT zone is close enough to the GPS error to actually
+                       be in play — about 30% of fixes in Novi Sad — and when it
+                       appears it names that zone and the distance, so it is
+                       information rather than wallpaper. A warning that shows on
+                       every screen is one nobody reads on the screen that matters. -->
+                  <p
+                    v-if="claimNeighbourLine && !showUnsureBox"
+                    class="zone-hero-check"
+                  >
+                    <Icon name="sign" :size="14" />
+                    {{ claimNeighbourLine }}
+                  </p>
+                  <p v-else-if="spotNote" class="zone-hero-evidence">
+                    {{ spotNote }}
+                  </p>
+                  <p v-else-if="claimEvidence" class="zone-hero-evidence">
+                    {{ claimEvidence }}
                   </p>
                   <p v-if="mapApprox" class="zone-pick-approx">
                     <Icon name="alert" :size="13" />
@@ -1047,6 +1088,26 @@ const mapExpanded = ref(false);
 const showScan = ref(false); // scan-the-sign modal
 const showAi = ref(false); // ask-AI resolver panel
 const signReports = ref<any[]>([]); // confirmed sign scans → map pins
+
+// ── Payment density ──────────────────────────────────────────────────────────
+// Loaded on first toggle, never on mount: it is an optional secondary layer, and
+// the fullscreen map already has enough to do when it opens. `payHeatDemo` is true
+// while the cells are synthesised — the UI says so, because an invented layer that
+// doesn't announce itself is exactly the thing this app refuses to ship.
+const { cells: payCells, demo: payHeatDemo, load: loadPayHeat } = usePayHeat();
+const showHeat = ref(false);
+const heatLoaded = ref(false);
+
+const toggleHeat = async () => {
+  showHeat.value = !showHeat.value;
+  if (!showHeat.value || heatLoaded.value) return;
+  heatLoaded.value = true;
+  const city = detectedCity.value?.id ?? expectCityId.value;
+  if (!city) return;
+  // 10k users' worth of simulated pings, so the layer is visible before any of it
+  // is real. Drop the third argument once pings are actually persisted.
+  await loadPayHeat(city, zoneBoundaries.value, 10000);
+};
 const { loadForCity: loadSignReports } = useSignScan();
 
 // Time-aware hours — drives free-now desaturation + the night pre-pay path.
@@ -1191,6 +1252,61 @@ const defaultPlate = computed(() => {
 // Geometry-based detection: distance to the nearest paid-parking segment.
 const { nearest, zoneDistances } = useNearestParking(coords, zoneBoundaries);
 
+// ── Fix trail ────────────────────────────────────────────────────────────────
+// Every position update is kept for the session so that when someone pays we can
+// use the fix from when they OPENED the app rather than the one from the moment
+// they swiped — by then they have usually walked away from the car, in a
+// direction, which is an error no amount of data averages out. See useParkFix.
+const { record: recordFix, carFix } = useParkFix();
+watch(
+  coords,
+  (c) => recordFix(c),
+  { immediate: true },
+);
+
+// ── The two claims ───────────────────────────────────────────────────────────
+// "This block is the Blue zone" and "you are standing in it" are different
+// statements with different futures: the first gets stronger as scans and
+// payments accumulate, the second never improves, because GPS never improves.
+// Hedging them together meant one caveat that read the same at one source and at
+// four — so drivers learned to skip it. See app/utils/zoneClaim.js.
+//
+// Measured over 200 random points in Novi Sad: ~70% of fixes have no neighbouring
+// zone anywhere near the error circle. At those the honest UI is SILENCE, not
+// reassurance — which is why this drives whether the caveat renders at all.
+const zoneClaimNow = computed(() => {
+  const c = coords.value;
+  if (!c || !zoneBoundaries.value) return null;
+  return zoneClaim({
+    point: [c.lng, c.lat],
+    accuracy: c.accuracy ?? 25,
+    geo: zoneBoundaries.value,
+    signs: signReports.value,
+    pays: payCells.value,
+  });
+});
+const claimLevel = computed(() => zoneClaimNow.value?.you.level ?? "none");
+// The one sentence worth showing: which OTHER zone is in play and how far away.
+// Null at `quiet`, which is ~70% of fixes — there the honest UI is silence, not
+// reassurance. Null at `loud` too: that fix never reaches this card, because the
+// boundary surface takes over and offers both zones with their own slides, which
+// is a better answer than any sentence.
+const claimNeighbourLine = computed(() => {
+  const c = zoneClaimNow.value;
+  if (!c || c.you.level !== "normal" || !c.you.nearestOther) return null;
+  return claimLines(c).you;
+});
+// Evidence folded into the provenance line rather than given a row of its own —
+// more sources must not cost more screen.
+const claimEvidence = computed(() => {
+  const e = zoneClaimNow.value?.place?.evidence;
+  if (!e) return null;
+  const bits: string[] = [];
+  if (e.scans) bits.push(e.scans === 1 ? "1 tabla skenirana" : `${e.scans} table skenirane`);
+  if (e.payers >= 5) bits.push("uplate potvrđuju");
+  return bits.length ? bits.join(" · ") : null;
+});
+
 // ── On the boundary ───────────────────────────────────────────────────────────
 // At a corner two zones meet, and the nearest segment of each can be metres — or
 // centimetres — apart. At Trg neznanog junaka they are 22.4 m and 22.3 m away:
@@ -1323,6 +1439,26 @@ const unsure = computed(
   () => parkingState.value === "edge" || parkingState.value === "near",
 );
 
+// `unsure` measures the wrong risk to raise an alarm about. It is true whenever
+// the driver is near the edge of ANY lot — which in Novi Sad is most of the time,
+// because the lots are narrow strips. Measured over 20 random points: the amber
+// box fired at 13 of them, and at 11 there was no other zone within 100 m. A
+// warning that common is one nobody reads.
+//
+// What it measures — "you may not be on a paid bay" — is real, but its cost is an
+// unnecessary payment, never a fine. So it keeps the wording and loses the alarm.
+// The alarm belongs to the only risk that costs money: a DIFFERENT zone close
+// enough to the GPS error to be in play. That is what claimLevel tracks.
+const showUnsureBox = computed(
+  () => unsure.value && claimLevel.value !== "quiet",
+);
+// The quiet version: same information, no amber, no icon, no box.
+const spotNote = computed(() => {
+  const c = zoneClaimNow.value;
+  if (!c || !unsure.value || claimLevel.value !== "quiet") return null;
+  return claimLines(c).spot ?? null;
+});
+
 // No paid parking where the user stands (with geometry to back it) — the wizard
 // yields to a calm "you're fine here" card; zones would only contradict it.
 // Once the user explicitly taps/scans/AI-picks a zone, stop auto-following the
@@ -1428,8 +1564,16 @@ const selectZone = (name: string) => {
 // the "Wrong zone?" list — a spatial version of the escape hatch. It selects and
 // closes the map; the plate and the slide are still ahead, so nothing is billed
 // on the strength of where a finger landed on a polygon.
-const onPayZone = (name: string) => {
-  selectZone(name);
+// Where the driver tapped, kept after the map closes. Unlike searchPin — which is
+// an address they looked up and is cleared on close — this is the subject of the
+// pay card now on screen, so the small map has to travel to it. Leaving it on the
+// GPS fix put "pay Red Zone" directly under a picture of the driver standing in
+// Blue, and a card that argues with the map above it is not one anybody trusts.
+const pickedZonePin = ref<{ lat: number; lng: number; label?: string } | null>(null);
+
+const onPayZone = (pick: { zone: string; lat: number; lng: number }) => {
+  selectZone(pick.zone);
+  pickedZonePin.value = { lat: pick.lat, lng: pick.lng, label: pick.zone };
   mapExpanded.value = false;
 };
 
@@ -1445,7 +1589,10 @@ watch(
     // would pin the wizard to that zone for the rest of the session, still
     // offering to charge for it in a street that turns out to be free.
     // `prev` is undefined on the immediate run, which is not a change.
-    if (prev && cur[0] !== prev[0]) userPickedZone.value = false;
+    if (prev && cur[0] !== prev[0]) {
+      userPickedZone.value = false;
+      pickedZonePin.value = null;
+    }
 
     const valid = allZones.value.some(
       (z: any) => z.name === selectedZoneName.value
@@ -1545,6 +1692,17 @@ const pay = (zone: any) => {
   // fine this app exists to prevent. The surfaces above disable themselves, but
   // the scan flow reaches this function by another route.
   if (!defaultPlate.value || !import.meta.client) return;
+
+  // Where the car is, not where the phone is. This is the position that will be
+  // aggregated into the payment-density layer once pings are persisted — and the
+  // one worth offering as the parked-car pin, since it is the only moment the app
+  // knows a car was just left somewhere.
+  const at = carFix();
+  if (at && import.meta.dev)
+    console.info(
+      `[Kerb] pay fix: ${at.source} · walked ${Math.round(at.walkM)} m since opening · ±${Math.round(at.accuracy)} m`,
+    );
+
   const a = payActionFor(zone, { plate: defaultPlate.value });
   if (a.actionable) openPayAction(a);
 };
@@ -2485,6 +2643,46 @@ h2 {
   letter-spacing: -0.2px;
   color: var(--text);
 }
+/* Layer tools. The payment layer is opt-in and says when it is simulated — a
+   density field that doesn't announce its source is indistinguishable from one
+   we invented. */
+.map-fs-tools {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 9px 16px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.heat-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 13px;
+  border-radius: 999px;
+  border: 1.5px solid var(--border2);
+  background: var(--bg2);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.heat-toggle[aria-pressed="true"] {
+  border-color: #8f66c2;
+  color: var(--text);
+}
+.heat-swatch {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #6b3ba3 0%, #b79ad9 65%, rgba(183, 154, 217, 0) 100%);
+}
+.heat-demo {
+  font-size: 11.5px;
+  color: var(--amber);
+  line-height: 1.35;
+}
 .map-fs-close {
   flex: 0 0 auto;
   width: 36px;
@@ -2907,6 +3105,12 @@ h2 {
   font-size: 13px;
   color: var(--text2);
   line-height: 1.5;
+}
+/* Evidence rides quietly under the price when there is no warning to give. */
+.zone-hero-evidence {
+  font-size: 11.5px;
+  color: var(--muted);
+  letter-spacing: 0.1px;
 }
 .zone-hero-body .zone-pick-approx {
   margin-top: 10px;

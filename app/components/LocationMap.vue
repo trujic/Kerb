@@ -37,6 +37,17 @@ const props = defineProps<{
     zone_color?: string | null; zone_name?: string; price?: string | null
     heading?: number | null; created_at?: string; photo_url?: string | null
   }[] // confirmed sign scans
+  // Aggregated payment density — NOT individual payments. Each entry is a coarse
+  // grid cell that already cleared the k-anonymity threshold server-side; `users`
+  // is a count of distinct payers, never an identity.
+  //
+  // These are drawn as a soft field rather than points on purpose. A payment ping
+  // carries two errors, and neither is small: the GPS fix (±20 m or worse between
+  // buildings) and the walk-away — the driver is usually already ten to fifty
+  // metres from the car by the time the SMS goes out, biased toward wherever they
+  // were heading. A crisp dot would claim a precision that does not exist; the
+  // blur is the honest rendering of what we actually know.
+  heat?: { lat: number; lng: number; users: number }[]
   compassPrompt?: boolean // show a one-tap "Enable compass" chip (iOS first-time)
   hideUser?: boolean      // static city-overview map: no user marker, fit to zones
   labels?: boolean        // show permanent street/zone labels (e.g. on the locked preview)
@@ -50,7 +61,11 @@ const props = defineProps<{
   payable?: boolean
 }>()
 
-const emit = defineEmits<{ compassTap: []; enableCompass: []; payZone: [zone: string] }>()
+const emit = defineEmits<{
+  compassTap: []
+  enableCompass: []
+  payZone: [pick: { zone: string; lat: number; lng: number }]
+}>()
 
 // When interactive, the map follows the user until they drag; then a
 // recenter button re-arms follow. Non-interactive maps always follow.
@@ -235,7 +250,10 @@ watchEffect((onCleanup) => {
     // this inside the `if (name)` above meant every Novi Sad and Niš polygon was
     // silently unclickable.
     if (props.interactive && zoneName)
-      layer.bindPopup(zonePopup(zoneName, name, color, residents), { className: 'lm-pop-wrap', closeButton: true })
+      layer.bindPopup(
+        zonePopup(zoneName, name, color, residents, () => layer.getPopup()?.getLatLng() ?? null),
+        { className: 'lm-pop-wrap', closeButton: true },
+      )
     layers.push(layer)
   }
 
@@ -309,7 +327,10 @@ const { lang, t } = useLang()
  * Leaflet re-renders it at open time; "free at 21:00" must not be answered from
  * whenever the layer happened to be built.
  */
-const zonePopup = (zoneName: string, street: string, color: string, residents: boolean) => () => {
+const zonePopup = (
+  zoneName: string, street: string, color: string, residents: boolean,
+  at: () => { lat: number; lng: number } | null,
+) => () => {
   const z = props.zoneMeta?.find((m: any) => m?.name === zoneName)
   const rate = z ? rateLabel(readTariff(z)) : null
   const max  = z ? maxStayFor(z) : null
@@ -345,7 +366,13 @@ const zonePopup = (zoneName: string, street: string, color: string, residents: b
     btn.type = 'button'
     btn.className = 'lm-pop-pay'
     btn.textContent = t('zonePayBtn')
-    btn.addEventListener('click', () => emit('payZone', zoneName))
+    // Where the driver tapped travels with the choice. The card that opens next
+    // names this zone, and the map above it was still centred on the GPS fix —
+    // so it read "pay Red Zone" over a picture of the driver standing in Blue.
+    btn.addEventListener('click', () => {
+      const p = at()
+      if (p) emit('payZone', { zone: zoneName, lat: p.lat, lng: p.lng })
+    })
     el.appendChild(btn)
   }
   return el
@@ -362,6 +389,62 @@ const relAge = (iso?: string): string => {
 }
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string))
+
+// ── Payment density — where people actually pay, drawn as a field ─────────────
+// Sits UNDER the sign pins and the user dot: it is the weakest claim on the map
+// and must never outrank a scanned sign. One hue, light→dark by count, no border,
+// wide and soft — every visual property here says "approximately, around here".
+//
+// What this layer may say: "people pay for parking around here, this often."
+// What it may never say: which zone. Drivers pay the wrong zone routinely, and
+// rendering that as evidence would launder a common mistake into social proof.
+const HEAT_RAMP = ['#EDE6F7', '#D6C4EC', '#B79AD9', '#8F66C2', '#6B3BA3']
+const heatStep = (users: number) =>
+  users < 12 ? 0 : users < 30 ? 1 : users < 70 ? 2 : users < 160 ? 3 : 4
+
+watchEffect((onCleanup) => {
+  const heat = props.heat
+  const map  = mapRef.value
+  const L    = LRef.value
+  if (!L || !map || !heat?.length) return
+
+  const layers: any[] = []
+  for (const c of heat) {
+    if (c.lat == null || c.lng == null) continue
+    // Below the anonymity threshold nothing is drawn at all. The server should
+    // already have filtered these out; this is the second lock on the same door.
+    if (c.users < 5) continue
+    const step = heatStep(c.users)
+    // Radius in METRES, not pixels: the blur has to mean something on the ground,
+    // and it has to stay meaning it when the map is zoomed.
+    const radius = 34 + step * 9
+    const circle = L.circle([c.lat, c.lng], {
+      radius,
+      stroke: false,                  // no edge — an edge implies a boundary
+      fillColor: HEAT_RAMP[step],
+      fillOpacity: 0.34 + step * 0.06,
+      interactive: true,
+      pane: 'overlayPane',
+    }).addTo(map)
+
+    // Bucketed, never exact: "38 people" plus a location is closer to an identity
+    // than it looks, and the extra precision buys the driver nothing.
+    const band = c.users < 12 ? '5–11' : c.users < 30 ? '12–29'
+      : c.users < 70 ? '30–69' : c.users < 160 ? '70–159' : '160+'
+    circle.bindPopup(
+      `<div class="lm-pop"><div class="lm-pop-head">` +
+      `<span class="lm-pop-zone" style="color:${HEAT_RAMP[4]}">${band} vozača</span></div>` +
+      `<div class="lm-pop-age">platilo je parking u ovom kraju ove nedelje.<br>` +
+      `Ne znamo koju zonu — proveri tablu.</div></div>`,
+      { className: 'lm-pop-wrap', closeButton: true },
+    )
+    layers.push(circle)
+  }
+
+  onCleanup(() => {
+    for (const c of layers) { try { map.removeLayer(c) } catch {} }
+  })
+})
 
 // ── Confirmed sign scans — verified community pins (✓ in the zone colour) ──────
 // Each pin opens a popup with zone, price, the photo, and how recently it was
