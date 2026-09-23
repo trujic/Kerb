@@ -446,12 +446,18 @@ export const useSignScan = (engine: 'ocr' | 'claude' = 'ocr') => {
 
   // Recent confirmed signs for a city — the verified pins drawn on the map.
   const loadForCity = async (cityId: string, limit = 200): Promise<SignReport[]> => {
-    const { data, error } = await supabase
+    const BASE = 'id, city_id, zone_name, zone_color, price, sms_shortcode, street_name, lat, lng, heading, photo_path, created_at'
+    const query = (cols: string) => supabase
       .from('sign_reports')
-      .select('id, city_id, zone_name, zone_color, price, sms_shortcode, street_name, lat, lng, heading, photo_path, created_at, fixed_lat, fixed_lng')
+      .select(cols)
       .eq('city_id', cityId)
       .order('created_at', { ascending: false })
       .limit(limit)
+    let { data, error } = await query(`${BASE}, fixed_lat, fixed_lng`)
+    // Until migration-sign-positions.sql has run there are no fixed_* columns, and
+    // asking for them failed the whole query — every pin on the map vanished over
+    // a correction feature nobody had used yet. Ask again without them.
+    if (error?.code === '42703') ({ data, error } = await query(BASE))
     if (error) { console.warn('[Kerb] loadForCity sign_reports failed (run migration-sign-reports.sql?):', error); return [] }
 
     return (data as SignReport[]).map((r: any) => ({
