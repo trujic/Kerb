@@ -1,15 +1,14 @@
 <template>
   <div class="czm">
     <div class="czm-head">
-      <p class="section-label">Where the zones are</p>
+      <p class="section-label">{{ t('czmTitle') }}</p>
       <span class="czm-tier" :class="`t-${tier}`">{{ tierLabel }}</span>
     </div>
 
     <!-- ── cadastre / cadastre_approx: interactive reference map ── -->
     <template v-if="tier === 'cadastre' || tier === 'cadastre_approx'">
       <div v-if="tier === 'cadastre_approx'" class="czm-warn">
-        <Icon name="alert" :size="13" /> {{ cityName }} publishes no official vector map — these zone
-        areas are <strong>approximate</strong>: {{ approxReason }} Confirm on the sign before you pay.
+        <Icon name="alert" :size="13" /> {{ t('czmApproxWarn', { city: cityName }) }}
       </div>
 
       <ClientOnly>
@@ -25,70 +24,60 @@
             hide-user
           />
         </div>
-        <div v-else-if="mapError" class="czm-loading">
-          Couldn't load the zone map for {{ cityName }}. The zone list below still applies.
-        </div>
-        <div v-else class="czm-loading">Loading zone map…</div>
+        <div v-else-if="mapError" class="czm-loading">{{ t('czmLoadFail') }}</div>
+        <div v-else class="czm-loading">{{ t('czmLoading') }}</div>
       </ClientOnly>
 
       <div v-if="zones?.length" class="czm-legend">
         <span v-for="z in zones" :key="z.name" class="czm-leg">
-          <span class="czm-leg-chip" :style="{ background: z.color }" />{{ z.name }}
+          <span class="czm-leg-chip" :style="{ background: z.color }" />{{ zoneLabel(z.name) }}
         </span>
       </div>
 
       <p class="czm-prov">
-        <template v-if="tier === 'cadastre_approx'">
-          Approximate overlay derived from the official source{{ provenance }} — not an exact cadastre.
-          It narrows it down — <strong>the sign always wins</strong>.
-        </template>
-        <template v-else>
-          Reference overlay digitised from the official source{{ provenance }}. It narrows it down —
-          <strong>the sign always wins</strong>.
-        </template>
+        <template v-if="copy?.mapNote">{{ copy.mapNote[lang] }}</template>
+        <template v-else-if="tier === 'cadastre_approx'">{{ t('czmProvApprox', { prov: provenance }) }}</template>
+        <template v-else>{{ t('czmProv', { prov: provenance }) }}</template>
       </p>
     </template>
 
     <!-- ── street_registry: street → zone lookup ── -->
     <template v-else-if="tier === 'street_registry'">
-      <p class="czm-sub">Search the official street registry — type your street to see its zone.</p>
+      <p class="czm-sub">{{ t('czmRegistrySub') }}</p>
       <input
         v-model="q"
         class="czm-input"
         type="text"
-        placeholder="Street name…"
+        :placeholder="t('czmStreetPh')"
         autocomplete="off"
         @input="onSearch"
       />
       <div v-if="results.length" class="czm-results">
         <div v-for="(r, i) in results" :key="i" class="czm-result">
           <span class="czm-r-street">{{ r.street_name }}</span>
-          <span class="czm-r-zone">{{ r.zone_name }}</span>
+          <span class="czm-r-zone">{{ zoneLabel(r.zone_name) }}</span>
         </div>
       </div>
       <p v-else-if="q.length >= 2 && !searching" class="czm-empty">
-        Not in our registry yet — <NuxtLink to="/">scan the sign there</NuxtLink> to add it.
+        {{ t('czmNotInRegistry') }} <NuxtLink to="/">{{ t('czmScanThere') }}</NuxtLink>.
       </p>
-      <p class="czm-prov">From the official street registry{{ provenance }}. The sign always wins.</p>
+      <p class="czm-prov">{{ t('czmRegistryProv', { prov: provenance }) }}</p>
     </template>
 
     <!-- ── street_lists: coarse, with an honest caveat ── -->
     <template v-else-if="tier === 'street_lists'">
       <div class="czm-warn">
-        <Icon name="alert" :size="13" /> No official cadastre is published for {{ cityName }} — zone areas here are approximate.
-        Confirm on the sign before you pay.
+        <Icon name="alert" :size="13" /> {{ t('czmApproxWarn', { city: cityName }) }}
       </div>
-      <NuxtLink to="/" class="czm-scan"><Icon name="camera" :size="14" /> Scan the sign to confirm + map it →</NuxtLink>
+      <NuxtLink to="/" class="czm-scan"><Icon name="camera" :size="14" /> {{ t('czmScanConfirm') }}</NuxtLink>
     </template>
 
     <!-- ── none: no source we can back ── -->
     <template v-else>
       <div class="czm-none">
-        <p class="czm-none-title">No map we can stand behind — yet.</p>
-        <p class="czm-none-sub">
-          Kerb doesn't draw maps it can't back with a source. Here the sign — and your scans — are the map.
-        </p>
-        <NuxtLink to="/" class="czm-scan"><Icon name="camera" :size="14" /> Scan a sign to start the map →</NuxtLink>
+        <p class="czm-none-title">{{ t('czmNoneTitle') }}</p>
+        <p class="czm-none-sub">{{ t('czmNoneSub') }}</p>
+        <NuxtLink to="/" class="czm-scan"><Icon name="camera" :size="14" /> {{ t('czmScanStart') }}</NuxtLink>
       </div>
     </template>
   </div>
@@ -108,16 +97,15 @@ const props = defineProps<{
 
 const { searchStreetZone } = useCity()
 
-// tier arrives as a prop, but the reason behind an approximate map is per-city
-// and lives with the classification.
-const { approxReason } = useCityTier(() => props.cityId)
+const { t, lang, zoneLabel } = useLang()
+const copy = computed(() => cityCopy(props.cityId))
 
 const tierLabel = computed(() => ({
-  cadastre: 'Mapped',
-  cadastre_approx: 'Approximate',
-  street_registry: 'Registry',
-  street_lists: 'Approximate',
-  none: 'Sign-only',
+  cadastre: t('czmMapped'),
+  cadastre_approx: t('czmApprox'),
+  street_registry: t('czmRegistry'),
+  street_lists: t('czmApprox'),
+  none: t('czmSignOnly'),
 }[props.tier]))
 
 const provenance = computed(() => {
@@ -125,7 +113,7 @@ const provenance = computed(() => {
   if (props.officialUrl) {
     try { host = ` · ${new URL(props.officialUrl).hostname.replace(/^www\./, '')}` } catch { /* ignore */ }
   }
-  const date = props.lastUpdated ? ` · updated ${props.lastUpdated}` : ''
+  const date = props.lastUpdated ? ` · ${t('czmUpdated', { date: props.lastUpdated })}` : ''
   return `${host}${date}`
 })
 
@@ -169,12 +157,12 @@ onMounted(async () => {
 const q = ref('')
 const results = ref<{ street_name: string; zone_name: string }[]>([])
 const searching = ref(false)
-let t: ReturnType<typeof setTimeout>
+let debounce: ReturnType<typeof setTimeout>
 const onSearch = () => {
-  clearTimeout(t)
+  clearTimeout(debounce)
   if (q.value.trim().length < 2) { results.value = []; return }
   searching.value = true
-  t = setTimeout(async () => {
+  debounce = setTimeout(async () => {
     results.value = await searchStreetZone(props.cityId, q.value)
     searching.value = false
   }, 250)

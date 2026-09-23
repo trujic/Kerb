@@ -1,10 +1,10 @@
 <template>
   <Teleport to="body">
-    <div class="scan" role="dialog" aria-label="Scan the parking sign">
+    <div class="scan" role="dialog" :aria-label="t('scAria')">
       <!-- Bar -->
       <div class="scan-bar">
-        <span class="scan-title"><Icon name="sign" :size="15" /> Scan the sign</span>
-        <button ref="closeEl" class="scan-close" type="button" aria-label="Close" @click="$emit('close')">✕</button>
+        <span class="scan-title"><Icon name="sign" :size="15" /> {{ t('scTitle') }}</span>
+        <button ref="closeEl" class="scan-close" type="button" :aria-label="t('scClose')" @click="$emit('close')">✕</button>
       </div>
 
       <div class="scan-body" :class="{ 'scan-body--cam': step === 'capture' && cameraOn }">
@@ -13,13 +13,10 @@
           <!-- Guest meter: free scans used up -->
           <div v-if="metered" class="scan-hero">
             <div class="scan-hero-icon">🔒</div>
-            <p class="scan-hero-title">That's your {{ FREE_SCANS }} free scans</p>
-            <p class="scan-hero-sub">
-              Every scan you add improves the shared sign map — thank you. Create a free
-              account to keep scanning. (Kerb+ will be unlimited.)
-            </p>
-            <NuxtLink to="/login" class="scan-btn scan-meter-cta">Create a free account →</NuxtLink>
-            <button class="scan-btn-ghost wide" type="button" @click="$emit('close')">Maybe later</button>
+            <p class="scan-hero-title">{{ t('scMeterTitle', { n: FREE_SCANS }) }}</p>
+            <p class="scan-hero-sub">{{ t('scMeterSub') }}</p>
+            <NuxtLink to="/login" class="scan-btn scan-meter-cta">{{ t('scMeterCta') }}</NuxtLink>
+            <button class="scan-btn-ghost wide" type="button" @click="$emit('close')">{{ t('scLater') }}</button>
           </div>
 
           <!-- Live in-app camera: 2/3 viewfinder, slide-to-pay underneath -->
@@ -27,9 +24,9 @@
             <div class="cam">
               <video ref="videoEl" class="cam-video" autoplay playsinline muted />
               <div class="cam-guide">
-                <span class="cam-guide-hint">Point at the colored zone sign</span>
+                <span class="cam-guide-hint">{{ t('scPoint') }}</span>
               </div>
-              <button type="button" class="cam-shutter" aria-label="Capture the sign" @click="capturePhoto">
+              <button type="button" class="cam-shutter" :aria-label="t('scCapture')" @click="capturePhoto">
                 <span class="cam-shutter-ring"><span class="cam-shutter-dot" /></span>
               </button>
             </div>
@@ -38,20 +35,20 @@
               <template v-if="liveZone">
                 <div class="cam-pay-zone">
                   <span class="cam-pay-stripe" :style="{ background: liveZone.color }" />
-                  <span class="cam-pay-name">{{ liveZone.name }}</span>
+                  <span class="cam-pay-name">{{ zoneLabel(liveZone.name) }}</span>
                   <span class="cam-pay-price" :style="{ color: liveZone.color }">{{ liveZone.price }}</span>
                 </div>
                 <SlideToConfirm
                   v-if="liveZone.sms_shortcode"
                   :key="liveZone.name"
-                  :label="`Slide to pay ${liveZone.name}`"
-                  :done-label="`Opening ${liveZone.sms_shortcode}…`"
+                  :label="t('scSlidePay', { zone: zoneLabel(liveZone.name) })"
+                  :done-label="t('scOpening', { code: liveZone.sms_shortcode })"
                   :color="liveZone.color || 'var(--blue)'"
                   @confirm="payNow(liveZone)"
                 />
-                <p class="cam-pay-hint">Tap the shutter to read &amp; pin the sign — or just slide to pay the detected zone.</p>
+                <p class="cam-pay-hint">{{ t('scHintLive') }}</p>
               </template>
-              <p v-else class="cam-pay-hint">Tap the shutter to read the zone off the sign, then pay.</p>
+              <p v-else class="cam-pay-hint">{{ t('scHintNoZone') }}</p>
             </div>
           </template>
 
@@ -59,12 +56,8 @@
           <template v-else>
             <div class="scan-hero">
               <div class="scan-hero-icon"><Icon name="camera" :size="30" /></div>
-              <p class="scan-hero-title">Photograph the parking sign</p>
-              <p class="scan-hero-sub">
-                The sign is the source of truth. Snap the colored zone sign next to your car —
-                we read the zone and price off it, you confirm, and it goes on the map for
-                everyone. Then we prefill the right payment.
-              </p>
+              <p class="scan-hero-title">{{ t('scHeroTitle') }}</p>
+              <p class="scan-hero-sub">{{ t('scHeroSub') }}</p>
             </div>
 
             <label class="scan-shutter">
@@ -77,14 +70,12 @@
                 @change="onFile"
               />
               <span class="scan-shutter-ring"><span class="scan-shutter-dot" /></span>
-              <span class="scan-shutter-label">Open camera</span>
+              <span class="scan-shutter-label">{{ t('scOpenCam') }}</span>
             </label>
 
-            <p v-if="!user && used === FREE_SCANS - 1" class="scan-meter-note">
-              Last free scan — create an account to keep going.
-            </p>
+            <p v-if="!user && used === FREE_SCANS - 1" class="scan-meter-note">{{ t('scLastFree') }}</p>
             <p v-if="!coords" class="scan-warn">
-              <Icon name="alert" :size="13" /> Location not available yet — we need your GPS to pin the sign. Allow location and try again.
+              <Icon name="alert" :size="13" /> {{ t('scNoGps') }}
             </p>
           </template>
         </template>
@@ -92,55 +83,50 @@
         <!-- ── 2 · Reading ── -->
         <template v-else-if="step === 'reading'">
           <div class="scan-preview-wrap">
-            <img v-if="photoUrl" :src="photoUrl" class="scan-preview" alt="Captured sign" />
+            <img v-if="photoUrl" :src="photoUrl" class="scan-preview" :alt="t('scPhotoAlt')" />
           </div>
           <div class="scan-status">
             <span class="scan-spinner" />
-            <span>Reading the sign…</span>
+            <span>{{ t('scReading') }}</span>
           </div>
         </template>
 
         <!-- ── 3 · Confirm / correct ── -->
         <template v-else-if="step === 'confirm'">
           <div class="scan-preview-wrap">
-            <img v-if="photoUrl" :src="photoUrl" class="scan-preview" alt="Captured sign" />
+            <img v-if="photoUrl" :src="photoUrl" class="scan-preview" :alt="t('scPhotoAlt')" />
           </div>
 
           <!-- Per-field read: green ✓ / amber double-check / red can't-read -->
           <div class="scan-fields">
-            <p class="scan-fields-head">What we read off the sign</p>
+            <p class="scan-fields-head">{{ t('scWhatRead') }}</p>
             <div v-for="f in fieldRows" :key="f.label" class="scan-field">
               <span class="scan-field-label">{{ f.label }}</span>
               <span class="scan-field-val" :class="'st-' + f.state">
                 {{ f.display }}
-                <span class="scan-field-tag">{{ f.state === 'read' ? '✓' : f.state === 'low' ? '~ check' : '✕' }}</span>
+                <span class="scan-field-tag">{{ f.state === 'read' ? '✓' : f.state === 'low' ? t('scCheck') : '✕' }}</span>
               </span>
             </div>
           </div>
 
           <!-- Not a parking sign — refuse to guess a zone off colour alone -->
-          <p v-if="read?.notSign" class="scan-unsafe">
-            That doesn't look like a parking sign — we found no price, hours or SMS number on it.
-            Point at the coloured zone sign next to your car (the one with the price and the SMS code) and retake.
-          </p>
+          <p v-if="read?.notSign" class="scan-unsafe">{{ t('scNotSign') }}</p>
 
           <!-- Colour vs text corroboration -->
           <p v-else-if="read?.corroboration === 'agree'" class="scan-corr ok">
-            ✓ Colour and text both read <strong>{{ read.zone?.name }}</strong>.
+            {{ t('scAgree', { zone: zoneLabel(read.zone?.name) }) }}
           </p>
           <p v-else-if="read?.corroboration === 'conflict'" class="scan-corr warn">
-            <Icon name="alert" :size="13" /> The colour looks like <strong>{{ read.color?.zone?.name }}</strong> but the text read
-            <strong>{{ read.zone?.name }}</strong> — look again and pick what the sign actually says.
+            <Icon name="alert" :size="13" />
+            {{ t('scConflict', { color: zoneLabel(read.color?.zone?.name), zone: zoneLabel(read.zone?.name) }) }}
           </p>
           <p v-else-if="read?.corroboration === 'color-only'" class="scan-corr">
-            Colour suggests <strong>{{ read.color?.zone?.name }}</strong> (text was unclear) — confirm below.
+            {{ t('scColorOnly', { color: zoneLabel(read.color?.zone?.name) }) }}
           </p>
 
           <!-- Unsafe read → no pre-fill, the user must pick deliberately -->
-          <p v-if="zoneUnsafe && !read?.notSign" class="scan-unsafe">
-            No pre-fill — the zone read wasn't safe enough to trust with your money. Pick the zone printed on the sign.
-          </p>
-          <p v-else-if="!zoneUnsafe" class="scan-read-hint scan-read-hint--block">Tap a zone below if that's wrong.</p>
+          <p v-if="zoneUnsafe && !read?.notSign" class="scan-unsafe">{{ t('scUnsafe') }}</p>
+          <p v-else-if="!zoneUnsafe" class="scan-read-hint scan-read-hint--block">{{ t('scTapIfWrong') }}</p>
 
           <div class="scan-zones">
             <button
@@ -153,7 +139,7 @@
               @click="selectedName = z.name"
             >
               <span class="scan-zone-stripe" :style="{ background: z.color }" />
-              <span class="scan-zone-name">{{ z.name }}</span>
+              <span class="scan-zone-name">{{ zoneLabel(z.name) }}</span>
               <span class="scan-zone-price" :style="{ color: z.color }">{{ z.price }}</span>
               <span class="scan-zone-radio" :class="{ on: z.name === selectedName }">
                 <span v-if="z.name === selectedName">✓</span>
@@ -163,14 +149,14 @@
 
           <!-- GPS cross-check: read vs registry -->
           <div v-if="crossCheck" class="scan-xcheck" :class="crossCheck">
-            <template v-if="crossCheck === 'match'">✓ Matches the registry for this spot.</template>
-            <template v-else><Icon name="alert" :size="13" /> Differs from the registry here — trust the sign in front of you, and make sure you scanned the one next to your car.</template>
+            <template v-if="crossCheck === 'match'">{{ t('scMatch') }}</template>
+            <template v-else><Icon name="alert" :size="13" /> {{ t('scMismatch') }}</template>
           </div>
 
           <p v-if="submitError" class="scan-warn">{{ submitError }}</p>
 
           <div class="scan-actions">
-            <button class="scan-btn-ghost" type="button" @click="reset">Retake</button>
+            <button class="scan-btn-ghost" type="button" @click="reset">{{ t('scRetake') }}</button>
             <button
               class="scan-btn"
               type="button"
@@ -178,7 +164,7 @@
               :style="selectedZone ? { background: selectedZone.color } : null"
               @click="confirm"
             >
-              {{ submitting ? 'Saving…' : 'Confirm & pin this sign' }}
+              {{ submitting ? t('scSaving') : t('scConfirm') }}
             </button>
           </div>
         </template>
@@ -189,10 +175,10 @@
             <div class="scan-done-badge" :style="{ background: selectedZone.color + '1a', borderColor: selectedZone.color }">
               <span class="scan-done-check" :style="{ color: selectedZone.color }">✓</span>
             </div>
-            <p class="scan-done-title">Pinned · {{ selectedZone.name }}</p>
+            <p class="scan-done-title">{{ t('scPinned', { zone: zoneLabel(selectedZone.name) }) }}</p>
             <p class="scan-done-sub">
-              <strong>+1 sign added to the street map.</strong>
-              Thanks — that confirmed sign now helps everyone here (and powers “Ask AI”).
+              <strong>{{ t('scAdded') }}</strong>
+              {{ t('scThanks') }}
             </p>
 
             <button
@@ -202,11 +188,11 @@
               :style="{ background: selectedZone.color }"
               @click="payNow"
             >
-              Pay {{ selectedZone.name }} <span class="scan-btn-arrow">→ {{ selectedZone.sms_shortcode }}</span>
+              {{ t('scPay', { zone: zoneLabel(selectedZone.name) }) }} <span class="scan-btn-arrow">→ {{ selectedZone.sms_shortcode }}</span>
             </button>
 
-            <button class="scan-btn-ghost wide" type="button" @click="reset">Scan another</button>
-            <button class="scan-textlink" type="button" @click="$emit('close')">Done</button>
+            <button class="scan-btn-ghost wide" type="button" @click="reset">{{ t('scAnother') }}</button>
+            <button class="scan-textlink" type="button" @click="$emit('close')">{{ t('scDone') }}</button>
           </div>
         </template>
       </div>
@@ -236,6 +222,7 @@ const emit = defineEmits<{
 // there's no key or no network. `source` on the stored report records which ran.
 const { readSign, submit, compressImage, FREE_SCANS, scansUsed, incScan } = useSignScan('claude')
 const user = useSupabaseUser()
+const { t, zoneLabel } = useLang()
 
 // Escape closes; focus lands on the close button and returns to the opener.
 const closeEl = ref<HTMLElement | null>(null)
@@ -283,11 +270,11 @@ const fieldRows = computed(() => {
   const row = (label: string, fld: { value: string | null; state: string }) => ({
     label,
     state: fld.state,
-    display: fld.state === 'unreadable' ? "can't read" : (fld.value ?? '—'),
+    display: fld.state === 'unreadable' ? t('scCantRead') : (fld.value ?? '—'),
   })
   return [
-    row('Zone', f.zone), row('Price', f.price), row('Limit', f.limit),
-    row('SMS code', f.code), row('Hours', f.hours),
+    row(t('scFieldZone'), f.zone), row(t('scFieldPrice'), f.price), row(t('scFieldLimit'), f.limit),
+    row(t('scFieldCode'), f.code), row(t('scFieldHours'), f.hours),
   ]
 })
 
@@ -426,7 +413,7 @@ const confirm = async () => {
   if (!selectedZone.value || !photoBlob.value) return
   const loc = shotCoords.value ?? props.coords
   if (!loc) {
-    submitError.value = 'No GPS fix — allow location, then retake so we can pin the sign.'
+    submitError.value = t('scErrNoGps')
     return
   }
   submitting.value = true
@@ -450,7 +437,7 @@ const confirm = async () => {
     step.value = 'done'
   } catch (err: any) {
     console.warn('[Kerb] sign submit failed:', err)
-    submitError.value = 'Could not save the scan. Check your connection and try again.'
+    submitError.value = t('scErrSave')
   } finally {
     submitting.value = false
   }

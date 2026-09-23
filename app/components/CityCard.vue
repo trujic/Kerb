@@ -4,18 +4,18 @@
       <span class="city-flag">{{ city.flag }}</span>
       <span class="verified-dot" :class="{ ok: city.verified }" />
     </div>
-    <div class="city-name">{{ city.name }}</div>
-    <div class="city-country">{{ city.country }}</div>
+    <div class="city-name">{{ cityName(city.id, city.name) }}</div>
+    <div class="city-country">{{ countryName(city.country) }}</div>
     <div class="city-tags">
       <span
         v-for="tag in city.tags"
         :key="tag.label"
         class="tag"
         :class="tagClass(tag.label)"
-      >{{ tag.label }}</span>
+      >{{ tagLabel(tag.label) }}</span>
     </div>
     <div class="card-footer">
-      <span class="updated">Updated {{ city.last_updated }}</span>
+      <span class="updated">{{ updated }}</span>
       <span class="arrow">→</span>
     </div>
   </NuxtLink>
@@ -24,7 +24,29 @@
 <script setup lang="ts">
 import type { CityListItem } from '~/composables/useCity'
 
-defineProps<{ city: CityListItem }>()
+const props = defineProps<{ city: CityListItem }>()
+const { t, lang, cityName, countryName, zoneLabel } = useLang()
+
+// A checked city shows the date its rules were checked; the rest, the row's own.
+const updated = computed(() => {
+  const c = cityCopy(props.city.id)
+  return c
+    ? t('cityChecked', { date: fmtCheckedOn(c.checkedOn, lang.value) })
+    : t('cityUpdated', { date: props.city.last_updated })
+})
+
+// Registry tags are English shorthand ("Blue zone", "SMS pay"). Zone tags read as
+// the sign does; the rest get a plain translation where we have one.
+const TAGS_SR: Record<string, string> = {
+  'sms pay': 'SMS', 'app pay': 'Aplikacija', 'free evenings': 'Uveče besplatno',
+  'free sundays': 'Nedeljom besplatno', 'card pay': 'Kartica', 'meters': 'Parking-automati',
+}
+const tagLabel = (label: string) => {
+  if (lang.value !== 'sr') return label
+  const z = /^(\w+)\s+zone$/i.exec(label.trim())
+  if (z) return zoneLabel(`${z[1]} Zone`)
+  return TAGS_SR[label.trim().toLowerCase()] ?? label
+}
 
 function tagClass(label: string) {
   const l = label.toLowerCase()

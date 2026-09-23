@@ -3,9 +3,9 @@
     <div class="nav-inner container-wide">
       <NuxtLink to="/" class="nav-logo">Kerb</NuxtLink>
       <ul class="nav-links">
-        <li><NuxtLink to="/cities">Cities</NuxtLink></li>
-        <li><NuxtLink to="/roadmap">Roadmap</NuxtLink></li>
-        <li><NuxtLink to="/contribute">Contribute</NuxtLink></li>
+        <li><NuxtLink to="/cities">{{ t('navCities') }}</NuxtLink></li>
+        <li><NuxtLink to="/roadmap">{{ t('navPlan') }}</NuxtLink></li>
+        <li><NuxtLink to="/contribute">{{ t('navContribute') }}</NuxtLink></li>
       </ul>
       <div class="nav-right">
         <button
@@ -24,10 +24,9 @@
             {{ initials }}
           </NuxtLink>
         </template>
-        <template v-else>
-          <NuxtLink to="/login" class="nav-btn nav-btn-ghost">Sign in</NuxtLink>
-          <NuxtLink to="/#cities" class="nav-btn nav-btn-primary">Find parking →</NuxtLink>
-        </template>
+        <!-- One way in. "Find parking →" sat beside it on every screen, including
+             the one that had already found the parking. -->
+        <NuxtLink v-else to="/login" class="nav-btn nav-btn-ghost">{{ t('navSignIn') }}</NuxtLink>
       </div>
     </div>
   </nav>
@@ -37,11 +36,11 @@
   <nav class="tabbar" aria-label="Primary">
     <NuxtLink to="/" class="tabbar-item" :class="{ on: route.path === '/' }">
       <Icon name="home" :size="20" />
-      <span>Home</span>
+      <span>{{ t('navHome') }}</span>
     </NuxtLink>
     <NuxtLink to="/cities" class="tabbar-item" :class="{ on: route.path.startsWith('/cities') }">
       <Icon name="city" :size="20" />
-      <span>Cities</span>
+      <span>{{ t('navCities') }}</span>
     </NuxtLink>
     <NuxtLink v-if="isRelay" to="/relay" class="tabbar-item" :class="{ on: route.path.startsWith('/relay') }">
       <Icon name="bell" :size="20" />
@@ -49,11 +48,11 @@
     </NuxtLink>
     <NuxtLink v-else to="/contribute" class="tabbar-item" :class="{ on: route.path.startsWith('/contribute') }">
       <Icon name="plus" :size="20" />
-      <span>Contribute</span>
+      <span>{{ t('navContribute') }}</span>
     </NuxtLink>
     <NuxtLink :to="user ? '/profile' : '/login'" class="tabbar-item" :class="{ on: route.path.startsWith(user ? '/profile' : '/login') }">
       <Icon name="user" :size="20" />
-      <span>{{ user ? 'Profile' : 'Sign in' }}</span>
+      <span>{{ user ? t('navProfile') : t('navSignIn') }}</span>
     </NuxtLink>
   </nav>
 </template>
@@ -82,7 +81,7 @@ const checkRelay = async () => {
 onMounted(checkRelay)
 watch(user, checkRelay)
 const route = useRoute()
-const { lang, toggle } = useLang()
+const { lang, toggle, t } = useLang()
 
 const displayName = computed(() =>
   user.value?.user_metadata?.display_name || user.value?.email?.split('@')[0] || 'Account'

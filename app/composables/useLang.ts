@@ -1,7 +1,7 @@
-// Pay-path language layer — Serbian (latinica) first, English fallback.
+// Language layer — Serbian (latinica) first, English fallback.
 // Deliberately tiny: a dictionary + {param} interpolation, no i18n framework.
-// Scope is the curb-critical path (dashboard, pay card, sheets); marketing
-// pages stay English until the copy settles.
+// Every public surface goes through it: a Serbian driver who meets an English
+// sentence halfway through the pay flow has been told the app is not for them.
 
 export type Lang = 'sr' | 'en'
 
@@ -154,7 +154,13 @@ const dict = {
   },
 
   // Pay card
-  plateHint: { sr: 'Sačuvano na uređaju · spremno za plaćanje', en: 'Saved on this device · prefilled for payment' },
+  // Two states, never one: "saved · ready" under an empty field told the driver
+  // the one thing that was not true.
+  plateHint: { sr: 'Sačuvano na uređaju', en: 'Saved on this device' },
+  plateHintEmpty: {
+    sr: 'Upiši tablicu tačno kao na autu, sa Č, Ć, Ž, Š, Đ — SMS se šalje sa njom.',
+    en: 'Type the plate exactly as it is on the car, special letters included — the SMS carries it.',
+  },
   plateSync: { sr: 'Napravi nalog za sinhronizaciju.', en: 'Create an account to sync it.' },
   sendSms: { sr: 'Prevuci da pošalješ SMS → {code}', en: 'Slide to send SMS → {code}' },
   openingSms: { sr: 'Otvaram SMS…', en: 'Opening SMS…' },
@@ -211,7 +217,7 @@ const dict = {
     en: 'to track your session, get an expiry reminder, and watch your plate for fines.',
   },
   createAccount: { sr: 'Napravi besplatan nalog', en: 'Create a free account' },
-  fineIfUnpaid: { sr: 'Kazna ako ne platiš', en: 'Fine if unpaid' },
+  fineIfUnpaid: { sr: 'Ako ne platiš', en: 'If you do not pay' },
   recentSessions: { sr: 'Skorašnje sesije', en: 'Recent sessions' },
 
   // Armed / session card
@@ -254,8 +260,8 @@ const dict = {
   // The honest version of the promise: no web app can wake a phone that has
   // closed it, so this says "while Kerbo is running" rather than guaranteeing.
   remindOn: {
-    sr: 'Uključeno — javimo se 10 min pre isteka, dok je Kerbo pokrenut.',
-    en: 'On — we ping you 10 min before expiry, while Kerbo is running.',
+    sr: 'Uključeno — javimo se 10 min pre isteka, dok je Kerb pokrenut.',
+    en: 'On — we ping you 10 min before expiry, while Kerb is running.',
   },
   remindEnable: { sr: 'Uključi', en: 'Turn on' },
   remindOnShort: { sr: 'Uključeno', en: 'On' },
@@ -264,12 +270,12 @@ const dict = {
     en: 'Notifications are blocked for this site — enable them in your browser settings.',
   },
   remindNeedsInstall: {
-    sr: 'Na iPhone-u obaveštenja stižu tek kad je Kerbo dodat na početni ekran.',
-    en: 'On iPhone, notifications only arrive once Kerbo is on the home screen.',
+    sr: 'Na iPhone-u obaveštenja stižu tek kad je Kerb dodat na početni ekran.',
+    en: 'On iPhone, notifications only arrive once Kerb is on the home screen.',
   },
 
   // Plate input
-  plateHow: { sr: 'Vidi kako', en: 'See how' },
+  plateHow: { sr: 'Kako se upisuje?', en: 'How do I type it?' },
   plateOcrHint: {
     sr: 'Pogledaj tablicu na autu. Prekucaj svako slovo i broj tačno kako tamo piše — ništa više, ništa manje.',
     en: 'Look at the plate on your car. Type every letter and number exactly as written there — nothing more, nothing less.',
@@ -292,10 +298,10 @@ const dict = {
   heroTitle1: { sr: 'Ulično parkiranje u Srbiji,', en: 'Street parking in Serbia,' },
   heroTitle2: { sr: 'konačno jasno.', en: 'finally clear.' },
   heroSub: {
-    sr: 'Zone, cene i kako se plaća u Novom Sadu i Nišu: iz zvaničnih izvora, provereno prema tabli na ulici. Više gradova čim ih potvrdimo.',
-    en: 'Zones, prices, and how to pay in Novi Sad and Niš: pulled from official sources and checked against the sign at the curb. More cities as we verify them.',
+    sr: 'Zone, cene i kako se plaća u Novom Sadu: iz zvaničnih izvora, sa datumom provere. Tabla pored auta uvek ima poslednju reč. Drugi gradovi dolaze kad ih proverimo.',
+    en: 'Zones, prices, and how to pay in Novi Sad: from official sources, with the date we checked. The sign by your car always has the last word. More cities once we have verified them.',
   },
-  searchPlaceholder: { sr: 'Pretraži grad: Novi Sad, Beograd, Niš…', en: 'Search city: Novi Sad, Belgrade, Niš…' },
+  searchPlaceholder: { sr: 'Pretraži grad: Novi Sad…', en: 'Search city: Novi Sad…' },
   findBtn: { sr: 'Nađi →', en: 'Find →' },
   detecting: { sr: 'Otkrivam tvoju lokaciju…', en: 'Detecting your location…' },
   resolvingSpot: { sr: 'Proveravam zonu na tvom mestu…', en: 'Checking the zone where you are…' },
@@ -366,27 +372,309 @@ const dict = {
   fineIdle: { sr: 'Zvanični podaci JKP Parking servis. Kerb ih samo prenosi.', en: 'Official data from JKP Parking servis. Kerb only relays it.' },
   enterValidPlate: { sr: 'Unesi ispravne tablice', en: 'Enter a valid plate' },
   fineCheckFail: { sr: 'Provera trenutno nije moguća. Pokušaj ponovo.', en: 'Could not check fines right now. Try again.' },
+  // ── MVP additions ─────────────────────────────────────────────────────────
+  // The answer card's last line: what not paying costs, and where that is written.
+  ifUnpaidLine: { sr: 'Ako ne platiš: {what}', en: 'If you do not pay: {what}' },
+  sourceLine: { sr: 'Izvor: {source} · provereno {date}', en: 'Source: {source} · checked {date}' },
+  // Scan leads the escape hatch now: the sign is the one answer that beats ours.
+  scanShort: { sr: 'Skeniraj tablu', en: 'Scan the sign' },
+  otherZones: { sr: 'Druga zona?', en: 'Other zone?' },
+
+  // Nav + tab bar
+  navHome: { sr: 'Početna', en: 'Home' },
+  navCities: { sr: 'Gradovi', en: 'Cities' },
+  navPlan: { sr: 'Plan', en: 'Roadmap' },
+  navContribute: { sr: 'Doprinesi', en: 'Contribute' },
+  navSignIn: { sr: 'Prijava', en: 'Sign in' },
+  navProfile: { sr: 'Profil', en: 'Profile' },
+
+  // Footer + legal
+  footPrivacy: { sr: 'Privatnost', en: 'Privacy' },
+  footTerms: { sr: 'Uslovi korišćenja', en: 'Terms of use' },
+  footNote: {
+    sr: 'Kerb je informativni vodič, nije operater parkinga. Tabla pored auta je zvanična.',
+    en: 'Kerb is an information guide, not a parking operator. The sign next to your car is official.',
+  },
+
+  // A city Kerb knows exists but has not verified: say so, and hand over the
+  // operator's own site instead of a dead end or a guess.
+  uncoveredTitle: { sr: 'Kerb još ne pokriva {city}', en: 'Kerb does not cover {city} yet' },
+  uncoveredSub: {
+    sr: 'Nemamo proverene zone i cene za ovaj grad, pa ih ne prikazujemo. Tabla pored auta kaže zonu i broj za SMS.',
+    en: 'We have no verified zones or prices here, so we show none. The sign next to your car names the zone and the SMS number.',
+  },
+  uncoveredOfficial: { sr: 'Zvanični sajt parkinga ↗', en: 'Official parking site ↗' },
+  uncoveredElsewhere: {
+    sr: 'Izgleda da si van Novog Sada. Kerb za sada pokriva samo Novi Sad.',
+    en: 'You seem to be outside Novi Sad. For now Kerb covers Novi Sad only.',
+  },
+
+  // Location errors, shown in the landing hero
+  gpsNoSupport: { sr: 'Ovaj pregledač ne daje lokaciju.', en: 'This browser does not provide location.' },
+  gpsDenied: {
+    sr: 'Lokacija je isključena za ovaj sajt. Uključi je u podešavanjima pregledača, ili potraži grad ispod.',
+    en: 'Location is blocked for this site. Allow it in your browser settings, or search for a city below.',
+  },
+  gpsTimeout: { sr: 'Lokacija nije stigla na vreme. Pokušaj ponovo.', en: 'Location took too long. Try again.' },
+  gpsFail: { sr: 'Ne mogu da odredim lokaciju.', en: 'Could not find your location.' },
+  gpsNoCity: { sr: 'Ne mogu da odredim grad u kom si.', en: 'Could not tell which city you are in.' },
+
+  // City page
+  backCities: { sr: '← Svi gradovi', en: '← All cities' },
+  cityNotFound: { sr: 'Nema tog grada', en: 'City not found' },
+  cityNotFoundSub: { sr: 'Za ovaj grad još nemamo podatke.', en: 'We have no data for this city yet.' },
+  cityGuide: { sr: 'Vodič za ulično parkiranje', en: 'Street parking guide' },
+  cityVerified: { sr: '✓ Provereno', en: '✓ Verified' },
+  cityCommunity: { sr: '⚠ Podaci zajednice', en: '⚠ Community data' },
+  cityChecked: { sr: 'Provereno {date}', en: 'Checked {date}' },
+  cityUpdated: { sr: 'Ažurirano {date}', en: 'Updated {date}' },
+  cityDisclaimer: {
+    sr: 'Pravila smo poslednji put proverili {date}. Menjaju se — pre parkiranja pogledaj tablu ili',
+    en: 'We last checked these rules on {date}. They change — before you park, look at the sign or',
+  },
+  cityOfficialSource: { sr: 'zvanični izvor ↗', en: 'the official source ↗' },
+  cityZones: { sr: 'Zone', en: 'Parking zones' },
+  cityHowPay: { sr: 'Kako se plaća', en: 'How to pay' },
+  cityStepSms: { sr: 'Korak po korak — SMS', en: 'Step by step — SMS' },
+  cityStepOther: { sr: 'Korak po korak', en: 'Step by step' },
+  cityDailyCode: { sr: 'Dnevna karta', en: 'Daily ticket' },
+  cityTips: { sr: 'Dobro je znati', en: 'Good to know' },
+  cityVerifyTitle: { sr: 'Proveri pre parkiranja', en: 'Verify before you park' },
+  cityVerifySub: {
+    sr: 'Kerb je vodič, ne garancija. Važeća pravila su na tabli i na sajtu operatera.',
+    en: 'Kerb is a guide, not a guarantee. The rules in force are on the sign and on the operator’s site.',
+  },
+  cityOfficialBtn: { sr: 'Zvanični sajt ↗', en: 'Official source ↗' },
+  cityContribTitle: { sr: 'Nešto nije tačno?', en: 'Know something we got wrong?' },
+  cityContribSub: {
+    sr: 'Pravila se menjaju. Javi nam, da sledeći vozač ne plati pogrešnu zonu.',
+    en: 'Rules change. Tell us, so the next driver does not pay the wrong zone.',
+  },
+  cityContribBtn: { sr: 'Javi ispravku', en: 'Suggest a correction' },
+  cityTowNote: {
+    sr: 'Pauk je takođe aktivan — iznose proveri na tabli i kod operatera.',
+    en: 'Towing is also active — check local signage for current amounts.',
+  },
+
+  // Scan-the-sign dialog (ScanSign)
+  scTitle: { sr: 'Skeniraj tablu', en: 'Scan the sign' },
+  scAria: { sr: 'Skeniranje table za parking', en: 'Scan the parking sign' },
+  scClose: { sr: 'Zatvori', en: 'Close' },
+  scMeterTitle: { sr: 'Iskoristio si {n} besplatna skeniranja', en: 'That’s your {n} free scans' },
+  scMeterSub: {
+    sr: 'Svako skeniranje popravlja zajedničku mapu tabli — hvala. Napravi besplatan nalog da nastaviš.',
+    en: 'Every scan improves the shared sign map — thank you. Create a free account to keep scanning.',
+  },
+  scMeterCta: { sr: 'Napravi besplatan nalog →', en: 'Create a free account →' },
+  scLater: { sr: 'Možda kasnije', en: 'Maybe later' },
+  scPoint: { sr: 'Uperi u obojenu tablu zone', en: 'Point at the coloured zone sign' },
+  scCapture: { sr: 'Slikaj tablu', en: 'Capture the sign' },
+  scSlidePay: { sr: 'Prevuci da platiš: {zone}', en: 'Slide to pay {zone}' },
+  scOpening: { sr: 'Otvaram {code}…', en: 'Opening {code}…' },
+  scHintLive: {
+    sr: 'Slikaj da pročitamo i ucrtamo tablu — ili samo prevuci da platiš prepoznatu zonu.',
+    en: 'Tap the shutter to read and pin the sign — or just slide to pay the detected zone.',
+  },
+  scHintNoZone: { sr: 'Slikaj tablu da pročitamo zonu, pa plati.', en: 'Tap the shutter to read the zone off the sign, then pay.' },
+  scHeroTitle: { sr: 'Slikaj tablu za parking', en: 'Photograph the parking sign' },
+  scHeroSub: {
+    sr: 'Tabla je zvanična. Slikaj obojenu tablu zone pored auta — pročitamo zonu i cenu, ti potvrdiš, i tabla ide na mapu za sve. Onda pripremimo pravo plaćanje.',
+    en: 'The sign is the source of truth. Snap the coloured zone sign next to your car — we read the zone and price off it, you confirm, and it goes on the map for everyone. Then we prefill the right payment.',
+  },
+  scOpenCam: { sr: 'Otvori kameru', en: 'Open camera' },
+  scLastFree: { sr: 'Poslednje besplatno skeniranje — napravi nalog da nastaviš.', en: 'Last free scan — create an account to keep going.' },
+  scNoGps: {
+    sr: 'Lokacija još nije stigla — treba nam da ucrtamo tablu. Dozvoli lokaciju i pokušaj ponovo.',
+    en: 'Location not available yet — we need your GPS to pin the sign. Allow location and try again.',
+  },
+  scPhotoAlt: { sr: 'Slika table', en: 'Captured sign' },
+  scReading: { sr: 'Čitam tablu…', en: 'Reading the sign…' },
+  scWhatRead: { sr: 'Šta smo pročitali sa table', en: 'What we read off the sign' },
+  scFieldZone: { sr: 'Zona', en: 'Zone' },
+  scFieldPrice: { sr: 'Cena', en: 'Price' },
+  scFieldLimit: { sr: 'Najduže', en: 'Limit' },
+  scFieldCode: { sr: 'SMS broj', en: 'SMS code' },
+  scFieldHours: { sr: 'Vreme naplate', en: 'Hours' },
+  scCantRead: { sr: 'ne čita se', en: "can't read" },
+  scCheck: { sr: '~ proveri', en: '~ check' },
+  scNotSign: {
+    sr: 'Ovo ne liči na tablu za parking — nema cene, vremena ni SMS broja. Uperi u obojenu tablu zone pored auta (onu sa cenom i SMS brojem) i slikaj ponovo.',
+    en: 'That doesn’t look like a parking sign — we found no price, hours or SMS number on it. Point at the coloured zone sign next to your car (the one with the price and the SMS code) and retake.',
+  },
+  scAgree: { sr: '✓ I boja i tekst kažu: {zone}.', en: '✓ Colour and text both read {zone}.' },
+  scConflict: {
+    sr: 'Boja liči na {color}, a tekst kaže {zone} — pogledaj ponovo i izaberi ono što piše na tabli.',
+    en: 'The colour looks like {color} but the text reads {zone} — look again and pick what the sign actually says.',
+  },
+  scColorOnly: { sr: 'Boja ukazuje na {color} (tekst nije jasan) — potvrdi ispod.', en: 'Colour suggests {color} (text was unclear) — confirm below.' },
+  scUnsafe: {
+    sr: 'Ne popunjavamo ništa — zona nije pročitana dovoljno sigurno da bi se na nju platilo. Izaberi zonu koja piše na tabli.',
+    en: 'No pre-fill — the zone read wasn’t safe enough to trust with your money. Pick the zone printed on the sign.',
+  },
+  scTapIfWrong: { sr: 'Dodirni drugu zonu ispod ako ovo nije tačno.', en: "Tap a zone below if that's wrong." },
+  scMatch: { sr: '✓ Slaže se sa registrom za ovo mesto.', en: '✓ Matches the registry for this spot.' },
+  scMismatch: {
+    sr: 'Razlikuje se od registra ovde — veruj tabli ispred sebe i proveri da si slikao onu pored svog auta.',
+    en: 'Differs from the registry here — trust the sign in front of you, and make sure you scanned the one next to your car.',
+  },
+  scRetake: { sr: 'Slikaj ponovo', en: 'Retake' },
+  scSaving: { sr: 'Čuvam…', en: 'Saving…' },
+  scConfirm: { sr: 'Potvrdi i ucrtaj tablu', en: 'Confirm & pin this sign' },
+  scPinned: { sr: 'Ucrtano · {zone}', en: 'Pinned · {zone}' },
+  scAdded: { sr: '+1 tabla na mapi ulica.', en: '+1 sign added to the street map.' },
+  scThanks: { sr: 'Hvala — ta potvrđena tabla sada pomaže svima ovde.', en: 'Thanks — that confirmed sign now helps everyone here.' },
+  scPay: { sr: 'Plati {zone}', en: 'Pay {zone}' },
+  scAnother: { sr: 'Skeniraj još jednu', en: 'Scan another' },
+  scDone: { sr: 'Gotovo', en: 'Done' },
+  scErrNoGps: {
+    sr: 'Nema lokacije — dozvoli lokaciju pa slikaj ponovo, da bismo ucrtali tablu.',
+    en: 'No GPS fix — allow location, then retake so we can pin the sign.',
+  },
+  scErrSave: {
+    sr: 'Skeniranje nije sačuvano. Proveri vezu i pokušaj ponovo.',
+    en: 'Could not save the scan. Check your connection and try again.',
+  },
+
+  // City page map (CityZoneMap)
+  czmTitle: { sr: 'Gde su zone', en: 'Where the zones are' },
+  czmMapped: { sr: 'Mapirano', en: 'Mapped' },
+  czmApprox: { sr: 'Približno', en: 'Approximate' },
+  czmRegistry: { sr: 'Registar', en: 'Registry' },
+  czmSignOnly: { sr: 'Samo tabla', en: 'Sign-only' },
+  czmLoading: { sr: 'Učitavam mapu zona…', en: 'Loading zone map…' },
+  czmLoadFail: {
+    sr: 'Mapa zona se nije učitala. Spisak zona ispod i dalje važi.',
+    en: 'The zone map did not load. The zone list below still applies.',
+  },
+  czmApproxWarn: {
+    sr: 'Za {city} ne postoji zvanična mapa zona — ove površine su približne. Proveri tablu pre plaćanja.',
+    en: '{city} publishes no official zone map — these areas are approximate. Check the sign before you pay.',
+  },
+  czmProv: {
+    sr: 'Mapa je prenesena iz zvaničnog izvora{prov}. Pomaže da suziš izbor — tabla uvek ima poslednju reč.',
+    en: 'Map taken from the official source{prov}. It narrows things down — the sign always has the last word.',
+  },
+  czmProvApprox: {
+    sr: 'Približna mapa izvedena iz zvaničnog izvora{prov}, nije katastar. Pomaže da suziš izbor — tabla uvek ima poslednju reč.',
+    en: 'Approximate map derived from the official source{prov}, not a cadastre. It narrows things down — the sign always has the last word.',
+  },
+  czmUpdated: { sr: 'ažurirano {date}', en: 'updated {date}' },
+  czmRegistrySub: {
+    sr: 'Pretraži zvanični registar ulica — upiši ulicu da vidiš njenu zonu.',
+    en: 'Search the official street registry — type your street to see its zone.',
+  },
+  czmStreetPh: { sr: 'Ime ulice…', en: 'Street name…' },
+  czmNotInRegistry: { sr: 'Nije u našem registru —', en: 'Not in our registry yet —' },
+  czmScanThere: { sr: 'skeniraj tablu na licu mesta', en: 'scan the sign there' },
+  czmRegistryProv: { sr: 'Iz zvaničnog registra ulica{prov}. Tabla uvek ima poslednju reč.', en: 'From the official street registry{prov}. The sign always has the last word.' },
+  czmScanConfirm: { sr: 'Skeniraj tablu da potvrdiš i ucrtaš →', en: 'Scan the sign to confirm and map it →' },
+  czmNoneTitle: { sr: 'Još nema mape iza koje možemo da stanemo.', en: 'No map we can stand behind — yet.' },
+  czmNoneSub: {
+    sr: 'Kerb ne crta mape bez izvora. Ovde su tabla i tvoja skeniranja mapa.',
+    en: 'Kerb does not draw maps it cannot back with a source. Here the sign, and your scans, are the map.',
+  },
+  czmScanStart: { sr: 'Skeniraj tablu i započni mapu →', en: 'Scan a sign to start the map →' },
+
+  // Landing, below the hero
+  citiesLabel: { sr: 'Gradovi', en: 'Cities' },
+  citiesTitle: { sr: 'Gde Kerb radi', en: 'Where Kerb works' },
+  citiesAll: { sr: 'Svi gradovi →', en: 'All cities →' },
+  citiesFail: { sr: 'Gradovi se nisu učitali. Osveži stranicu.', en: 'Cities did not load. Refresh the page.' },
+  howLabel: { sr: 'Kako radi', en: 'How it works' },
+  howTitle: { sr: 'Otvoriš, pogledaš, platiš.', en: 'Open it, check it, pay.' },
+  howSub: {
+    sr: 'Bez naloga i bez instalacije. Kerb nađe zonu po lokaciji, a ti je potvrdiš tablom.',
+    en: 'No account, nothing to install. Kerb finds the zone from your location, and you confirm it with the sign.',
+  },
+  how1Title: { sr: 'Otvori Kerb pored auta', en: 'Open Kerb by the car' },
+  how1Body: {
+    sr: 'Vidiš zonu, cenu, do kad si pokriven i šta te čeka ako ne platiš.',
+    en: 'You see the zone, the price, how long you are covered, and what not paying costs.',
+  },
+  how2Title: { sr: 'Uporedi sa tablom', en: 'Check it against the sign' },
+  how2Body: {
+    sr: 'Na granici zona Kerb ne pogađa — pokaže obe. Tablu možeš i da skeniraš.',
+    en: 'At a zone boundary Kerb does not guess — it shows both. You can scan the sign too.',
+  },
+  how3Title: { sr: 'Prevuci i pošalji SMS', en: 'Slide and send the SMS' },
+  how3Body: {
+    sr: 'Poruka sa tvojom tablicom je spremna. Odgovor operatera je tvoja karta.',
+    en: 'The message with your plate is ready. The operator’s reply is your ticket.',
+  },
+  ctaLabel: { sr: 'Za one koji još ne znaju', en: 'For anyone new to it' },
+  ctaTitle: { sr: 'Znaj pre nego što platiš.', en: 'Know before you pay.' },
+  ctaSub: {
+    sr: 'Prvi put voziš u Novom Sadu, ili tek voziš? Kerb ti kaže pravila jednostavnim rečima i kaže odakle ih zna.',
+    en: 'New to Novi Sad, or new to driving? Kerb tells you the rules in plain words, and where it got them.',
+  },
+  ctaSearch: { sr: 'Pronađi grad →', en: 'Find a city →' },
+  ctaContribute: { sr: 'Javi grešku', en: 'Report a mistake' },
+  statVerified: { sr: 'provereno {date}', en: 'checked {date}' },
 } as const
 
 export type LangKey = keyof typeof dict
 
-export const useLang = () => {
-  const lang = useState<Lang>('kerb-lang', () => 'en')
+const isLang = (v: unknown): v is Lang => v === 'sr' || v === 'en'
 
-  if (import.meta.client) {
-    const stored = localStorage.getItem(LANG_KEY) as Lang | null
-    if (stored === 'sr' || stored === 'en') {
-      lang.value = stored
-    } else if (navigator.language?.toLowerCase().startsWith('sr')) {
-      lang.value = 'sr'
+// Serbian and its mutually intelligible neighbours read the Latin UI fine.
+const SR_FAMILY = /^(sr|hr|bs|sh|cnr|me)\b/i
+
+/** What this browser would pick with nobody asking: the stored choice first
+ *  (the cookie, then the older localStorage key), then the device language. */
+export const preferredLang = (): Lang | null => {
+  if (!import.meta.client) return null
+  const cookie = document.cookie.match(/(?:^|;\s*)kerb_lang=(sr|en)/)?.[1]
+  if (isLang(cookie)) return cookie
+  try {
+    const stored = localStorage.getItem(LANG_KEY)
+    if (isLang(stored)) return stored
+  } catch { /* storage blocked — fall through to the device */ }
+  return SR_FAMILY.test(navigator.language ?? '') ? 'sr' : 'en'
+}
+
+export const useLang = () => {
+  // The language is decided where the HTML is made. It used to start as 'en' on
+  // the server and flip during hydration on the client, so every page rendered
+  // one language, hydrated another, and logged a mismatch. Now the server reads
+  // the cookie (or Accept-Language), and a prerendered page is Serbian — the
+  // plugin in plugins/lang.client.ts switches after hydration if the visitor
+  // wants otherwise, which is a re-render rather than a mismatch.
+  const cookie = useCookie<Lang | null>(LANG_KEY, {
+    maxAge: 60 * 60 * 24 * 365,
+    sameSite: 'lax',
+    default: () => null,
+  })
+  const lang = useState<Lang>('kerb-lang', () => {
+    if (isLang(cookie.value)) return cookie.value
+    if (import.meta.server) {
+      const header = useRequestHeaders(['accept-language'])['accept-language'] ?? ''
+      // No header at all is the prerender: Serbia first.
+      if (!header.trim()) return 'sr'
+      return SR_FAMILY.test(header.trim()) ? 'sr' : 'en'
     }
-  }
+    return preferredLang() ?? 'sr'
+  })
 
   const setLang = (l: Lang) => {
     lang.value = l
-    if (import.meta.client) localStorage.setItem(LANG_KEY, l)
+    cookie.value = l
+    if (import.meta.client) {
+      try { localStorage.setItem(LANG_KEY, l) } catch { /* private mode */ }
+    }
   }
   const toggle = () => setLang(lang.value === 'sr' ? 'en' : 'sr')
+
+  // Zone names as the sign prints them. The registry keys zones by their English
+  // names ("Blue Zone") and every lookup, polygon and scan match depends on that
+  // key, so it stays; only what a person reads changes. A driver comparing the
+  // screen to a sign that says PLAVA ZONA should find the same words on both.
+  const zoneLabel = (name?: string | null): string => {
+    if (!name) return ''
+    if (lang.value !== 'sr') return name
+    const m = /^(\w+)\s+Zone$/i.exec(name.trim())
+    const word = m ? ZONE_WORDS_SR[m[1]!.toLowerCase()] : null
+    return word ? `${word} zona` : name
+  }
 
   const t = (key: LangKey, params?: Record<string, string | number>): string => {
     let out: string = dict[key][lang.value]
@@ -396,5 +684,37 @@ export const useLang = () => {
     return out
   }
 
-  return { lang, setLang, toggle, t }
+  // City and country names as a Serbian reader writes them. The registry keeps
+  // English names ("Belgrade"), which read wrong inside a Serbian sentence.
+  const cityName = (id?: string | null, name?: string | null): string =>
+    (lang.value === 'sr' && id && CITY_NAMES_SR[id]) || name || id || ''
+  const countryName = (name?: string | null): string =>
+    (lang.value === 'sr' && name && COUNTRY_NAMES_SR[name]) || name || ''
+
+  return { lang, setLang, toggle, t, zoneLabel, cityName, countryName }
+}
+
+const CITY_NAMES_SR: Record<string, string> = {
+  belgrade: 'Beograd',
+  thessaloniki: 'Solun',
+  'new-york-city': 'Njujork',
+  sofia: 'Sofija',
+}
+const COUNTRY_NAMES_SR: Record<string, string> = {
+  Serbia: 'Srbija',
+  Greece: 'Grčka',
+  Bulgaria: 'Bugarska',
+  'United States': 'SAD',
+  Montenegro: 'Crna Gora',
+}
+
+const ZONE_WORDS_SR: Record<string, string> = {
+  extra: 'Ekstra',
+  red: 'Crvena',
+  blue: 'Plava',
+  white: 'Bela',
+  green: 'Zelena',
+  yellow: 'Žuta',
+  orange: 'Narandžasta',
+  purple: 'Ljubičasta',
 }
