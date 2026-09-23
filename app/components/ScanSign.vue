@@ -232,7 +232,9 @@ const emit = defineEmits<{
   pay: [zone: ZoneDef]
 }>()
 
-const { readSign, submit, compressImage, FREE_SCANS, scansUsed, incScan } = useSignScan('ocr')
+// Claude vision reads the sign; on-device OCR is the fallback inside readSign when
+// there's no key or no network. `source` on the stored report records which ran.
+const { readSign, submit, compressImage, FREE_SCANS, scansUsed, incScan } = useSignScan('claude')
 const user = useSupabaseUser()
 
 // Escape closes; focus lands on the close button and returns to the opener.
@@ -283,7 +285,10 @@ const fieldRows = computed(() => {
     state: fld.state,
     display: fld.state === 'unreadable' ? "can't read" : (fld.value ?? '—'),
   })
-  return [row('Zone', f.zone), row('Price', f.price), row('Limit', f.limit), row('SMS code', f.code)]
+  return [
+    row('Zone', f.zone), row('Price', f.price), row('Limit', f.limit),
+    row('SMS code', f.code), row('Hours', f.hours),
+  ]
 })
 
 // The zone read wasn't safe enough to seed payment from — force a manual pick.

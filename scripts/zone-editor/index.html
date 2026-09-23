@@ -108,6 +108,10 @@
     <label style="display:flex;gap:6px;align-items:center;font-size:12px">
       <input type="checkbox" id="ref" checked> postojeći podaci iz aplikacije (ako postoje)
     </label>
+    <label style="display:flex;gap:6px;align-items:center;font-size:12px;margin-top:4px">
+      <input type="checkbox" id="signs" checked> skenirane table (prevuci pin da ispraviš)
+    </label>
+    <div class="hint" id="signsmsg"></div>
   </section>
 
   <section>
@@ -207,6 +211,13 @@ const CITIES = {
   'nis': {
     label: 'Niš', center: [43.3209, 21.8958], zoom: 14,
     zones: { 'Extra Zone':'#E6A700', 'Red Zone':'#E25141', 'Green Zone':'#2FB36B' },
+  },
+  'subotica': {
+    label: 'Subotica', center: [46.1005, 19.6651], zoom: 15,
+    zones: { 'Red Zone':'#E25141', 'Yellow Zone':'#E6A700', 'Green Zone':'#2FB36B', 'Blue Zone':'#2F6BE0' },
+    // Built from suparking.rs's street tables by scripts/build-subotica-geometry.py.
+    // No official zone sheet is published, so there is nothing to calibrate against —
+    // the reference layer (the drawn lines) is what there is to correct.
   },
 }
 
@@ -663,6 +674,88 @@ fetch(zonesUrl(cityId)).then(r => r.ok ? r.json() : null).then(d => {
   }
 }).catch(() => {})
 document.getElementById('ref').onchange = (e) => e.target.checked ? refLayer.addTo(map) : map.removeLayer(refLayer)
+
+// ── scanned signs: the one thing here that is ground truth ────────────────────
+// A scan's position is the GPS fix of the phone that took the photo, which in a
+// street of tall buildings lands twenty or thirty metres out — often on the wrong
+// side of the road, sometimes in the wrong zone. Drag the pin onto the pole.
+//
+// The capture point is never overwritten. It stays drawn as a small hollow circle
+// with a dashed leash to wherever the pin was put, so the correction is visible as
+// a correction — you can always see how far someone moved it, and put it back.
+const signLayer = L.layerGroup().addTo(map)
+const signsMsg = document.getElementById('signsmsg')
+
+const signIcon = (color) => L.divIcon({
+  className: '',
+  html: `<div style="width:26px;height:26px;border-radius:50%;background:${color || '#2563EB'};`
+      + `border:3px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);display:flex;`
+      + `align-items:center;justify-content:center;color:#fff;font:700 13px/1 monospace">T</div>`,
+  iconSize: [26, 26], iconAnchor: [13, 13],
+})
+
+async function loadSigns() {
+  let res
+  try { res = await fetch(`/api/signs?city=${encodeURIComponent(cityId)}`).then(r => r.json()) }
+  catch { signsMsg.textContent = 'tabele nisu učitane (editor mora da radi kroz npm run dev)'; return }
+  if (res.reason) { signsMsg.textContent = res.reason; return }
+  const list = res.signs || []
+  signsMsg.textContent = list.length ? `${list.length} skeniranih tabli` : 'još nema skeniranih tabli'
+
+  for (const s of list) {
+    const moved = s.fixed_lat != null && s.fixed_lng != null
+    const at = moved ? [s.fixed_lat, s.fixed_lng] : [s.lat, s.lng]
+    const m = L.marker(at, { icon: signIcon(s.zone_color), draggable: true }).addTo(signLayer)
+
+    // The capture point and the leash to it — only drawn once the pin has moved.
+    let origin = null, leash = null
+    const drawOrigin = () => {
+      if (origin) { signLayer.removeLayer(origin); signLayer.removeLayer(leash); origin = leash = null }
+      const p = m.getLatLng()
+      if (Math.abs(p.lat - s.lat) < 1e-7 && Math.abs(p.lng - s.lng) < 1e-7) return
+      origin = L.circleMarker([s.lat, s.lng], { radius: 4, color: '#6B7280', weight: 2,
+        fillOpacity: 0, interactive: false }).addTo(signLayer)
+      leash = L.polyline([[s.lat, s.lng], [p.lat, p.lng]], { color: '#6B7280', weight: 1,
+        dashArray: '3 4', opacity: 0.8, interactive: false }).addTo(signLayer)
+    }
+    drawOrigin()
+
+    const popup = () => {
+      const p = m.getLatLng()
+      const d = Math.round(map.distance([s.lat, s.lng], p))
+      const photo = s.photo_url
+        ? `<img src="${s.photo_url}" style="display:block;width:100%;max-width:200px;border-radius:6px;margin-bottom:6px">` : ''
+      return `${photo}<b style="color:${s.zone_color || '#111'}">${s.zone_name || 'tabla'}</b>`
+        + (s.price ? ` · ${s.price}` : '')
+        + `<br><span style="font-size:11px;color:#6B7280">${s.street_name || ''}`
+        + (s.accuracy ? ` · GPS ±${Math.round(s.accuracy)} m` : '')
+        + (d ? ` · pomereno ${d} m` : '') + '</span>'
+        + (d ? `<br><a href="#" data-reset="${s.id}" style="font-size:11px">vrati na mesto snimanja</a>` : '')
+    }
+    m.bindPopup(popup)
+
+    const save = async (lat, lng) => {
+      const r = await fetch('/api/signs', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: s.id, lat, lng }),
+      }).then(r => r.json()).catch(() => ({ ok: false, reason: 'mreža' }))
+      toast(r.ok ? (r.cleared ? 'Tabla vraćena na mesto snimanja' : 'Nova pozicija table sačuvana')
+                 : `Nije sačuvano: ${r.reason || 'greška'}`)
+    }
+
+    m.on('dragend', () => { drawOrigin(); const p = m.getLatLng(); save(p.lat, p.lng) })
+    m.on('popupopen', (e) => {
+      const a = e.popup.getElement().querySelector('[data-reset]')
+      if (a) a.onclick = (ev) => {
+        ev.preventDefault()
+        m.setLatLng([s.lat, s.lng]); drawOrigin(); m.closePopup(); save(null, null)
+      }
+    })
+  }
+}
+loadSigns()
+document.getElementById('signs').onchange = (e) =>
+  e.target.checked ? signLayer.addTo(map) : map.removeLayer(signLayer)
 
 // ── "Označi ulice sa liste" — paste a podzone→street list, locate each street
 // in OSM, and render it as a colored/labelled layer to trace over. ──────────

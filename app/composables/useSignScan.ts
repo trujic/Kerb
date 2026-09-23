@@ -4,8 +4,12 @@
 // geotagged. That confirmed report drops a verified pin on the map AND prefills
 // the correct pay action (the SMS shortcode for the zone the sign actually shows).
 //
-// Read engine is pluggable: on-device OCR (Tesseract.js, free) now, with a slot to
-// swap in a Claude-vision serverless read later — see `readSign`'s `engine`.
+// Read engine is pluggable. `claude` posts the frame to /api/read-sign for a vision
+// read; `ocr` runs Tesseract on-device. Claude is the default because Tesseract is
+// running an English model over signs that are half Cyrillic, shot at an angle in
+// direct sun — and its failure mode is a confident wrong digit, which is the single
+// failure this product cannot afford. OCR stays as the offline/no-key fallback: a
+// degraded read still beats a blocked scan, and every read still needs confirming.
 
 export interface ZoneDef {
   name: string
@@ -34,6 +38,7 @@ export interface SignFields {
   price: SignField
   limit: SignField
   code: SignField
+  hours: SignField
 }
 
 export interface SignReport {
@@ -197,7 +202,32 @@ const detectColor = (image: Blob, zones: ZoneDef[]): Promise<{ zone: ZoneDef | n
     img.src = url
   })
 
-// Downscale + re-encode to keep OCR fast and storage small.
+// The Claude read names the sign's colour band in words rather than pixels, so it
+// resolves through the same synonym table the text match uses. Unlike `detectColor`
+// this cannot be fooled by blue sky behind the sign — the model was looking at the
+// board, not at the frame's average hue.
+const matchColorWord = (word: string, zones: ZoneDef[]): { zone: ZoneDef | null; confidence: number } | null => {
+  const w = normalize(word).trim()
+  if (!w) return null
+  for (const z of zones) {
+    const key = z.name.toLowerCase().split(/\s+/)[0]
+    const words = ZONE_SYNONYMS[key] ?? [key]
+    if (key === w || words.includes(w)) return { zone: z, confidence: 0.8 }
+  }
+  return null
+}
+
+const blobToBase64 = (blob: Blob): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const fr = new FileReader()
+    // readAsDataURL gives "data:image/jpeg;base64,AAAA…" — the API wants the payload.
+    fr.onload = () => resolve(String(fr.result).split(',')[1] ?? '')
+    fr.onerror = () => reject(new Error('read failed'))
+    fr.readAsDataURL(blob)
+  })
+
+// Downscale + re-encode to keep the read fast, the upload small, and vision cost
+// proportional to pixels rather than to whatever the phone camera produced.
 const compressImage = (file: Blob, maxDim = 1280, quality = 0.82): Promise<Blob> =>
   new Promise((resolve, reject) => {
     const img = new Image()
@@ -237,6 +267,7 @@ export const useSignScan = (engine: 'ocr' | 'claude' = 'ocr') => {
     const limitM = rawText.match(/(\d{2,3})\s*min/i)
     const codeM = digits.match(/\b(8\d{3})\b/)
     const code = codeM ? codeM[1] : null
+    const hoursM = rawText.match(/\b([01]?\d|2[0-4])\s*[-–]\s*([01]?\d|2[0-4])\b/)
 
     const zoneState: FieldState = confidence >= 0.6 ? 'read' : confidence > 0 ? 'low' : 'unreadable'
     const codeState: FieldState = code
@@ -248,36 +279,102 @@ export const useSignScan = (engine: 'ocr' | 'claude' = 'ocr') => {
       price: { value: price, state: price ? (priceM ? 'read' : 'low') : 'unreadable' },
       limit: { value: limitM ? `${limitM[1]} min` : null, state: limitM ? 'read' : 'unreadable' },
       code:  { value: code, state: codeState },
+      hours: { value: hoursM ? `${hoursM[1]}–${hoursM[2]}` : null, state: hoursM ? 'read' : 'unreadable' },
     }
   }
 
-  // Read the sign image into a structured per-field read. OCR runs fully on-device.
+  const UNREADABLE: SignField = { value: null, state: 'unreadable' }
+  const blankFields = (): SignFields => ({
+    zone: { ...UNREADABLE }, price: { ...UNREADABLE }, limit: { ...UNREADABLE },
+    code: { ...UNREADABLE }, hours: { ...UNREADABLE },
+  })
+
+  // Claude vision read. Returns null on any failure — no key, offline, rate limit,
+  // a refusal — so the caller can drop to OCR rather than lose the scan.
+  const readViaClaude = async (image: Blob): Promise<{
+    fields: SignFields; rawText: string; notSign: boolean; dominantColor: string | null
+  } | null> => {
+    try {
+      // Smaller than the stored photo: vision cost scales with pixels, and a sign
+      // filling the frame is legible well below the resolution worth keeping.
+      const small = await compressImage(image, 1024, 0.8)
+      const base64 = await blobToBase64(small)
+      const res = await $fetch<any>('/api/read-sign', {
+        method: 'POST',
+        body: { image: base64, mediaType: 'image/jpeg' },
+      })
+      if (!res?.ok || !res.read) return null
+
+      const r = res.read
+      const f = (x: any): SignField => ({
+        value: x?.value ?? null,
+        // A value the model reported without a state it trusts is not a value.
+        state: x?.value ? (x.state ?? 'low') : 'unreadable',
+      })
+      return {
+        rawText: String(r.rawText ?? ''),
+        notSign: !!r.notSign,
+        dominantColor: r.dominantColor ?? null,
+        fields: {
+          zone: f(r.zone), price: f(r.price), limit: f(r.limit),
+          code: f(r.code), hours: f(r.hours),
+        },
+      }
+    } catch {
+      return null
+    }
+  }
+
+  // Read the sign image into a structured per-field read.
   const readSign = async (image: Blob, zones: ZoneDef[]): Promise<SignRead> => {
     if (engine === 'claude') {
-      // Upgrade slot: POST the image to a serverless Claude-vision read.
-      throw new Error('Claude vision read not enabled yet')
+      const v = await readViaClaude(image)
+      if (v) return finishRead(v.rawText, v.notSign, v.dominantColor, zones, image, v.fields)
+      // Fall through to on-device OCR: a weaker read the user must confirm anyway
+      // beats telling someone standing at the kerb that scanning is unavailable.
     }
     const Tesseract = (await import('tesseract.js')).default
     const { data } = await Tesseract.recognize(image, 'eng')
     const rawText = data.text ?? ''
 
+    return finishRead(rawText, false, null, zones, image)
+  }
+
+  // Everything after the raw read, shared by both engines: the not-a-sign gate, the
+  // deterministic zone match, and colour corroboration. Keeping this common is the
+  // point — whichever engine read the pixels, the decision about WHICH zone this is
+  // comes from the city's registry, never from the reader.
+  const finishRead = async (
+    rawText: string,
+    modelSaysNotSign: boolean,
+    dominantColor: string | null,
+    zones: ZoneDef[],
+    image: Blob,
+    modelFields?: SignFields,
+  ): Promise<SignRead> => {
     // Gate on content first: if the frame carries no parking-tariff text, it's some
     // other sign that merely shares a colour. Refuse to read a zone off colour alone —
     // that's exactly how a blue road sign would masquerade as the Blue zone.
-    if (!looksLikeParkingSign(rawText)) {
-      const unreadable: SignField = { value: null, state: 'unreadable' }
+    if (modelSaysNotSign || !looksLikeParkingSign(rawText)) {
       return {
-        rawText, zone: null, confidence: 0, color: null, corroboration: 'none', notSign: true,
-        fields: { zone: { ...unreadable }, price: { ...unreadable }, limit: { ...unreadable }, code: { ...unreadable } },
+        rawText, zone: null, confidence: 0, color: null,
+        corroboration: 'none', notSign: true, fields: blankFields(),
       }
     }
 
     const { zone, confidence } = matchZone(rawText, zones)
-    const fields = parseFields(rawText, zone, confidence)
+    const fields = modelFields ?? parseFields(rawText, zone, confidence)
+
+    // The model reads the sign's own wording; the registry names the zone. Where the
+    // text matched a known zone, show that name so the pay action and the panel agree.
+    if (zone && fields.zone.state !== 'unreadable') fields.zone.value = zone.name
+    if (!zone && fields.zone.state === 'read') fields.zone.state = 'low' // legible, but not a zone we know
 
     // Independent colour read, then corroborate it against the text read. Colour only
     // ranks WHICH zone now that the text has confirmed this is a parking sign.
-    const color = await detectColor(image, zones)
+    const color = dominantColor
+      ? matchColorWord(dominantColor, zones)
+      : await detectColor(image, zones)
     let corroboration: SignRead['corroboration'] = 'none'
     if (color?.zone && zone) corroboration = color.zone.name === zone.name ? 'agree' : 'conflict'
     else if (color?.zone && !zone) corroboration = 'color-only'
@@ -351,14 +448,20 @@ export const useSignScan = (engine: 'ocr' | 'claude' = 'ocr') => {
   const loadForCity = async (cityId: string, limit = 200): Promise<SignReport[]> => {
     const { data, error } = await supabase
       .from('sign_reports')
-      .select('id, city_id, zone_name, zone_color, price, sms_shortcode, street_name, lat, lng, heading, photo_path, created_at')
+      .select('id, city_id, zone_name, zone_color, price, sms_shortcode, street_name, lat, lng, heading, photo_path, created_at, fixed_lat, fixed_lng')
       .eq('city_id', cityId)
       .order('created_at', { ascending: false })
       .limit(limit)
     if (error) { console.warn('[Kerb] loadForCity sign_reports failed (run migration-sign-reports.sql?):', error); return [] }
 
-    return (data as SignReport[]).map((r) => ({
+    return (data as SignReport[]).map((r: any) => ({
       ...r,
+      // A hand-corrected position wins over the capture point. lat/lng from a phone
+      // between tall buildings is routinely tens of metres out, which is the width
+      // of a zone boundary — the pin then argues with the sign it is showing.
+      // Corrections are made in the zone editor; the capture point stays on the row.
+      lat: r.fixed_lat ?? r.lat,
+      lng: r.fixed_lng ?? r.lng,
       photo_url: r.photo_path
         ? supabase.storage.from('sign-photos').getPublicUrl(r.photo_path).data.publicUrl
         : null,

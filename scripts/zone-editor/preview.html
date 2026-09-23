@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="sr"><head><meta charset="utf-8">
+<title>Kerb · pregled zona</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  html,body{height:100%;margin:0;font:14px/1.4 system-ui,sans-serif;color:#1A1D23}
+  #map{position:absolute;inset:0}
+  /* The basemap is standard OSM cartography — pushed back so the zones read as
+     the subject rather than competing with shop icons and house numbers. */
+  .leaflet-tile-pane{filter:grayscale(.75) saturate(.8) brightness(1.1) contrast(.88)}
+  #panel{position:absolute;top:12px;left:12px;z-index:1000;background:#fff;border-radius:12px;
+    box-shadow:0 2px 14px rgba(0,0,0,.18);padding:12px 14px;max-width:270px}
+  h1{font-size:15px;margin:0 0 2px}
+  .sub{font-size:12px;color:#6B7280;margin-bottom:9px}
+  .leg{display:flex;align-items:center;gap:7px;font-size:12.5px;margin:3px 0}
+  .sw{width:22px;height:4px;border-radius:2px;flex:none}
+  .n{margin-left:auto;color:#6B7280;font-variant-numeric:tabular-nums}
+  .warn{margin-top:9px;padding:7px 9px;background:#FEF3C7;border-radius:8px;font-size:11.5px;line-height:1.45}
+  select{width:100%;margin-top:9px;padding:5px 7px;border:1px solid #C9CDD6;border-radius:7px;font:inherit}
+  .pop b{font-size:13px}.pop .m{font-size:11.5px;color:#6B7280;display:block;margin-top:3px}
+  .tag{display:inline-block;padding:1px 6px;border-radius:5px;font-size:10.5px;font-weight:700;margin-top:4px}
+  .ok{background:#DCFCE7;color:#166534}.part{background:#FEE2E2;color:#991B1B}.all{background:#E5E7EB;color:#374151}
+</style></head><body>
+<div id="map"></div>
+<div id="panel"><h1 id="title">…</h1><div class="sub" id="sub"></div><div id="legend"></div>
+  <div class="warn" id="warn" hidden></div>
+  <select id="city"></select>
+</div>
+<script>
+// ── ZONE PREVIEW (DEV ONLY, served from /zone-editor/) ────────────────────────
+// The editor draws published zones faintly and dashed, because there they sit
+// UNDER an official sheet being traced. A city built from a street list has no
+// sheet, so that view showed almost nothing. This is the plain read-only look:
+// full-strength lines on a muted basemap, click one to see whether its span was
+// actually resolved or whether the whole street got drawn.
+const CITIES = ['subotica', 'nis', 'novi-sad', 'zrenjanin', 'belgrade', 'thessaloniki']
+const city = new URLSearchParams(location.search).get('city') || 'subotica'
+
+const sel = document.getElementById('city')
+sel.innerHTML = CITIES.map(c => `<option${c === city ? ' selected' : ''}>${c}</option>`).join('')
+sel.onchange = () => location.search = `?city=${sel.value}`
+
+const map = L.map('map', { preferCanvas: true }).setView([46.1005, 19.6651], 15)
+const RS = { south: 41.7, west: 18.7, north: 46.3, east: 23.2 }
+L.TileLayer.extend({})
+new (L.TileLayer.extend({
+  getTileUrl(c) {
+    const b = this._tileCoordsToBounds(c)
+    const inRS = b.getSouth() >= RS.south && b.getNorth() <= RS.north
+              && b.getWest() >= RS.west && b.getEast() <= RS.east
+    return inRS ? `https://tiles.openstreetmap.rs/lat/${c.z}/${c.x}/${c.y}.png`
+                : `https://tile.openstreetmap.org/${c.z}/${c.x}/${c.y}.png`
+  },
+}))('', { maxNativeZoom: 18, maxZoom: 19,
+  attribution: '&copy; <a href="https://openstreetmap.rs">OpenStreetMap Srbija</a>, &copy; OpenStreetMap contributors' }).addTo(map)
+
+// Length of a polyline OR a multi-polyline. Flattening the parts into one list
+// first measured the jump from the end of one part to the start of the next as if
+// it were road — Subotica came out 41.6 km instead of 23.6.
+const km = (ll) => {
+  if (!ll.length) return 0
+  if (Array.isArray(ll[0])) return ll.reduce((t, part) => t + km(part), 0)
+  let t = 0
+  for (let i = 0; i < ll.length - 1; i++) t += map.distance(ll[i], ll[i + 1])
+  return t
+}
+
+fetch(`/zones/${city}.json`).then(r => r.json()).then(d => {
+  const per = {}, len = {}, bays = {}
+  let partial = 0, clipped = 0
+  const layer = L.geoJSON(d, {
+    // Bays are the real thing and get a solid fill; the street line behind them is
+    // the operator's claim about the street, drawn thinner so the two do not fight.
+    style: f => f.properties.bay
+      ? { color: f.properties.color, weight: 1.5, opacity: .9, fillColor: f.properties.color, fillOpacity: .85 }
+      : { color: f.properties.color, weight: 3, opacity: .55, lineCap: 'round' },
+    onEachFeature: (f, l) => {
+      const p = f.properties
+      // Bays and streets are different units — one is an area, the other a run of
+      // kerb. Adding a bay's perimeter to the street kilometres made the totals
+      // meaningless, so they are counted apart.
+      if (p.bay) { bays[p.zone] = (bays[p.zone] || 0) + 1 }
+      else {
+        per[p.zone] = (per[p.zone] || 0) + 1
+        len[p.zone] = (len[p.zone] || 0) + (l.getLatLngs ? km(l.getLatLngs()) : 0)
+      }
+      if (p.partial) partial++
+      if (p.clipped) clipped++
+      const tag = p.bay ? `<span class="tag ok">parking iz OSM-a${p.parking ? ' · ' + p.parking : ''}</span>`
+        + (p.hours ? `<span class="m">naplata: ${p.hours}</span>` : '')
+        : p.clipped ? '<span class="tag ok">isečeno na raspon</span>'
+        : p.partial ? '<span class="tag part">raspon nerešen — crta se cela ulica</span>'
+        : '<span class="tag all">cela ulica</span>'
+      l.bindPopup(`<div class="pop"><b style="color:${p.color}">${p.name || '(bez imena)'}</b>`
+        + `<span class="m">${p.zone}</span>`
+        + (p.span ? `<span class="m">operater: „${p.span}"</span>` : '') + tag + '</div>')
+    },
+  }).addTo(map)
+  map.fitBounds(layer.getBounds(), { padding: [30, 30] })
+
+  document.getElementById('title').textContent = city
+  const nBays = Object.values(bays).reduce((a, b) => a + b, 0)
+  document.getElementById('sub').textContent =
+    `${d.features.length - nBays} ulica · ${(Object.values(len).reduce((a, b) => a + b, 0) / 1000).toFixed(1)} km`
+    + (nBays ? ` · ${nBays} parkinga` : '')
+  document.getElementById('legend').innerHTML = Object.keys(per).sort((a, b) => per[b] - per[a])
+    .map(z => {
+      const c = d.features.find(f => f.properties.zone === z).properties.color
+      return `<div class="leg"><span class="sw" style="background:${c}"></span>${z}`
+           + `<span class="n">${per[z]} ul · ${(len[z] / 1000).toFixed(1)} km`
+           + (bays[z] ? ` · ${bays[z]}P` : '') + `</span></div>`
+    }).join('')
+  if (partial) {
+    const w = document.getElementById('warn')
+    w.hidden = false
+    w.innerHTML = `<b>${partial}</b> ulica ima raspon koji nije razrešen — crtaju se cele `
+      + `i preteruju na krajevima. Klikni liniju da vidiš koju.`
+      + (clipped ? `<br><b>${clipped}</b> je isečeno na tačan potez.` : '')
+  }
+}).catch(e => { document.getElementById('title').textContent = `nema /zones/${city}.json` })
+</script></body></html>
