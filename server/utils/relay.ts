@@ -55,20 +55,24 @@ export const notifyRelays = async (
   actions: PushAction[] = [], actionUrls: Record<string, string> = {},
 ) => {
   try {
-    return await sendToRelays(title, body, url, actions, actionUrls)
+    return await pushToUsers(relayUserIds(), { title, body, url, actions, actionUrls, tag: 'kerb-relay' })
   } catch (e: any) {
     console.error('[relay] push failed, request stands:', e?.message ?? e)
     return { sent: 0, reason: 'push failed' }
   }
 }
 
-const sendToRelays = async (
-  title: string, body: string, url: string,
-  actions: PushAction[], actionUrls: Record<string, string>,
-) => {
+/** Whoever keeps the map: ADMIN_USER_IDS, or the relay list when that is unset
+ *  (during the pilot they are the same person). */
+export const adminUserIds = (): string[] =>
+  (process.env.ADMIN_USER_IDS || process.env.RELAY_USER_IDS || '')
+    .split(',').map((s) => s.trim()).filter(Boolean)
+
+/** Push to every device of the given accounts. Throws only on misconfiguration
+ *  of the push library itself; a dead subscription is pruned, not fatal. */
+export const pushToUsers = async (ids: string[], payload: Record<string, unknown>) => {
   const pub = process.env.VAPID_PUBLIC_KEY
   const priv = process.env.VAPID_PRIVATE_KEY
-  const ids = relayUserIds()
   if (!pub || !priv || !ids.length) return { sent: 0, reason: 'push not configured' }
 
   const webpush = (await import('web-push')).default
@@ -85,7 +89,7 @@ const sendToRelays = async (
     try {
       await webpush.sendNotification(
         { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
-        JSON.stringify({ title, body, url, actions, actionUrls, tag: 'kerb-relay' }),
+        JSON.stringify(payload),
       )
       sent++
     } catch (e: any) {
