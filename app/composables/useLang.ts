@@ -15,13 +15,14 @@ const dict = {
   // Free-now surface
   freeNow: { sr: 'Besplatno sada', en: 'Free now' },
   freeTitle: { sr: 'Ne moraš da platiš sada', en: 'No need to pay right now' },
-  freeSub: { sr: 'Parkiranje je besplatno u {city}.', en: 'Parking is free in {city}.' },
+  // The city is named in the line above; Serbian would need it in the locative.
+  freeSub: { sr: 'Parkiranje je sada besplatno.', en: 'Parking is free in {city} right now.' },
   chargingResumes: { sr: 'Naplata ponovo počinje', en: 'Charging resumes' },
   prepayBtn: { sr: 'Plati unapred {start}–{end} →', en: 'Pre-pay {start}–{end} →' },
   tipLabel: { sr: 'Savet', en: 'Tip' },
   prepayWhy: {
-    sr: 'Ujutru se parking najlakše zaboravi — naplata krene u {start} pre nego što se većina seti. Tada najčešće stižu kazne. Platiš li sad, pokriven si čim počne.',
-    en: "Morning is when parking slips the mind — charging starts at {start} before most people think of it. That's when fines usually land. Pay now and you're covered the moment it starts.",
+    sr: 'Naplata počinje u {start}. Ako platiš sada, pokriven si od tog trenutka.',
+    en: "Charging starts at {start}. Pay now and you're covered from that moment.",
   },
   browseZones: { sr: 'Pregledaj zone', en: 'Browse zones' },
   today: { sr: 'danas', en: 'today' },
@@ -33,6 +34,63 @@ const dict = {
   // The SMS is nothing but the plate, so without one there is no payment to make.
   // "Add" rather than "type": a guest types it into the field, a signed-in driver
   // with no plate yet gets an Add-plate link. Both sit directly above this line.
+  // In the slide itself when there is no plate yet: the reason has to be where
+  // the thumb refuses to move, not in a line the tab bar can cover.
+  needPlateSlide: { sr: 'Prvo upiši tablicu ↑', en: 'Type your plate first ↑' },
+  // The one rule that saves a fine, in the field itself now that the "how to
+  // type it" disclosure is gone: exactly as on the plate, special letters too.
+  platePlaceholder: { sr: 'Tablica tačno kao na autu', en: 'Plate exactly as on the car' },
+  fullGuideCity: { sr: 'Ceo vodič za {city}', en: 'Full guide to {city}' },
+  // First visit: the location prompt is earned by a button, not fired on load.
+  findMyZone: { sr: 'Nađi moju zonu', en: 'Find my zone' },
+  firstHelpShort: { sr: 'Prvi put ovde? →', en: 'First time here? →' },
+  // The zone claim lines (app/utils/zoneClaim.js). The hedge is its own sentence.
+  claimNoData: { sr: 'Ovde nemam podatke o zoni.', en: 'I have no zone data here.' },
+  claimSignOnly: { sr: 'Tabla pored auta je jedini odgovor.', en: 'The sign by the car is the only answer.' },
+  claimPlace: { sr: 'Ovaj deo je {zone}.', en: 'This stretch is {zone}.' },
+  claimSources: { sr: 'Potvrđeno iz {n} izvora: {list}.', en: 'Confirmed by {n} sources: {list}.' },
+  claimSourceRegistry: { sr: 'Izvor: registar operatera.', en: "Source: the operator's registry." },
+  claimBitRegistry: { sr: 'registar', en: 'registry' },
+  claimBitScan1: { sr: '1 skenirana tabla', en: '1 scanned sign' },
+  claimBitScans: { sr: '{n} skenirane table', en: '{n} scanned signs' },
+  claimBitPays: { sr: 'uplate', en: 'payments' },
+  claimOtherZone: { sr: 'Druga zona', en: 'Another zone' },
+  claimLoud: {
+    sr: '⚠ {zone} je {dist} odavde, a GPS greši ±{acc} — ne mogu da ti kažem sa koje si strane linije. Pogledaj tablu.',
+    en: '⚠ {zone} is {dist} away and GPS is off by ±{acc}, so I cannot tell which side of the line you are on. Check the sign.',
+  },
+  claimNormal: {
+    sr: '{zone} počinje {dist} odavde. Ako su kola u njoj, važi ona.',
+    en: '{zone} starts {dist} away. If the car is in it, that zone applies.',
+  },
+  claimQuiet: {
+    sr: 'Najbliža druga zona je {dist} odavde — tu zabune nema.',
+    en: 'The nearest other zone is {dist} away, so there is no confusion here.',
+  },
+  claimSpotOutside: {
+    sr: 'Izgleda da nisi na parking mestu — najbliže je {dist} odavde.',
+    en: 'You do not seem to be on a parking bay; the nearest is {dist} away.',
+  },
+  claimSpotEdge: {
+    sr: 'Na ivici si parking površine, pa ne mogu da potvrdim da je mesto naplatno.',
+    en: 'You are at the edge of the parking area, so I cannot confirm the spot is paid.',
+  },
+  // Desktop: the place is where the car is, not where the reader is.
+  claimSpotOutsideCar: {
+    sr: 'To mesto nije na parking površini — najbliža je {dist} odatle.',
+    en: 'That spot is not on a parking bay; the nearest is {dist} from it.',
+  },
+  claimSpotEdgeCar: {
+    sr: 'Kola su na ivici parking površine, pa ne mogu da potvrdim da je mesto naplatno.',
+    en: 'The car is at the edge of the parking area, so I cannot confirm the spot is paid.',
+  },
+  claimEvidenceScan1: { sr: '1 tabla skenirana', en: '1 sign scanned' },
+  claimEvidenceScans: { sr: '{n} table skenirane', en: '{n} signs scanned' },
+  claimEvidencePays: { sr: 'uplate potvrđuju', en: 'payments agree' },
+  findMyZoneWhy: {
+    sr: 'Lokacija služi samo da nađemo zonu u kojoj si.',
+    en: 'Your location is only used to find the zone you are in.',
+  },
   needPlate: {
     sr: 'Dodaj tablicu iznad — SMS se šalje sa njom.',
     en: 'Add your plate above — the SMS is sent with it.',
@@ -54,15 +112,21 @@ const dict = {
     sr: 'Proveri tablu i plati po njoj.',
     en: 'Check the sign and pay accordingly.',
   },
-  // The daily ticket. Sold at only some lots inside a zone, so it can only be
-  // offered where the geometry says this lot sells it — and it is worth offering
-  // loudly, because it is the one place the app saves a driver money rather than
-  // just saving them from a fine.
-  dailyTitle: { sr: 'Ovde postoji i dnevna karta', en: 'A daily ticket is sold here' },
-  dailyCheaper: {
-    sr: 'Od {hours} h naviše jeftinija je od plaćanja po satu.',
-    en: 'From {hours} h it costs less than paying by the hour.',
+  // The daily ticket: an equal second way to pay wherever the zone sells it, and
+  // worth offering loudly, because it is the one place the app saves a driver
+  // money rather than just saving them from a fine. Off the lots our map lists,
+  // the extra sign decides, and the option says so.
+  payChoiceLabel: { sr: 'Način plaćanja', en: 'How to pay' },
+  payHourly: { sr: 'Po satu', en: 'By the hour' },
+  payDailyOpt: { sr: 'Dnevna karta', en: 'Daily ticket' },
+  dailyFromShort: { sr: 'Isplati se od {hours} h', en: 'Cheaper from {hours} h' },
+  dailyOnePay: { sr: 'Jedna uplata', en: 'One payment' },
+  dailyFrom: { sr: 'Može od: {when}', en: 'Available from {when}' },
+  dailyOnlyIfSign: {
+    sr: 'Za ovo mesto nemamo podatak da važi dnevna karta. Plati je samo ako na dodatnoj tabli piše da važi.',
+    en: 'We have no record of the daily ticket at this spot. Pay it only if an extra sign says it is valid here.',
   },
+  payDailyBtn: { sr: 'Plati dnevnu kartu', en: 'Pay the daily ticket' },
   dailySend: { sr: 'Prevuci za dnevnu — {amount} → {code}', en: 'Slide for the daily — {amount} → {code}' },
   wrongZone: { sr: 'Pogrešna zona? Pogledaj sve zone', en: 'Wrong zone? See all zones' },
   askAiShort: { sr: 'Pitaj AI', en: 'Ask AI' },
@@ -71,7 +135,7 @@ const dict = {
     en: "{city}'s zone areas are approximate (no official map) — use this to narrow it down, then trust the sign.",
   },
   likelyYours: { sr: 'verovatno tvoja', en: 'likely yours' },
-  noLimit: { sr: 'Bez limita', en: 'No limit' },
+  noLimit: { sr: 'Bez ograničenja', en: 'No limit' },
   // Inside the zone, near its line. The polygons are drawn a little wider than
   // the bays they cover, so being just inside one is not proof of anything.
   edgeTitle: {
@@ -106,6 +170,22 @@ const dict = {
   noParkingTitle: { sr: 'Nema naplate tu gde stojiš', en: "No paid zone where you're standing" },
   noParkingSub: { sr: 'Parkiranje ovde je verovatno besplatno. Najbliža naplata je', en: 'Parking here is likely free. Nearest paid parking is' },
   awayOn: { sr: 'odavde —', en: 'away —' },
+  // Desktop — the laptop is not where the car is, so the panel asks.
+  carWhereTitle: { sr: 'Gde su ti kola?', en: 'Where is your car?' },
+  carWhereSub: {
+    sr: 'Laptop ne zna gde su ti kola, zato upiši ulicu.',
+    en: 'A laptop cannot tell where your car is, so type the street.',
+  },
+  carWhereMap: { sr: 'Klikni na mapi zonu u kojoj su kola', en: 'Click the zone your car is in on the map' },
+  carMapChip: { sr: 'Klikni zonu u kojoj su ti kola', en: 'Click the zone your car is in' },
+  carHereBtn: { sr: 'Kola su ovde →', en: 'My car is here →' },
+  or: { sr: 'ili', en: 'or' },
+  carIsAt: { sr: 'Tvoja kola', en: 'Your car' },
+  carChange: { sr: 'Promeni', en: 'Change' },
+  carOnMap: { sr: 'Mesto izabrano na mapi', en: 'Spot picked on the map' },
+  carNoParkingTitle: { sr: 'Tamo nema naplate', en: 'No paid zone there' },
+  carNoParkingSub: { sr: 'Parkiranje na tom mestu je verovatno besplatno. Najbliža naplata je', en: 'Parking there is likely free. Nearest paid parking is' },
+  carAwayOn: { sr: 'dalje —', en: 'away —' },
   scanContribute: { sr: 'Vidiš tablu? Skeniraj je', en: 'See a sign? Scan it' },
 
   // Address search — "which zone parks at this address", for a place you are
@@ -116,6 +196,7 @@ const dict = {
     en: 'Which zone parks at an address — before you set off.',
   },
   addressPlaceholder: { sr: 'npr. Koste Stojanovića 15', en: 'e.g. Koste Stojanovića 15' },
+  addressScope: { sr: 'Pretraga samo za: {city}', en: 'Searching only in: {city}' },
   searching: { sr: 'Tražim…', en: 'Searching…' },
   noAddressHit: { sr: 'Nema pogotka — probaj samo ime ulice.', en: 'No match — try just the street name.' },
   addressSearchFailed: { sr: 'Pretraga nije uspela. Proveri vezu.', en: 'Search failed. Check your connection.' },
@@ -164,10 +245,10 @@ const dict = {
   plateSync: { sr: 'Napravi nalog za sinhronizaciju.', en: 'Create an account to sync it.' },
   sendSms: { sr: 'Prevuci da pošalješ SMS → {code}', en: 'Slide to send SMS → {code}' },
   openingSms: { sr: 'Otvaram SMS…', en: 'Opening SMS…' },
-  slideConfirms: { sr: 'Prevlačenjem potvrđuješ da si proverio tablu.', en: "Sliding confirms you've checked the sign." },
+  slideConfirms: { sr: 'Prevuci tek kad proveriš tablu.', en: 'Slide once you have checked the sign.' },
   payZone: { sr: 'Plati {zone}', en: 'Pay {zone}' },
   addPlate: { sr: 'Dodaj tablice za SMS jednim dodirom', en: 'Add a plate for one-tap SMS' },
-  smsToOperator: { sr: 'Tvoj telefon šalje SMS operateru parkinga.', en: 'Your phone sends the SMS to the parking operator.' },
+  smsToOperator: { sr: 'Tvoj telefon šalje SMS operateru, a SMS potvrda koju dobiješ je tvoja karta.', en: 'Your phone sends the SMS to the operator; the confirmation SMS you get back is your ticket.' },
   // Cities outside the SMS world: an app hand-off, or no in-app payment at all.
   openApp: { sr: 'Prevuci da otvoriš {app}', en: 'Slide to open {app}' },
   openingApp: { sr: 'Otvaram aplikaciju…', en: 'Opening the app…' },
@@ -277,8 +358,8 @@ const dict = {
   // Plate input
   plateHow: { sr: 'Kako se upisuje?', en: 'How do I type it?' },
   plateOcrHint: {
-    sr: 'Pogledaj tablicu na autu. Prekucaj svako slovo i broj tačno kako tamo piše — ništa više, ništa manje.',
-    en: 'Look at the plate on your car. Type every letter and number exactly as written there — nothing more, nothing less.',
+    sr: 'Pogledaj tablicu na autu. Prekucaj svako slovo i broj tačno kako tamo piše, sa Č, Ć, Ž, Š i Đ. SMS se šalje baš sa tom tablicom.',
+    en: 'Look at the plate on your car. Type every letter and number exactly as written there, special letters included. The SMS is sent with exactly that plate.',
   },
   plateConf: { sr: 'pročitano {pct}% — proveri svaki znak', en: 'read {pct}% — check every character' },
   plateNoRead: {
@@ -320,6 +401,14 @@ const dict = {
   zoneNoRate: { sr: 'Cena nije objavljena', en: 'No published rate' },
   zoneMaxStay: { sr: 'Najduže {n} min', en: 'Max stay {n} min' },
   zoneDaily: { sr: 'Dnevna karta {amount}', en: 'Day ticket {amount}' },
+  // A scanned sign's pin on the map.
+  signConfirmedTitle: { sr: 'Potvrđena tabla', en: 'Confirmed sign' },
+  signConfirmedAge: { sr: 'Potvrđeno {age}', en: 'Confirmed {age}' },
+  ageToday: { sr: 'danas', en: 'today' },
+  ageYesterday: { sr: 'juče', en: 'yesterday' },
+  ageDays: { sr: 'pre {n} dana', en: '{n} days ago' },
+  ageWeeks: { sr: 'pre {n} ned.', en: '{n} wk ago' },
+  ageMonths: { sr: 'pre {n} mes.', en: '{n} mo ago' },
   zoneNoData: { sr: 'Nema podataka o ovoj zoni', en: 'Nothing known about this zone' },
   zonePayBtn: { sr: 'Plati ovu zonu →', en: 'Pay this zone →' },
   zoneResidents: { sr: 'Mesto za stanare — plaćanje ovde ništa ne kupuje', en: 'Residents\u2019 bay — paying here buys nothing' },

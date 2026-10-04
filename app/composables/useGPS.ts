@@ -233,6 +233,29 @@ export const useGPS = () => {
     return cached.city ?? { id, name: id, country: '', flag: '' }
   }
 
+  /**
+   * Name the city without a position. For desktop, where the device often cannot
+   * place itself at all (Chrome on Linux has no Wi-Fi positioning and times out),
+   * and where a position would only ever have chosen the city: the panel asks for
+   * the car's street next anyway. Coordinates stay null — nothing pretends to know
+   * where anyone is.
+   */
+  const setCityWithoutFix = async (id: string) => {
+    if (!isLive(id)) return null
+    const { data } = await supabase
+      .from('cities')
+      .select('id, name, country, flag')
+      .eq('id', id)
+      .maybeSingle()
+    if (!data) return null
+    gpsError.value = null
+    gpsDenied.value = false
+    detectedStreet.value = null
+    suggestedZoneName.value = null
+    detectedCity.value = data
+    return data
+  }
+
   let _watchId: number | null = null
 
   const startTracking = () => {
@@ -258,5 +281,5 @@ export const useGPS = () => {
     }
   }
 
-  return { detectCity, detectedCity, detectedStreet, coords, detecting, gpsError, gpsDenied, suggestedZoneName, unsupportedCity, unsupportedUrl, startTracking, stopTracking }
+  return { detectCity, setCityWithoutFix, detectedCity, detectedStreet, coords, detecting, gpsError, gpsDenied, suggestedZoneName, unsupportedCity, unsupportedUrl, startTracking, stopTracking }
 }

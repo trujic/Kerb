@@ -15,10 +15,12 @@
         autocomplete="off"
         spellcheck="false"
         maxlength="10"
-        :placeholder="placeholder"
+        :placeholder="placeholder ?? t('platePlaceholder')"
         @input="onInput"
       />
+      <!-- Off on desktop: nobody carries a laptop round to the back of the car. -->
       <button
+        v-if="camera"
         type="button"
         class="plate-cam"
         :aria-label="busy ? t('plateReadingAria') : t('plateScanAria')"
@@ -29,6 +31,7 @@
         <Icon v-else name="camera" :size="18" />
       </button>
       <input
+        v-if="camera"
         ref="fileEl"
         type="file"
         accept="image/*"
@@ -43,12 +46,6 @@
         {{ t('plateConf', { pct: Math.round(confidence * 100) }) }}
       </span>
     </p>
-    <!-- The how-to hides behind a disclosure: one tap for the six-year-old
-         version, invisible to everyone who already knows their plate. -->
-    <details class="plate-how">
-      <summary>{{ t('plateHow') }}</summary>
-      <p>{{ t('plateOcrHint') }}</p>
-    </details>
     <p v-if="scanError" class="plate-err">{{ scanError }}</p>
   </div>
 </template>
@@ -57,7 +54,8 @@
 const props = withDefaults(defineProps<{
   modelValue: string
   placeholder?: string
-}>(), { placeholder: 'NS123AB' })
+  camera?: boolean
+}>(), { placeholder: undefined, camera: true })
 
 const emit = defineEmits<{ 'update:modelValue': [v: string] }>()
 
@@ -142,7 +140,16 @@ const onFile = async (e: Event) => {
   color: #11131A;
   outline: none;
 }
-.plate-input::placeholder { color: #9AA1AD; letter-spacing: 2px; font-weight: 500; }
+/* An instruction, not an example plate: a sample like "NS123AB" in the plate's
+   own typeface read as a plate already filled in. Body font, sentence case. */
+.plate-input::placeholder {
+  font-family: var(--font-body);
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--muted);
+}
 .plate-cam {
   flex-shrink: 0;
   width: 46px;
@@ -169,19 +176,6 @@ const onFile = async (e: Event) => {
 }
 @keyframes plate-spin { to { transform: rotate(360deg); } }
 .plate-hint { margin-top: 7px; font-size: 12px; color: var(--muted); line-height: 1.45; }
-.plate-how { margin-top: 6px; }
-.plate-how summary {
-  display: inline-block;
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--blue);
-  cursor: pointer;
-  list-style: none;
-}
-.plate-how summary::-webkit-details-marker { display: none; }
-.plate-how summary::after { content: ' ▾'; font-size: 10px; }
-.plate-how[open] summary::after { content: ' ▴'; }
-.plate-how p { margin-top: 4px; font-size: 12.5px; color: var(--text2); line-height: 1.5; }
 .plate-conf {
   display: inline-block;
   margin-right: 6px;

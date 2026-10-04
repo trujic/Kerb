@@ -28,6 +28,17 @@ export interface CityCopy {
   payMethods: Bi[]
   tips: { icon: string; text: Bi }[]
   mapNote?: Bi // where the drawn zones come from, when that differs from the rules' source
+  // The zone SMS goes to a national short code, so it only works from a domestic
+  // number. Where the operator has a way to pay that a foreign SIM can use, it is
+  // named here and offered under the slide — the visitor the SMS fails for is
+  // exactly the one who has no way of knowing it will.
+  foreignSim?: {
+    text: Bi
+    app: string
+    ios: string
+    android: string
+    info: string // the operator's own page about it, for everyone else
+  }
 }
 
 const COPY: Record<string, CityCopy> = {
@@ -40,13 +51,17 @@ const COPY: Record<string, CityCopy> = {
       sr: 'Novi Sad ima četiri zone naplate: Ekstra, Crvenu, Plavu i Belu. Naplata traje radnim danima od 7 do 21 i subotom od 7 do 14 časova, a nedeljom je parkiranje besplatno. Plaća se SMS-om, aplikacijom nSpark ili elektronskom parking karticom (ePK). Parkingom upravlja JKP „Parking servis” Novi Sad.',
       en: 'Novi Sad has four paid zones: Extra, Red, Blue and White. Charging runs on weekdays from 7:00 to 21:00 and on Saturdays from 7:00 to 14:00; Sundays are free. You pay by SMS, with the nSpark app, or with an electronic parking card (ePK). Parking is run by JKP Parking servis Novi Sad.',
     },
+    // The amount checked 2026-10-04 against the 2026 price list (Cenovnik JKP
+    // Parking servis Novi Sad 2026, PDF of 21 Jul 2026, section III items 4–5):
+    // "elektronska posebna parking karta", 24 hours, 900 RSD; 5,000 RSD on a bay
+    // with an EV charger. The deadline to pay it is not in the price list.
     ifUnpaid: {
-      sr: 'doplatna parking karta',
-      en: 'a surcharge parking ticket',
+      sr: 'elektronska posebna parking karta, 900 din',
+      en: 'an electronic special parking ticket, 900 RSD',
     },
     ifUnpaidMore: {
-      sr: 'Kontrola izdaje doplatnu parking kartu; iznos i rok za plaćanje su na parkingns.rs. Nepropisno parkirano vozilo može da odnese pauk: uklanjanje putničkog vozila košta od 5.000 do 13.500 din, zavisno od mase, plus 184 din za svaki dan čuvanja.',
-      en: 'Inspectors issue a surcharge parking ticket; the amount and the deadline are on parkingns.rs. An illegally parked car can be towed: removing a passenger car costs 5,000 to 13,500 RSD depending on its weight, plus 184 RSD for each day in storage.',
+      sr: 'Kontrola izdaje elektronsku posebnu parking kartu od 900 din, koja važi 24 sata. Na mestu sa punjačem za električna vozila ona košta 5.000 din. Nepropisno parkirano vozilo može da odnese pauk: uklanjanje putničkog vozila košta od 5.000 do 13.500 din, zavisno od mase, plus 184 din za svaki dan čuvanja.',
+      en: 'Inspectors issue an electronic special parking ticket of 900 RSD, valid for 24 hours. On a bay with an EV charger it costs 5,000 RSD. An illegally parked car can be towed: removing a passenger car costs 5,000 to 13,500 RSD depending on its weight, plus 184 RSD for each day in storage.',
     },
     zoneNotes: {
       'Extra Zone': {
@@ -71,6 +86,18 @@ const COPY: Record<string, CityCopy> = {
     mapNote: {
       sr: 'Zone su precrtane sa zvaničnog katastarskog lista operatera (parkingns.rs, 26. 6. 2026.). Mapa pomaže da suziš izbor — tabla uvek ima poslednju reč.',
       en: 'Zones traced from the operator’s official cadastre sheet (parkingns.rs, 26 Jun 2026). The map narrows things down — the sign always has the last word.',
+    },
+    // nSpark takes foreign cards (Opšti uslovi poslovanja za plaćanje, tačka 6) and
+    // needs a registered account; both said, so nobody is surprised at the curb.
+    foreignSim: {
+      text: {
+        sr: 'Strani broj? SMS radi samo sa srpskim brojem. Stranom karticom plaćaš u aplikaciji (uz registraciju):',
+        en: 'Foreign number? The SMS only works from a Serbian one. Pay by foreign card in the app (sign-up needed):',
+      },
+      app: 'nSpark',
+      ios: 'https://apps.apple.com/rs/app/nspark/id6505144660',
+      android: 'https://play.google.com/store/apps/details?id=rs.parkingns.nspark',
+      info: 'https://parkingns.rs/nacini-placanja/mobilna-aplikacija-za-placanje-nspark/',
     },
     payMethods: [
       { sr: 'SMS na broj zone', en: 'SMS to the zone’s number' },

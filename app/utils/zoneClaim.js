@@ -207,35 +207,70 @@ export function zoneClaim({ point, accuracy = 25, geo, signs = [], pays = [] }) 
   }
 }
 
-/** Serbian copy for both halves. The hedge is a separate sentence on purpose. */
-export function claimLines(c) {
+// Serbian fallback for callers that have no translator. Keys match useLang.
+const SR = {
+  claimNoData: 'Ovde nemam podatke o zoni.',
+  claimSignOnly: 'Tabla pored auta je jedini odgovor.',
+  claimPlace: 'Ovaj deo je {zone}.',
+  claimSources: 'Potvrđeno iz {n} izvora: {list}.',
+  claimSourceRegistry: 'Izvor: registar operatera.',
+  claimBitRegistry: 'registar',
+  claimBitScan1: '1 skenirana tabla',
+  claimBitScans: '{n} skenirane table',
+  claimBitPays: 'uplate',
+  claimOtherZone: 'Druga zona',
+  claimLoud: '⚠ {zone} je {dist} odavde, a GPS greši ±{acc} — ne mogu da ti kažem sa koje si strane linije. Pogledaj tablu.',
+  claimNormal: '{zone} počinje {dist} odavde. Ako su kola u njoj, važi ona.',
+  claimQuiet: 'Najbliža druga zona je {dist} odavde — tu zabune nema.',
+  claimSpotOutside: 'Izgleda da nisi na parking mestu — najbliže je {dist} odavde.',
+  claimSpotEdge: 'Na ivici si parking površine, pa ne mogu da potvrdim da je mesto naplatno.',
+  claimSpotOutsideCar: 'To mesto nije na parking površini — najbliža je {dist} odatle.',
+  claimSpotEdgeCar: 'Kola su na ivici parking površine, pa ne mogu da potvrdim da je mesto naplatno.',
+}
+const fill = (text, params = {}) =>
+  text.replace(/\{(\w+)\}/g, (m, k) => (params[k] != null ? String(params[k]) : m))
+
+/**
+ * Copy for both halves. The hedge is a separate sentence on purpose.
+ *
+ * `label` turns a registry zone name ("Red Zone") into the one the reader sees on
+ * the sign ("Crvena zona"). `tr` is the page's translator (useLang's `t`); without
+ * it the Serbian above is used. `car: true` words the spot line about the car —
+ * on desktop the place was named by the driver, and "you are at the edge" would
+ * be about someone sitting at a laptop.
+ */
+export function claimLines(c, label = (z) => z, tr = null, { car = false } = {}) {
+  const say = (key, params) => (tr ? tr(key, params) : fill(SR[key], params))
+
   if (!c || c.state === 'none')
-    return { place: 'Ovde nemam podatke o zoni.', you: 'Tabla pored auta je jedini odgovor.', level: 'none' }
+    return { place: say('claimNoData'), you: say('claimSignOnly'), level: 'none' }
 
   const { place, you } = c
   const m = (n) => Math.round(n) + ' m'
+  const other = you.nearestOther ? label(you.nearestOther.zone) : say('claimOtherZone')
 
-  const bits = ['registar']
-  if (place.evidence.scans) bits.push(place.evidence.scans === 1 ? '1 skenirana tabla' : place.evidence.scans + ' skenirane table')
-  if (place.evidence.payers >= 5) bits.push('uplate')
-  const placeLine = `Ovaj deo je ${place.zone}. ` +
-    (place.sources > 1 ? `Potvrđeno iz ${place.sources} izvora: ${bits.join(', ')}.` : 'Izvor: registar operatera.')
+  const bits = [say('claimBitRegistry')]
+  if (place.evidence.scans)
+    bits.push(place.evidence.scans === 1 ? say('claimBitScan1') : say('claimBitScans', { n: place.evidence.scans }))
+  if (place.evidence.payers >= 5) bits.push(say('claimBitPays'))
+  const placeLine = say('claimPlace', { zone: label(place.zone) }) + ' ' +
+    (place.sources > 1 ? say('claimSources', { n: place.sources, list: bits.join(', ') }) : say('claimSourceRegistry'))
 
   // The alarm — driven only by the risk that costs money.
   let youLine
   if (you.level === 'loud') {
-    youLine = `⚠ ${you.nearestOther?.zone ?? 'Druga zona'} je ${m(you.nearestOther?.distM ?? 0)} odavde, a GPS greši ±${m(you.accuracyM)} — ne mogu da ti kažem sa koje si strane linije. Pogledaj tablu.`
+    youLine = say('claimLoud', { zone: other, dist: m(you.nearestOther?.distM ?? 0), acc: m(you.accuracyM) })
   } else if (you.level === 'normal') {
-    youLine = `${you.nearestOther?.zone ?? 'Druga zona'} počinje ${m(you.nearestOther.distM)} odavde. Ako si prešao tu liniju, važi ona.`
+    youLine = say('claimNormal', { zone: other, dist: m(you.nearestOther.distM) })
   } else {
-    youLine = `Najbliža druga zona je ${m(you.nearestOther?.distM ?? Infinity)} odavde — tu zabune nema.`
+    youLine = say('claimQuiet', { dist: m(you.nearestOther?.distM ?? Infinity) })
   }
 
   // Separate sentence, separate risk: whether this is a paid bay at all. Costs an
   // unnecessary payment at worst, never a fine, so it never raises the alarm.
   const spotLine =
-    you.spot === 'outside' ? `Izgleda da nisi na parking mestu — najbliže je ${m(you.offByM)} odavde.`
-    : you.spot === 'edge' ? `Na ivici si parking površine, pa ne mogu da potvrdim da je mesto naplatno.`
+    you.spot === 'outside' ? say(car ? 'claimSpotOutsideCar' : 'claimSpotOutside', { dist: m(you.offByM) })
+    : you.spot === 'edge' ? say(car ? 'claimSpotEdgeCar' : 'claimSpotEdge')
     : null
 
   return { place: placeLine, you: youLine, spot: spotLine, level: you.level }

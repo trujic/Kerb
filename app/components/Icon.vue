@@ -71,6 +71,9 @@
     <template v-else-if="name === 'check'">
       <path d="M4 12.5 9.5 18 20 6.5" />
     </template>
+    <template v-else-if="name === 'phone'">
+      <rect x="7" y="2.5" width="10" height="19" rx="2.2" /><path d="M11 18.5h2" />
+    </template>
   </svg>
 </template>
 
@@ -79,7 +82,7 @@ withDefaults(defineProps<{
   name:
     | 'home' | 'city' | 'clock' | 'plus' | 'user' | 'pin' | 'sign' | 'camera'
     | 'ai' | 'moon' | 'bell' | 'alert' | 'parking' | 'car' | 'expand'
-    | 'nav-arrow' | 'compass' | 'check'
+    | 'nav-arrow' | 'compass' | 'check' | 'phone'
   size?: number
 }>(), { size: 16 })
 </script>

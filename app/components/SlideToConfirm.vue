@@ -9,7 +9,7 @@
   >
     <div class="s2c-fill" :style="{ transform: `scaleX(${fillRatio})` }" />
     <!-- Instruction lives IN the track — the gesture is the label. Fades as you drag. -->
-    <span class="s2c-label" :class="{ 's2c-label--shimmer': !done && !dragging }" :style="{ opacity: labelOpacity }">
+    <span class="s2c-label" :style="{ opacity: labelOpacity }">
       {{ done ? doneLabel : label }}
     </span>
     <!-- Round thumb on a visible rail — the pre-learned slide-to-pay pattern -->
@@ -23,7 +23,11 @@
       @keydown.enter.prevent="onKeyConfirm"
       @keydown.space.prevent="onKeyConfirm"
     >
-      <span class="s2c-thumb-chev" aria-hidden="true">{{ done ? '✓' : '››' }}</span>
+      <span
+        class="s2c-thumb-chev"
+        :class="{ 's2c-thumb-chev--hint': !done && !dragging && !disabled }"
+        aria-hidden="true"
+      >{{ done ? '✓' : '››' }}</span>
     </button>
   </div>
 </template>
@@ -37,7 +41,9 @@ const props = withDefaults(defineProps<{
   disabled?: boolean    // nothing to confirm yet — e.g. no plate to send
 }>(), { doneLabel: 'Confirmed', color: 'var(--blue)', confirmRatio: 0.55, disabled: false })
 
-const emit = defineEmits<{ confirm: [] }>()
+// `blocked`: pressed while disabled. The parent knows what is missing (a plate)
+// and can take the driver there; a track that only refuses teaches nothing.
+const emit = defineEmits<{ confirm: []; blocked: [] }>()
 
 const PAD = 4
 
@@ -125,7 +131,8 @@ const onKeyConfirm = () => {
 
 // The whole track is grabbable — the thumb is the visual, not the only handle.
 const onDown = (e: PointerEvent) => {
-  if (done.value || props.disabled) return
+  if (props.disabled) { emit('blocked'); return }
+  if (done.value) return
   measure()
   dragging.value = true
   moved = false
@@ -164,9 +171,11 @@ onUnmounted(() => {
   cursor: grab;
 }
 .s2c--drag { cursor: grabbing; }
-/* Visibly not ready, rather than a track that silently refuses to move. */
-.s2c--off { opacity: 0.5; cursor: not-allowed; }
-.s2c--off .s2c-thumb { cursor: not-allowed; }
+/* Visibly not ready, rather than a track that silently refuses to move. The
+   thumb dims; the label stays legible, because it now says what is missing. */
+.s2c--off { cursor: not-allowed; }
+.s2c--off .s2c-thumb { cursor: not-allowed; opacity: 0.45; }
+.s2c--off .s2c-label { color: var(--text2); }
 .s2c-fill {
   position: absolute;
   inset: 0;
@@ -192,17 +201,13 @@ onUnmounted(() => {
   color: var(--text2);
   pointer-events: none;
 }
-.s2c-label--shimmer {
-  background: linear-gradient(90deg, var(--muted) 38%, var(--text) 50%, var(--muted) 62%);
-  background-size: 200% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  animation: s2c-shimmer 2.4s linear infinite;
-}
-@keyframes s2c-shimmer {
-  from { background-position: 100% 0; }
-  to { background-position: 0% 0; }
+/* The way to go, shown on the thumb itself: a small rightward drift of the
+   chevrons. A sweep across the label text used to do this, and it cost the
+   label its contrast in sunlight. */
+.s2c-thumb-chev--hint { animation: s2c-hint 1.8s var(--ease-in-out) infinite; }
+@keyframes s2c-hint {
+  0%, 55%, 100% { transform: translateX(0); }
+  25% { transform: translateX(4px); }
 }
 .s2c--done .s2c-label { color: var(--text); }
 
@@ -225,7 +230,7 @@ onUnmounted(() => {
 .s2c--drag .s2c-thumb { transition: none; cursor: grabbing; }
 .s2c-thumb:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
 .s2c--done .s2c-thumb { cursor: default; }
-.s2c-thumb-chev { font-size: 17px; font-weight: 700; letter-spacing: -1px; line-height: 1; }
+.s2c-thumb-chev { display: inline-block; font-size: 17px; font-weight: 700; letter-spacing: -1px; line-height: 1; }
 
 /* Tap without drag → the thumb points the way instead of silently ignoring you */
 .s2c--nudge .s2c-thumb { animation: s2c-nudge 450ms var(--ease-out); }
@@ -237,13 +242,7 @@ onUnmounted(() => {
 
 @media (prefers-reduced-motion: reduce) {
   .s2c-fill, .s2c-thumb { transition: none; }
-  .s2c-label--shimmer {
-    animation: none;
-    background: none;
-    -webkit-background-clip: initial;
-    background-clip: initial;
-    color: var(--text2);
-  }
+  .s2c-thumb-chev--hint { animation: none; }
   .s2c--nudge .s2c-thumb { animation: none; }
 }
 </style>

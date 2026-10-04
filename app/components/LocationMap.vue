@@ -8,7 +8,7 @@
       @click.stop="$emit('enableCompass')"
     ><Icon name="compass" :size="14" /> Enable compass</button>
     <button
-      v-if="interactive && !follow"
+      v-if="interactive && !follow && !hideUser"
       class="lm-recenter"
       type="button"
       aria-label="Recenter on my location"
@@ -59,6 +59,9 @@ const props = defineProps<{
   // makes sense where the parent runs the pay flow (the dashboard), not on the
   // city guide's reference map, where it would lead nowhere.
   payable?: boolean
+  // What the popup's button says. The dashboard on desktop uses it to place the
+  // car ("my car is here") rather than to pay.
+  payLabel?: string
 }>()
 
 const emit = defineEmits<{
@@ -151,6 +154,18 @@ const zoneBounds = (zones: any): [[number, number], [number, number]] | null => 
   }
   return seen ? [[minLat, minLng], [maxLat, maxLng]] : null
 }
+
+// The city overview fits itself to the zones once. They can arrive after the map
+// mounts, and a map with no user to centre on would otherwise sit wherever it began.
+let fittedToZones = false
+watchEffect(() => {
+  const map = mapRef.value
+  if (!props.hideUser || fittedToZones || !map || props.pin) return
+  const b = zoneBounds(props.zones)
+  if (!b) return
+  fittedToZones = true
+  map.fitBounds(b as any, { padding: [26, 26] })
+})
 
 watchEffect((onCleanup) => {
   const zones = props.zones
@@ -315,7 +330,7 @@ watchEffect((onCleanup) => {
 })
 
 // Relative "last confirmed" age, e.g. "today", "yesterday", "5 days ago".
-const { lang, t } = useLang()
+const { lang, t, zoneLabel } = useLang()
 
 /**
  * What a zone polygon says when you tap it.
@@ -346,14 +361,18 @@ const zonePopup = (
   if (z?.daily_amount) rows.push(`<div class="lm-pop-row">${esc(t('zoneDaily', {
     amount: formatMoney(Number(z.daily_amount), z.price_currency ?? null),
   }))}</div>`)
+  // The checked, bilingual note for this city wins over the registry's prose,
+  // which was written in English before the app spoke Serbian.
+  const note = cityCopy(props.cityId)?.zoneNotes[zoneName]?.[lang.value]
+  const rules = note ? fillFromZone(note, z) : z?.rules
   if (residents) rows.push(`<div class="lm-pop-rules">${esc(t('zoneResidents'))}</div>`)
-  else if (z?.rules) rows.push(`<div class="lm-pop-rules">${esc(String(z.rules))}</div>`)
+  else if (rules) rows.push(`<div class="lm-pop-rules">${esc(String(rules))}</div>`)
   if (!rows.length) rows.push(`<div class="lm-pop-row">${esc(t('zoneNoData'))}</div>`)
 
   const el = document.createElement('div')
   el.className = 'lm-pop'
   el.innerHTML =
-    `<div class="lm-pop-head"><span class="lm-pop-zone" style="color:${color}">${esc(zoneName)}</span>` +
+    `<div class="lm-pop-head"><span class="lm-pop-zone" style="color:${color}">${esc(zoneLabel(zoneName))}</span>` +
     `<span class="lm-pop-price">${esc(rate ?? t('zoneNoRate'))}</span></div>` +
     `<div class="lm-pop-body">${rows.join('')}</div>`
 
@@ -365,27 +384,31 @@ const zonePopup = (
     const btn = document.createElement('button')
     btn.type = 'button'
     btn.className = 'lm-pop-pay'
-    btn.textContent = t('zonePayBtn')
+    btn.textContent = props.payLabel ?? t('zonePayBtn')
     // Where the driver tapped travels with the choice. The card that opens next
     // names this zone, and the map above it was still centred on the GPS fix —
     // so it read "pay Red Zone" over a picture of the driver standing in Blue.
     btn.addEventListener('click', () => {
       const p = at()
       if (p) emit('payZone', { zone: zoneName, lat: p.lat, lng: p.lng })
+      // On desktop the map stays open beside the pay panel; a popup left over the
+      // pin would hide the very spot the panel is now about.
+      mapRef.value?.closePopup()
     })
     el.appendChild(btn)
   }
   return el
 }
 
+// How long ago a sign was confirmed, in the reader's language.
 const relAge = (iso?: string): string => {
   if (!iso) return ''
   const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000)
-  if (days <= 0) return 'today'
-  if (days === 1) return 'yesterday'
-  if (days < 7) return `${days} days ago`
-  if (days < 30) return `${Math.floor(days / 7)} wk ago`
-  return `${Math.floor(days / 30)} mo ago`
+  if (days <= 0) return t('ageToday')
+  if (days === 1) return t('ageYesterday')
+  if (days < 7) return t('ageDays', { n: days })
+  if (days < 30) return t('ageWeeks', { n: Math.floor(days / 7) })
+  return t('ageMonths', { n: Math.floor(days / 30) })
 }
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => (
   { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string))
@@ -468,14 +491,14 @@ watchEffect((onCleanup) => {
     })
     const m = L.marker([s.lat, s.lng], { icon, interactive: true }).addTo(map)
 
-    const name = s.zone_name ? esc(s.zone_name) : 'Confirmed sign'
+    const name = esc(s.zone_name ? zoneLabel(s.zone_name) : t('signConfirmedTitle'))
     const photo = s.photo_url ? `<img class="lm-pop-img" src="${esc(s.photo_url)}" alt="${name}" />` : ''
     const price = s.price ? `<span class="lm-pop-price">${esc(s.price)}</span>` : ''
     const age = relAge(s.created_at)
     m.bindPopup(
       `<div class="lm-pop">${photo}` +
       `<div class="lm-pop-head"><span class="lm-pop-zone" style="color:${color}">✓ ${name}</span>${price}</div>` +
-      (age ? `<div class="lm-pop-age">Confirmed ${age}</div>` : '') +
+      (age ? `<div class="lm-pop-age">${esc(t('signConfirmedAge', { age }))}</div>` : '') +
       `</div>`,
       { className: 'lm-pop-wrap', closeButton: true },
     )

@@ -50,7 +50,7 @@
         </section>
 
         <!-- The single sure thing -->
-        <button class="ai-btn" type="button" @click="$emit('scan')"><Icon name="camera" :size="15" /> {{ t('scanByCar') }}</button>
+        <button v-if="canScan !== false" class="ai-btn" type="button" @click="$emit('scan')"><Icon name="camera" :size="15" /> {{ t('scanByCar') }}</button>
 
         <!-- ── MORE, IF YOU WANT IT · tucked away ─────────────────────────── -->
 
@@ -112,6 +112,8 @@ const props = defineProps<{
   verdict?: ZoneVerdict | null
   sourceName?: string | null
   confirmedAt?: string | null
+  // Off on desktop: the scan needs a camera pointed at the sign.
+  canScan?: boolean
 }>()
 
 const emit = defineEmits<{ pick: [zone: string]; scan: []; close: [] }>()

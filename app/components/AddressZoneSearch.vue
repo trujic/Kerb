@@ -15,6 +15,7 @@
       <button v-if="q" type="button" class="azs-x" :aria-label="t('clear')" @click="reset">✕</button>
     </div>
 
+    <p v-if="lockCity && !picked" class="azs-msg">{{ t('addressScope', { city: cityName(lockCity.id, lockCity.name) }) }}</p>
     <p v-if="pending" class="azs-msg">{{ t('searching') }}</p>
     <p v-else-if="error === 'noAddressHit'" class="azs-msg">{{ t('noAddressHit') }}</p>
     <p v-else-if="error" class="azs-msg">{{ t('addressSearchFailed') }}</p>
@@ -88,20 +89,25 @@
 <script setup lang="ts">
 const props = defineProps<{
   cityId?: string | null
+  // The city GPS has placed the driver in. Set, the search answers only there.
+  lockCity?: { id: string; name: string } | null
+  // Picking a hit hands it straight to the parent and clears the field; the
+  // parent's own card shows the answer (desktop "where is your car?").
+  pickOnly?: boolean
   zones?: any[]
   geojson?: any
 }>()
-defineEmits<{ locate: [hit: any] }>()
+const emit = defineEmits<{ locate: [hit: any] }>()
 // The map needs the target city's zones too, or a pin lands on an empty map.
 
-const { t } = useLang()
+const { t, cityName } = useLang()
 const { results, pending, error, search, clear } = useAddressSearch()
 
 const q = ref('')
 const picked = ref<any>(null)
 let debounce: ReturnType<typeof setTimeout>
 
-const run = () => search(q.value, props.cityId)
+const run = () => search(q.value, props.cityId, props.lockCity?.id)
 const onType = () => {
   picked.value = null
   clearTimeout(debounce)
@@ -110,6 +116,11 @@ const onType = () => {
 }
 const reset = () => { q.value = ''; picked.value = null; target.value = null; clear() }
 const pick = async (h: any) => {
+  if (props.pickOnly) {
+    emit('locate', { ...h, geojson: props.geojson, zones: props.zones })
+    reset()
+    return
+  }
   picked.value = h
   clear()
   target.value = null

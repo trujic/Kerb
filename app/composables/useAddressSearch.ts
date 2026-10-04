@@ -48,13 +48,13 @@ export const useAddressSearch = () => {
   let seq = 0
 
   /**
-   * `nearCity` ranks results, it does not restrict them. Checking an address is
-   * mostly something you do BEFORE setting off — sitting in Novi Sad, planning a
-   * morning in Belgrade — so binding the search to wherever the phone happens to
-   * be defeats the point. Hits in the current city come first; the rest follow,
-   * each labelled with its own city.
+   * `nearCity` ranks results; `onlyCity` restricts them. When GPS has put the
+   * driver inside a covered city, the search stays in that city: the job there is
+   * "I know the street, I walked away from the car", and a same-named street in
+   * another city is a wrong answer, not a helpful one. Without a GPS city the
+   * search ranks the city we expect first and labels the rest with their own.
    */
-  const search = async (raw: string, nearCity?: string | null) => {
+  const search = async (raw: string, nearCity?: string | null, onlyCity?: string | null) => {
     const q = raw.trim()
     results.value = []
     error.value = null
@@ -67,10 +67,12 @@ export const useAddressSearch = () => {
         q, format: 'json', limit: '8', addressdetails: '1',
         countrycodes: 'rs,gr', 'accept-language': 'sr,en',
       })
-      const box = nearCity ? CITY_BOX[nearCity] : null
+      const lock = onlyCity && CITY_BOX[onlyCity] ? onlyCity : null
+      const box = CITY_BOX[lock ?? nearCity ?? ''] ?? null
       if (box) {
         // viewbox alone biases ranking; without bounded=1 it never excludes.
         params.set('viewbox', `${box[1]},${box[2]},${box[3]},${box[0]}`)
+        if (lock) params.set('bounded', '1')
       }
       const res = await fetch(`https://nominatim.openstreetmap.org/search?${params}`)
       const raw2 = res.ok ? await res.json() : []
@@ -90,6 +92,9 @@ export const useAddressSearch = () => {
         const inCity = cityIdAt(lat, lng)
         return { label, detail, lat, lng, cityId: isLive(inCity) ? inCity : null }
       })
+      // The box is a rectangle around the metro area; the city test is the same
+      // rectangle, so this only drops what Nominatim let through at the edges.
+      .filter((h) => !lock || h.cityId === lock)
       // Covered cities first (we can actually answer for those), then the city
       // you are in, then everything else in the order Nominatim ranked it.
       const rank = (h: AddressHit) => (h.cityId ? (h.cityId === nearCity ? 0 : 1) : 2)
@@ -104,6 +109,12 @@ export const useAddressSearch = () => {
 
   const clear = () => { results.value = []; error.value = null }
   return { results, pending, error, search, clear }
+}
+
+/** The middle of a city's box: where a map with no position to centre on starts. */
+export const cityCenter = (id?: string | null): { lat: number; lng: number } | null => {
+  const b = id ? CITY_BOX[id] : null
+  return b ? { lat: (b[0] + b[2]) / 2, lng: (b[1] + b[3]) / 2 } : null
 }
 
 /** Which covered city a point falls in, or null when we do not cover it. */

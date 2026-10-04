@@ -2,25 +2,41 @@
   <div>
     <!-- ── GPS DASHBOARD (logged-in + city detected) ── -->
     <section v-if="gpsMode" class="hero-gps">
-      <div class="container">
-        <!-- Map — hidden while free: the "no need to pay" answer is the whole screen -->
+      <div class="container" :class="{ 'gps-split': !freeSurface }">
+        <!-- Map — hidden while free: the "no need to pay" answer is the whole screen.
+             Phone: a locked thumbnail above the pay flow. Desktop: the other half of
+             the screen, pan/zoom and tap-a-zone-to-pay, beside the panel. -->
         <ClientOnly>
           <div v-if="!freeSurface" class="gps-map-wrap">
             <LocationMap
-              :lat="coords!.lat"
-              :lng="coords!.lng"
-              :accuracy="coords!.accuracy"
+              :key="wideLayout ? (hideDeskDot ? 'wide-city' : 'wide') : 'narrow'"
+              :lat="mapCenter.lat"
+              :lng="mapCenter.lng"
+              :accuracy="mapCenter.accuracy"
               :heading="heading"
-              :height="130"
-              :zones="displayZones"
-              :highlight="highlightPoint"
-              :pin="searchPin ?? pickedZonePin"
-              :signs="signReports"
+              :height="wideLayout ? undefined : 130"
+              :fill="wideLayout"
+              :interactive="wideLayout"
+              :hide-user="hideDeskDot"
+              :zones="wideLayout ? (searchZones ?? displayZones) : displayZones"
+              :highlight="wideLayout && searchPin ? null : highlightPoint"
+              :pin="mapPin"
+              :signs="deskAsking ? [] : signReports"
+              :zone-meta="allZones"
+              :city-id="detectedCity?.id ?? expectCityId"
+              :payable="wideLayout"
+              :pay-label="deskMode ? t('carHereBtn') : undefined"
               :compass-prompt="compassPrompt"
               labels
+              @pay-zone="onPayZone"
               @compass-tap="onMapTap"
               @enable-compass="onMapTap"
             />
+            <!-- The map is the second way to answer the panel's question; say so on
+                 the map itself, where the eye already is. -->
+            <p v-if="deskAsking" class="map-ask">
+              <Icon name="pin" :size="14" /> {{ t("carMapChip") }}
+            </p>
             <button
               class="map-expand-btn"
               type="button"
@@ -82,9 +98,9 @@
               </div>
               <div class="map-fs-body">
                 <LocationMap
-                  :lat="coords!.lat"
-                  :lng="coords!.lng"
-                  :accuracy="coords!.accuracy"
+                  :lat="mapCenter.lat"
+                  :lng="mapCenter.lng"
+                  :accuracy="mapCenter.accuracy"
                   :heading="heading"
                   :zones="searchZones ?? displayZones"
                   :highlight="searchPin ? null : highlightPoint"
@@ -105,18 +121,17 @@
           </Teleport>
         </ClientOnly>
 
+        <!-- Everything but the map. One column on a phone; the left half on desktop. -->
+        <div class="gps-panel">
         <!-- Detected-location line — minimal: where you are, not a city banner -->
         <div class="gps-detected">
           <span class="gps-detected-where">
             <span class="gps-detected-pin"><Icon name="pin" :size="13" /></span>
-            <template v-if="detectedStreet"
+            <!-- On desktop the street is the laptop's, so only the city is said. -->
+            <template v-if="detectedStreet && !deskMode"
               ><strong>{{ detectedStreet }}</strong> · </template
             >{{ detectedCity!.name }}
-            <span class="gps-detected-tag">{{ t("detected") }}</span>
           </span>
-          <NuxtLink :to="`/${detectedCity!.id}`" class="gps-detected-guide">{{
-            t("fullGuide")
-          }}</NuxtLink>
         </div>
 
         <!-- Working from a stored copy. The date is the whole point: zones do get
@@ -171,7 +186,7 @@
             <!-- Why pre-pay exists: the honest observation, framed as a tip
                  right under the button it explains — not manufactured urgency -->
             <p v-if="statusCanPrepay" class="free-prepay-tip">
-              <Icon name="alert" :size="14" />
+              <Icon name="clock" :size="14" />
               <span
                 ><strong>{{ t("tipLabel") }}:</strong>
                 {{ t("prepayWhy", { start: nextWindow!.start }) }}</span
@@ -185,6 +200,47 @@
 
         <!-- ═══ FULL DASHBOARD — paid now, or browsing while free ═══ -->
         <template v-else>
+          <!-- Desktop: the laptop is not where the car is, so ask. Above every
+               answer, including "no paid parking there", so the place can always
+               be changed. Direct children of the panel, so the search can stay
+               pinned under the nav for the whole length of it. -->
+          <template v-if="deskMode">
+            <!-- Until the car is placed: one question, the two ways to answer it,
+                 and nothing else asking to be read. -->
+            <div v-if="!carPoint" class="car-ask">
+              <h2 class="car-step-title">{{ t("carWhereTitle") }}</h2>
+              <p class="car-step-sub">{{ t("carWhereSub") }}</p>
+            </div>
+            <!-- Always on screen: the place can be changed at any point in the flow. -->
+            <div ref="carSearchEl" class="car-search">
+              <AddressZoneSearch
+                class="car-step-search"
+                pick-only
+                :city-id="detectedCity?.id ?? expectCityId"
+                :lock-city="detectedCity"
+                :zones="allZones"
+                :geojson="zoneBoundaries"
+                @locate="onCarAddress"
+              />
+            </div>
+            <div v-if="!carPoint" class="pay-step">
+              <p class="car-step-or"><span>{{ t("or") }}</span></p>
+              <p class="car-step-map">
+                {{ t("carWhereMap") }}
+                <span class="car-step-arrow" aria-hidden="true">→</span>
+              </p>
+            </div>
+            <div v-else class="pay-step car-step-set">
+              <span class="car-step-pin"><Icon name="pin" :size="15" /></span>
+              <span class="car-step-what">
+                <span class="car-step-kicker">{{ t("carIsAt") }}</span>
+                <strong class="car-step-label">{{ carLabel }}</strong>
+              </span>
+              <button type="button" class="car-step-change" @click="focusCarSearch">
+                {{ t("carChange") }}
+              </button>
+            </div>
+          </template>
           <!-- Geometry still loading — hold the verdict inside the frame the real
              zone card + slider will fill; never guess a zone to unsay -->
           <template v-if="!geoResolved">
@@ -215,11 +271,13 @@
             <div class="np-main">
               <div class="np-icon"><Icon name="parking" :size="24" /></div>
               <div class="np-text">
-                <p class="np-title">{{ t("noParkingTitle") }}</p>
+                <p class="np-title">
+                  {{ deskMode ? t("carNoParkingTitle") : t("noParkingTitle") }}
+                </p>
                 <p class="np-sub">
-                  {{ t("noParkingSub") }}
+                  {{ deskMode ? t("carNoParkingSub") : t("noParkingSub") }}
                   <strong>~{{ formatDist(nearest!.distanceM) }}</strong>
-                  {{ t("awayOn") }}
+                  {{ deskMode ? t("carAwayOn") : t("awayOn") }}
                   <span :style="{ color: zoneColor(nearest!.zoneName) }">{{
                     nearest!.zoneName
                   }}</span>
@@ -227,8 +285,10 @@
                 </p>
               </div>
             </div>
-            <div class="np-actions">
-              <button type="button" class="np-btn" @click="mapExpanded = true">
+            <!-- Desktop: the map is already beside this card, and nobody walks
+                 to a sign with a laptop, so neither button has a job there. -->
+            <div v-if="!deskMode" class="np-actions">
+              <button type="button" class="np-btn np-btn-map" @click="openMap">
                 <Icon name="expand" :size="14" /> {{ t("browseZones") }}
               </button>
               <button type="button" class="np-btn" @click="showScan = true">
@@ -242,17 +302,10 @@
             <!-- First run only: no plate yet — the one moment it deserves the space -->
             <!-- Guests always type the plate in the open — exactly as on the
                  vehicle, capitals and diacritics included; no chip to unfold -->
-            <div v-if="!user" class="pay-step">
-              <PlateInput v-model="guestPlate" />
-              <span class="zone-plate-hint">
-                <template v-if="guestPlate.trim()"
-                  >{{ t("plateHint") }} ·
-                  <NuxtLink to="/login">{{ t("plateSync") }}</NuxtLink></template
-                >
-                <template v-else>{{ t("plateHintEmpty") }}</template>
-              </span>
+            <div v-if="!user && (!deskMode || carPoint)" class="pay-step">
+              <PlateInput v-model="guestPlate" :camera="!deskMode" />
             </div>
-            <div v-else-if="!defaultPlate" class="pay-step">
+            <div v-else-if="user && !defaultPlate && (!deskMode || carPoint)" class="pay-step">
               <NuxtLink to="/profile" class="veh-add"
                 >{{ t("addPlate") }} →</NuxtLink
               >
@@ -288,15 +341,14 @@
                   </div>
                   <SlideToConfirm
                     :key="'bnd-' + z.name"
-                    :label="t('sendSms', { code: z.sms_shortcode })"
+                    :label="defaultPlate ? t('sendSms', { code: z.sms_shortcode }) : t('needPlateSlide')"
                     :done-label="t('openingSms')"
                     :color="z.color"
                     :disabled="!defaultPlate"
                     @confirm="pay(z)"
+                    @blocked="goToPlate"
                   />
                 </div>
-
-                <p v-if="!defaultPlate" class="pay-need-plate">{{ t("needPlate") }}</p>
               </div>
             </div>
 
@@ -431,10 +483,11 @@
                plate in the open above). At night the free-surface tip already
                explained the carry-over, so no consequence line repeats it here. -->
               <div
-                v-if="!nightPrepay || (user && defaultPlate)"
+                v-if="(!nightPrepay && !dailyOffer) || (user && defaultPlate)"
                 class="pay-summary"
               >
-                <span v-if="!nightPrepay" class="pay-until">
+                <!-- With two ways to pay, each option card carries its own line. -->
+                <span v-if="!nightPrepay && !dailyOffer" class="pay-until">
                   <strong>{{
                     t("coveredUntil", { time: coveredUntil })
                   }}</strong>
@@ -475,20 +528,54 @@
                 }}</NuxtLink>
               </div>
 
+              <!-- Where the zone sells a daily ticket, the two ways to pay sit
+                   side by side. Which is cheaper depends on how long the driver
+                   stays, and only they know that; under the hourly slide it read
+                   as fine print. One slide below sends whichever is chosen. -->
+              <div
+                v-if="dailyOffer"
+                class="pay-choice"
+                role="radiogroup"
+                :aria-label="t('payChoiceLabel')"
+                :style="{ '--opt-color': selectedZone.color }"
+              >
+                <button
+                  v-for="opt in payOptions"
+                  :key="opt.id"
+                  type="button"
+                  role="radio"
+                  class="pay-opt"
+                  :class="{ on: (opt.id === 'daily' ? payingDaily : !payingDaily) }"
+                  :aria-checked="opt.id === 'daily' ? payingDaily : !payingDaily"
+                  :disabled="opt.disabled"
+                  @click="payProduct = opt.id"
+                >
+                  <span class="pay-opt-name">
+                    <span class="pay-opt-radio" aria-hidden="true" />
+                    {{ opt.name }}
+                  </span>
+                  <span class="pay-opt-price">{{ opt.price }}</span>
+                  <span class="pay-opt-note">{{ opt.note }}</span>
+                </button>
+              </div>
+              <!-- The map lists the lots that sell it; elsewhere in the zone the
+                   extra sign decides, and the driver is told so before paying. -->
+              <p v-if="payingDaily && !dailyOffer!.listed" class="pay-opt-warn">
+                <Icon name="sign" :size="14" />
+                <span>{{ t("dailyOnlyIfSign") }}</span>
+              </p>
               <!-- Night pre-pay: free now, the SMS carries over to the next window -->
               <div v-if="nightPrepay" class="prepay">
                 <SlideToConfirm
                   :key="'pp-' + selectedZone.name"
-                  :label="payLabel"
+                  :label="defaultPlate ? payLabel : t('needPlateSlide')"
                   :done-label="payDoneLabel"
                   :color="selectedZone.color"
                   :disabled="!defaultPlate"
                   @confirm="pay(selectedZone)"
+                  @blocked="goToPlate"
                 />
-                <p v-if="!defaultPlate" class="pay-need-plate">
-                  {{ t("needPlate") }}
-                </p>
-                <p v-else class="pay-note">
+                <p v-if="defaultPlate" class="pay-note">
                   {{ t("slideConfirms") }} {{ payNote }}
                 </p>
               </div>
@@ -497,17 +584,15 @@
               <template v-else>
                 <template v-if="!skipConfirm">
                   <SlideToConfirm
-                    :key="selectedZone.name"
-                    :label="payLabel"
+                    :key="selectedZone.name + '-' + payProduct"
+                    :label="!defaultPlate ? t('needPlateSlide') : payingDaily ? dailyLabel : payLabel"
                     :done-label="payDoneLabel"
                     :color="selectedZone.color"
                     :disabled="!defaultPlate"
-                    @confirm="pay(selectedZone)"
+                    @confirm="payingDaily ? payDaily() : pay(selectedZone)"
+                    @blocked="goToPlate"
                   />
-                  <p v-if="!defaultPlate" class="pay-need-plate">
-                    {{ t("needPlate") }}
-                  </p>
-                  <p v-else class="pay-note">
+                  <p v-if="defaultPlate" class="pay-note">
                     {{ t("slideConfirms") }} {{ payNote }}
                   </p>
                 </template>
@@ -521,42 +606,27 @@
                     background: selectedZone.color,
                     color: inkOn(selectedZone.color),
                   }"
-                  @click="pay(selectedZone)"
+                  @click="payingDaily ? payDaily() : pay(selectedZone)"
                 >
                   <span v-if="defaultPlate"
-                    >{{ t("payZone", { zone: zoneLabel(selectedZone.name) }) }} ·
-                    {{ defaultPlate }}</span
+                    >{{
+                      payingDaily
+                        ? t("payDailyBtn")
+                        : t("payZone", { zone: zoneLabel(selectedZone.name) })
+                    }}
+                    · {{ defaultPlate }}</span
                   >
                   <span v-else>{{
-                    t("payZone", { zone: zoneLabel(selectedZone.name) })
+                    payingDaily
+                      ? t("payDailyBtn")
+                      : t("payZone", { zone: zoneLabel(selectedZone.name) })
                   }}</span>
-                  <span v-if="payAction?.label" class="zone-act-arrow"
-                    >→ {{ payAction.label }}</span
+                  <span
+                    v-if="payingDaily ? dailyOffer : payAction?.label"
+                    class="zone-act-arrow"
+                    >→ {{ payingDaily ? dailyOffer!.target : payAction!.label }}</span
                   >
                 </button>
-                <!-- The daily ticket, where this lot sells it. A second way to
-                     pay rather than a replacement: under two hours the hourly
-                     rate still wins, and the app says which is which instead of
-                     choosing for the driver. -->
-                <div v-if="dailyHere" class="daily">
-                  <p class="daily-title">
-                    <Icon name="clock" :size="14" /> {{ t("dailyTitle") }}
-                  </p>
-                  <p v-if="dailyFromHours" class="daily-note">
-                    {{ t("dailyCheaper", { hours: dailyFromHours }) }}
-                  </p>
-                  <SlideToConfirm
-                    :key="'daily-' + selectedZone.name"
-                    :label="t('dailySend', {
-                      amount: selectedZone.daily_amount + ' ' + (selectedZone.price_currency || 'RSD'),
-                      code: selectedZone.daily_target,
-                    })"
-                    :done-label="t('openingSms')"
-                    :color="selectedZone.color"
-                    :disabled="!defaultPlate"
-                    @confirm="payDaily"
-                  />
-                </div>
 
                 <p v-if="skipConfirm && !defaultPlate" class="pay-need-plate">
                   {{ t("needPlate") }}
@@ -584,12 +654,33 @@
               </div>
             </div>
 
+            <!-- The SMS above only works from a domestic number. Said here, under the
+                 slide, with the operator's own way to pay a foreign SIM can use —
+                 the visitor it fails for has no other way of knowing. -->
+            <a
+              v-if="selectedZone && foreignSim && (atBoundary || payAction?.kind === 'sms')"
+              :href="foreignSimHref"
+              target="_blank"
+              rel="noopener"
+              class="foreign-sim"
+            >
+              <Icon name="phone" :size="16" />
+              <span class="foreign-sim-text">{{ foreignSim.text[lang] }}</span>
+              <span class="foreign-sim-go">{{ foreignSim.app }} →</span>
+            </a>
+
             <!-- The one escape hatch, after the primary action: every other zone + tools -->
             <template v-if="selectedZone">
               <!-- Scan leads the row: the sign is the one answer better than
                    ours, and it used to sit a scroll below the fold. -->
               <div class="zone-next">
-                <button type="button" class="zone-scan" @click="showScan = true">
+                <!-- Not on desktop: a laptop does not go to the sign. -->
+                <button
+                  v-if="!deskMode"
+                  type="button"
+                  class="zone-scan"
+                  @click="showScan = true"
+                >
                   <Icon name="camera" :size="16" /> {{ t("scanShort") }}
                 </button>
                 <button
@@ -639,31 +730,23 @@
           ><!-- /pay surface -->
 
           <!-- ═══ BELOW THE FOLD — the sign tools, one scroll past the pay job ═══ -->
-          <div class="below-section">
+          <!-- On desktop the same search already sits at the top, as "where is the car". -->
+          <div v-if="!deskMode" class="below-section">
             <p class="section-label">{{ t("addressTitle") }}</p>
             <p class="addr-sub">{{ t("addressSub") }}</p>
             <AddressZoneSearch
               :city-id="detectedCity?.id ?? expectCityId"
+              :lock-city="detectedCity"
               :zones="allZones"
               :geojson="zoneBoundaries"
               @locate="onLocateAddress"
             />
           </div>
 
-          <div class="below-section">
-            <!-- Scanning the sign moved up under the slide, where the decision is
-                 made; a second copy down here only made the page longer. -->
-
-            <!-- Ask AI — geometry + registry decide, never a remembered guess -->
-            <button type="button" class="ai-cta" @click="showAi = true">
-              <span class="ai-cta-icon"><Icon name="ai" :size="20" /></span>
-              <span class="ai-cta-text">
-                <span class="ai-cta-title">{{ t("aiTitle") }}</span>
-                <span class="ai-cta-sub">{{ t("aiSub") }}</span>
-              </span>
-              <span class="ai-cta-arrow">→</span>
-            </button>
-
+          <!-- The first-time explainer and the "nearest confirmed sign" card used
+               to sit here. The explainer stays reachable from "Druga zona?" → Pitaj
+               AI; the sign card could point a kilometre away, at a different street. -->
+          <div v-if="relayPublic && (!deskMode || carPoint)" class="below-section">
             <!-- Pay for me — the one case the pay surface above cannot serve:
                  a driver whose phone physically cannot send the message. Last
                  of the tools, because for most people here it is not the job. -->
@@ -675,73 +758,41 @@
               </span>
               <span class="ai-cta-arrow">→</span>
             </NuxtLink>
-
-            <!-- Nearest confirmed sign — lead the user to verified ground truth -->
-            <button
-              v-if="nearestSign"
-              type="button"
-              class="nsign"
-              :style="{
-                borderColor:
-                  (nearestSign.report.zone_color || 'var(--blue)') + '66',
-              }"
-              @click="onLeadToSign"
-            >
-              <span
-                class="nsign-arrow"
-                :style="{
-                  transform: `rotate(${nearestSignArrow}deg)`,
-                  color: nearestSign.report.zone_color || 'var(--blue)',
-                }"
-                ><Icon name="nav-arrow" :size="20"
-              /></span>
-              <span class="nsign-text">
-                <span class="nsign-title">
-                  {{
-                    t("nearestSign", {
-                      dist: formatDist(nearestSign.distanceM),
-                    })
-                  }}
-                </span>
-                <span class="nsign-sub">
-                  <span
-                    :style="{
-                      color: nearestSign.report.zone_color || 'var(--text2)',
-                    }"
-                    >{{ zoneLabel(nearestSign.report.zone_name) }}</span
-                  >
-                  ·
-                  {{
-                    t("confirmedAgo", {
-                      time: relTime(nearestSign.report.created_at),
-                    })
-                  }}
-                </span>
-              </span>
-              <span class="nsign-go">{{ t("leadMe") }}</span>
-            </button>
           </div>
           <!-- /sign tools -->
 
           <!-- ═══ CITY INFO — reference & reassurance, never urgent ═══ -->
-          <div class="below-section">
+          <div v-if="!deskMode || carPoint" class="below-section">
             <!-- Full weekly charging schedule (reference) -->
             <ParkingHours :city-id="detectedCity!.id" class="gps-hours" />
 
             <!-- Fine warning -->
-            <div v-if="copy || cityDetail.fine" class="gps-fine">
+            <!-- The answer card already says what not paying costs; this is the
+                 longer version, so it opens on request instead of repeating the
+                 card in a second red box. -->
+            <details v-if="copy" class="gps-fine">
+              <summary class="gps-fine-row">
+                <span class="gps-fine-label">{{ t("fineIfUnpaid") }}</span>
+                <span class="gps-fine-amount">{{ capFirst(copy.ifUnpaid[lang]) }}</span>
+              </summary>
+              <p class="gps-fine-more">{{ copy.ifUnpaidMore[lang] }}</p>
+            </details>
+            <div v-else-if="cityDetail.fine" class="gps-fine">
               <div class="gps-fine-row">
                 <span class="gps-fine-label">{{ t("fineIfUnpaid") }}</span>
-                <span class="gps-fine-amount">{{
-                  copy ? capFirst(copy.ifUnpaid[lang]) : cityDetail.fine
-                }}</span>
+                <span class="gps-fine-amount">{{ cityDetail.fine }}</span>
               </div>
-              <p v-if="copy" class="gps-fine-more">{{ copy.ifUnpaidMore[lang] }}</p>
             </div>
 
+            <!-- The full city guide: one quiet link at the end, rather than a link
+                 competing with the street name at the top of the answer. -->
+            <NuxtLink :to="`/${detectedCity!.id}`" class="city-guide-link">
+              {{ t("fullGuideCity", { city: cityName(detectedCity!.id, detectedCity!.name) }) }} →
+            </NuxtLink>
           </div>
           <!-- /city info --> </template
         ><!-- /full dashboard -->
+        </div><!-- /gps-panel -->
       </div>
 
       <!-- Scan the sign — capture → read → confirm → pin + prefill pay -->
@@ -750,7 +801,7 @@
           v-if="showScan"
           :city-id="detectedCity!.id"
           :zones="allZones"
-          :coords="coords"
+          :coords="deskMode ? carPoint : coords"
           :heading="heading"
           :street="nearest?.streetName ?? null"
           :likely-zone-name="likelyZoneName"
@@ -771,6 +822,7 @@
           :source-name="aiSourceName"
           :confirmed-at="cityDetail?.last_updated"
           @pick="onAiPick"
+          :can-scan="!deskMode"
           @scan="onAiScan"
           @close="showAi = false"
         />
@@ -788,10 +840,11 @@
         :class="{ 'gps-skel--on': gpsSkeleton }"
         aria-busy="true"
       >
-        <div class="container">
+        <div class="container" :class="{ 'gps-split': !freeSurface }">
           <div v-if="!freeSurface" class="gps-map-wrap">
             <div class="sk sk-map" />
           </div>
+          <div class="gps-panel">
           <div class="gps-detected">
             <span class="gps-detected-where">
               <span class="gps-detected-pin"
@@ -824,6 +877,7 @@
               <div class="sk sk-slider" />
             </div>
           </template>
+          </div><!-- /gps-panel -->
         </div>
       </section>
 
@@ -862,8 +916,27 @@
             </template>
           </div>
 
+          <!-- First visit: the browser's location prompt is earned by a button that
+               says what the location is for, instead of firing cold on page load.
+               Also the retry after a timeout — a denied permission or an
+               uncovered city gets nothing from asking again. -->
+          <div
+            v-if="!detecting && (askLocation || (gpsError && !gpsDenied && !unsupportedCity))"
+            class="find-zone fade-up-3"
+          >
+            <button type="button" class="find-zone-btn" @click="startDetect">
+              <Icon name="pin" :size="17" /> {{ t("findMyZone") }}
+            </button>
+            <p class="find-zone-why">{{ t("findMyZoneWhy") }}</p>
+          </div>
+
           <!-- Search -->
-          <div class="search-outer fade-up-3">
+          <!-- Quiet while "Nađi moju zonu" is on screen: one yellow action, not two
+               near-identical ones side by side. -->
+          <div
+            class="search-outer fade-up-3"
+            :class="{ 'search-outer--quiet': askLocation }"
+          >
             <div class="search-wrap" :class="{ focused: searchFocused }">
               <span class="search-icon">
                 <svg
@@ -1018,7 +1091,7 @@
 <script setup lang="ts">
 const { getCities, searchCities, getCity } = useCity();
 const { user, getProfile } = useAuth();
-const { t, lang, zoneLabel } = useLang();
+const { t, lang, zoneLabel, cityName } = useLang();
 const { public: pub } = useRuntimeConfig();
 // Pay-for-me needs a person on call and holds guests' money; off until both are
 // settled (runtimeConfig.public.relayPublic).
@@ -1046,6 +1119,7 @@ const dayWord = (label?: string | null) => {
 };
 const {
   detectCity,
+  setCityWithoutFix,
   detectedCity,
   detectedStreet,
   coords,
@@ -1096,6 +1170,120 @@ const zoneBoundaries = ref<any>(null);
 // zones[0] (Extra) for a few seconds and then get overwritten by the real verdict.
 const geoResolved = ref(false);
 const mapExpanded = ref(false);
+// Desktop split: the map sits beside the panel instead of above it. Read in JS
+// rather than only CSS because the map's mode (locked thumbnail vs. pan/zoom
+// with tap-to-pay) is a prop. Set on mount: the dashboard never prerenders.
+const wideLayout = ref(false);
+const finePointer = ref(false);
+let wideQuery: MediaQueryList | null = null;
+let fineQuery: MediaQueryList | null = null;
+const syncWide = () => {
+  wideLayout.value = !!wideQuery?.matches;
+  finePointer.value = !!fineQuery?.matches;
+};
+onMounted(() => {
+  wideQuery = window.matchMedia("(min-width: 1024px)");
+  fineQuery = window.matchMedia("(pointer: fine)");
+  syncWide();
+  wideQuery.addEventListener("change", syncWide);
+  fineQuery.addEventListener("change", syncWide);
+});
+onUnmounted(() => {
+  wideQuery?.removeEventListener("change", syncWide);
+  fineQuery?.removeEventListener("change", syncWide);
+});
+
+// ── Desktop: where is the car? ────────────────────────────────────────────────
+// A laptop has no GPS: it places itself from nearby Wi-Fi (20–100 m in a city) or
+// from its IP address (a district, or the whole city). And even a perfect fix
+// would answer the wrong question, because the laptop is where someone is
+// sitting, not where they left the car. So on a wide screen with a mouse the
+// device position only settles the city, and the pay panel starts from a place
+// the driver names: a street they search, or a zone they tap on the map.
+//
+// That place stands in for the GPS fix everywhere a zone is worked out — nearest
+// segment, boundary ties, the edge warning — so an address on a zone line still
+// gets the two-zone answer rather than a confident pick.
+const deskMode = computed(() => wideLayout.value && finePointer.value);
+const carPoint = ref<{ lat: number; lng: number; accuracy: number; label: string } | null>(null);
+const zoneCoords = computed(() => (deskMode.value ? carPoint.value : coords.value));
+// The blue dot is only drawn when it means something. On a laptop it is usually
+// tens of metres out, and it reads as "your car is here".
+const LAPTOP_DOT_MAX_M = 50;
+const hideDeskDot = computed(
+  () =>
+    !coords.value ||
+    (deskMode.value && (coords.value.accuracy ?? Infinity) > LAPTOP_DOT_MAX_M),
+);
+// Where the map starts. Without a position (desktop that could not place itself)
+// it starts on the city; the dot is hidden then, so nothing is drawn there.
+const mapCenter = computed(() => {
+  const c = coords.value;
+  if (c) return c;
+  const mid = cityCenter(detectedCity.value?.id) ?? { lat: 45.2551, lng: 19.8452 };
+  return { ...mid, accuracy: Infinity };
+});
+// Desktop before the car is placed: one question on screen. Sign pins wait too —
+// at city zoom they are a cluster of icons competing with the zones to be clicked.
+const deskAsking = computed(() => deskMode.value && !carPoint.value);
+// On a wide screen the map is already on screen; opening the fullscreen copy
+// would only cover the panel it is meant to sit beside.
+const openMap = () => {
+  if (!wideLayout.value) mapExpanded.value = true;
+};
+// ── When to ask for the location ─────────────────────────────────────────────
+// A cold browser prompt on page load, before the page has said what it is, is
+// the prompt people refuse — and a refusal can only be undone in the browser's
+// settings. So a first visit asks with a button that says what the location is
+// for. Anyone who already allowed it, or has used Kerb here before, goes straight
+// through. Where the Permissions API is missing, the old behaviour stands.
+const askLocation = ref(false);
+const startDetect = () => {
+  askLocation.value = false;
+  detectCity().then(openCityWithoutFix);
+};
+const decideLocation = async () => {
+  let state: PermissionState | null = null;
+  try {
+    state = (await navigator.permissions?.query({ name: "geolocation" }))?.state ?? null;
+  } catch {}
+  // Desktop does not need a position to work, so it never prompts: it opens the
+  // city at once (see openCityWithoutFix) and uses a fix only if one is allowed.
+  if (deskMode.value) {
+    openCityWithoutFix(null);
+    if (state === "granted") detectCity();
+    return;
+  }
+  let returning = false;
+  try {
+    returning = !!localStorage.getItem(EXPECT_GPS_KEY);
+  } catch {}
+  if (state === "prompt" && !returning) {
+    askLocation.value = true;
+    return;
+  }
+  startDetect();
+};
+
+// Desktop that could not place itself — timed out, denied, no Wi-Fi positioning.
+// Its position would only have chosen the city, so open the city it last used, or
+// the only one we publish, and let the panel ask for the car's street as it does
+// anyway. A city we do not cover keeps its honest "not covered" answer.
+const openCityWithoutFix = async (found: unknown) => {
+  if (found || !deskMode.value || unsupportedCity.value) return;
+  let id: string | null = null;
+  try {
+    id = localStorage.getItem(EXPECT_GPS_KEY);
+  } catch {}
+  if (!id) {
+    const live = String(useRuntimeConfig().public.liveCities ?? "")
+      .split(",")
+      .map((x) => x.trim())
+      .filter((x) => x && x !== "*");
+    if (live.length === 1) id = live[0]!;
+  }
+  if (id) await setCityWithoutFix(id);
+};
 const showScan = ref(false); // scan-the-sign modal
 const showAi = ref(false); // ask-AI resolver panel
 const signReports = ref<any[]>([]); // confirmed sign scans → map pins
@@ -1261,7 +1449,7 @@ const defaultPlate = computed(() => {
 });
 
 // Geometry-based detection: distance to the nearest paid-parking segment.
-const { nearest, zoneDistances } = useNearestParking(coords, zoneBoundaries);
+const { nearest, zoneDistances } = useNearestParking(zoneCoords, zoneBoundaries);
 
 // ── Fix trail ────────────────────────────────────────────────────────────────
 // Every position update is kept for the session so that when someone pays we can
@@ -1286,7 +1474,7 @@ watch(
 // zone anywhere near the error circle. At those the honest UI is SILENCE, not
 // reassurance — which is why this drives whether the caveat renders at all.
 const zoneClaimNow = computed(() => {
-  const c = coords.value;
+  const c = zoneCoords.value;
   if (!c || !zoneBoundaries.value) return null;
   return zoneClaim({
     point: [c.lng, c.lat],
@@ -1305,7 +1493,7 @@ const claimLevel = computed(() => zoneClaimNow.value?.you.level ?? "none");
 const claimNeighbourLine = computed(() => {
   const c = zoneClaimNow.value;
   if (!c || c.you.level !== "normal" || !c.you.nearestOther) return null;
-  return claimLines(c).you;
+  return claimLines(c, zoneLabel, t, { car: deskMode.value }).you;
 });
 // Evidence folded into the provenance line rather than given a row of its own —
 // more sources must not cost more screen.
@@ -1313,8 +1501,9 @@ const claimEvidence = computed(() => {
   const e = zoneClaimNow.value?.place?.evidence;
   if (!e) return null;
   const bits: string[] = [];
-  if (e.scans) bits.push(e.scans === 1 ? "1 tabla skenirana" : `${e.scans} table skenirane`);
-  if (e.payers >= 5) bits.push("uplate potvrđuju");
+  if (e.scans)
+    bits.push(e.scans === 1 ? t("claimEvidenceScan1") : t("claimEvidenceScans", { n: e.scans }));
+  if (e.payers >= 5) bits.push(t("claimEvidencePays"));
   return bits.length ? bits.join(" · ") : null;
 });
 
@@ -1338,7 +1527,7 @@ const BOUNDARY_FLOOR_M = 10;
 const tiedZones = computed(() => {
   const ds = zoneDistances.value;
   if (ds.length < 2 || parkingState.value === "none") return [];
-  const margin = Math.max(coords.value?.accuracy ?? 0, BOUNDARY_FLOOR_M);
+  const margin = Math.max(zoneCoords.value?.accuracy ?? 0, BOUNDARY_FLOOR_M);
   // One disc, radius r, centred on the driver: every zone it touches is a zone
   // they might be standing in. Distance to the ZONE, which is zero inside it —
   // so three metres inside the Blue line with Red beginning there puts Red at
@@ -1424,7 +1613,7 @@ const INSIDE_MARGIN_M = 5;
 const parkingState = computed<"on" | "edge" | "near" | "none" | null>(() => {
   const n = nearest.value;
   if (!n) return null;
-  const acc = coords.value?.accuracy ?? 0;
+  const acc = zoneCoords.value?.accuracy ?? 0;
   const onT = Math.min(Math.max(25, acc), 60);
   const nearT = Math.max(75, onT + 50);
   // Line geometry is a street centreline with no inside, and the kerb is half a
@@ -1467,7 +1656,7 @@ const showUnsureBox = computed(
 const spotNote = computed(() => {
   const c = zoneClaimNow.value;
   if (!c || !unsure.value || claimLevel.value !== "quiet") return null;
-  return claimLines(c).spot ?? null;
+  return claimLines(c, zoneLabel, t, { car: deskMode.value }).spot ?? null;
 });
 
 // No paid parking where the user stands (with geometry to back it) — the wizard
@@ -1508,7 +1697,9 @@ const activeSuggestedName = computed<string | null>(() => {
       ? nearest.value.zoneName
       : null;
   }
-  return suggestedZoneName.value;
+  // The street-name match comes from the device's own reverse-geocode, which on a
+  // desktop is the laptop's street, not the car's.
+  return deskMode.value ? null : suggestedZoneName.value;
 });
 
 // GPS gives a best guess — never a verdict. The user taps the zone on the sign.
@@ -1556,6 +1747,17 @@ const zoneLimits = computed<Record<string, ReturnType<typeof limitOf>>>(() => {
 // The checked, bilingual copy for this city (app/utils/cityCopy.ts), if any.
 const copy = computed(() => cityCopy(cityDetail.value?.id));
 const ifUnpaidText = computed(() => copy.value?.ifUnpaid[lang.value] ?? null);
+const foreignSim = computed(() => copy.value?.foreignSim ?? null);
+// The store the phone in hand uses; the operator's page for anything else.
+const foreignSimHref = computed(() => {
+  const f = foreignSim.value;
+  if (!f) return undefined;
+  if (!import.meta.client) return f.info;
+  const ua = navigator.userAgent;
+  if (/iPhone|iPad|iPod/i.test(ua)) return f.ios;
+  if (/Android/i.test(ua)) return f.android;
+  return f.info;
+});
 const sourceInfo = computed(() => {
   const c = copy.value;
   if (c)
@@ -1623,18 +1825,44 @@ const selectZone = (name: string) => {
 // Blue, and a card that argues with the map above it is not one anybody trusts.
 const pickedZonePin = ref<{ lat: number; lng: number; label?: string } | null>(null);
 
-const onPayZone = (pick: { zone: string; lat: number; lng: number }) => {
+const onPayZone = async (pick: { zone: string; lat: number; lng: number }) => {
+  if (deskMode.value) {
+    // The tapped spot becomes where the car is. Let the zone watch settle on the
+    // new place first, so the explicit pick below is the last word, not undone.
+    carPoint.value = { lat: pick.lat, lng: pick.lng, accuracy: BOUNDARY_FLOOR_M, label: "" };
+    await nextTick();
+  }
   selectZone(pick.zone);
   pickedZonePin.value = { lat: pick.lat, lng: pick.lng, label: pick.zone };
   mapExpanded.value = false;
 };
+
+// A searched street on desktop: that is where the car is. Accuracy is the
+// geocoder's — a house number lands on the building, not the kerb in front of it.
+const onCarAddress = (hit: any) => {
+  carPoint.value = { lat: hit.lat, lng: hit.lng, accuracy: 15, label: hit.label };
+};
+// The search is already on screen; "change" just puts the cursor in it.
+const carSearchEl = ref<HTMLElement | null>(null);
+const focusCarSearch = () => {
+  carSearchEl.value?.querySelector<HTMLInputElement>("input")?.focus();
+};
+// What to call the place: the searched address, else the street the tap landed on.
+const carLabel = computed(
+  () => carPoint.value?.label || nearest.value?.streetName || t("carOnMap"),
+);
+const mapPin = computed(() => {
+  if (!deskMode.value) return searchPin.value ?? pickedZonePin.value;
+  const c = carPoint.value;
+  return c ? { lat: c.lat, lng: c.lng, label: carLabel.value } : null;
+});
 
 // Follow the likely zone until the user picks; afterwards only repair invalid picks.
 // The zones[0] fallback is only honest AFTER geometry has settled — before that it
 // painted a confident wrong hero that the real verdict then swapped out from under
 // the user. While unresolved, null keeps the wizard on its "checking" line instead.
 watch(
-  [likelyZoneName, allZones, geoResolved],
+  [likelyZoneName, allZones, geoResolved, deskMode, carPoint],
   (cur, prev) => {
     // Driving into a different zone — or out of one — is new information, and it
     // retires whatever the user picked earlier. Without this, one tap on the map
@@ -1650,86 +1878,36 @@ watch(
       (z: any) => z.name === selectedZoneName.value
     );
     if (!userPickedZone.value || !valid) {
+      // On desktop with no car placed yet there is no zone to show at all; the
+      // first-zone fallback would put a price on a place nobody has named.
       selectedZoneName.value =
         likelyZoneName.value ??
-        (geoResolved.value ? allZones.value[0]?.name ?? null : null);
+        (geoResolved.value && !deskMode.value ? allZones.value[0]?.name ?? null : null);
     }
   },
   { immediate: true }
 );
 
-// ── Nearest confirmed sign — lead the user to verified ground truth ────────────
-const toRad = (d: number) => (d * Math.PI) / 180;
-const haversineM = (
-  a: { lat: number; lng: number },
-  b: { lat: number; lng: number }
-) => {
-  const R = 6371000;
-  const dLat = toRad(b.lat - a.lat);
-  const dLng = toRad(b.lng - a.lng);
-  const s =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dLng / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(s));
-};
-const bearingDeg = (
-  a: { lat: number; lng: number },
-  b: { lat: number; lng: number }
-) => {
-  const y = Math.sin(toRad(b.lng - a.lng)) * Math.cos(toRad(b.lat));
-  const x =
-    Math.cos(toRad(a.lat)) * Math.sin(toRad(b.lat)) -
-    Math.sin(toRad(a.lat)) *
-      Math.cos(toRad(b.lat)) *
-      Math.cos(toRad(b.lng - a.lng));
-  return ((Math.atan2(y, x) * 180) / Math.PI + 360) % 360;
-};
-
-// Closest confirmed sign to the user right now (within 1 km), with distance + bearing.
-const nearestSign = computed(() => {
-  const c = coords.value;
-  if (!c || !signReports.value.length) return null;
-  let best: any = null;
-  let bestD = Infinity;
-  for (const s of signReports.value) {
-    if (s.lat == null || s.lng == null) continue;
-    const d = haversineM(c, { lat: s.lat, lng: s.lng });
-    if (d < bestD) {
-      bestD = d;
-      best = s;
-    }
-  }
-  if (!best || bestD > 1000) return null;
-  return {
-    report: best,
-    distanceM: bestD,
-    bearing: bearingDeg(c, { lat: best.lat, lng: best.lng }),
-  };
-});
-
-// Arrow rotation for the nearest-sign card: relative to where the user faces when
-// the compass is available, otherwise an absolute (north-up) bearing.
-const nearestSignArrow = computed(() => {
-  const n = nearestSign.value;
-  if (!n) return null;
-  return heading.value != null ? n.bearing - heading.value : n.bearing;
-});
-
 // A tapped lead-to-sign point, else the nearest paid segment.
 const leadSignPoint = ref<{ lat: number; lng: number } | null>(null);
 const highlightPoint = computed(() => {
+  // The pointer is a line from the blue dot. On desktop the dot is the laptop.
+  if (deskMode.value) return null;
   if (leadSignPoint.value) return leadSignPoint.value;
   return parkingState.value !== "on"
     ? nearest.value?.point ?? null
     : null;
 });
 
-// Tap the nearest-sign card → draw a line to it and open the map.
-const onLeadToSign = () => {
-  const n = nearestSign.value;
-  if (!n) return;
-  leadSignPoint.value = { lat: n.report.lat, lng: n.report.lng };
-  mapExpanded.value = true;
+// A slide pressed with no plate: take the driver to the one thing missing.
+const goToPlate = () => {
+  const el = document.querySelector<HTMLElement>(".plate-input, .veh-add");
+  if (!el) return;
+  const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  el.scrollIntoView({ block: "center", behavior: still ? "auto" : "smooth" });
+  // After the press has finished: the tap on the track would otherwise move
+  // focus straight back off the field.
+  setTimeout(() => el.focus({ preventScroll: true }), 0);
 };
 
 // ── SMS handoff ────────────────────────────────────────────────────────────────
@@ -1783,14 +1961,14 @@ const onLocateAddress = (hit: any) => {
   searchZones.value = hit.geojson?.features?.length ? hit.geojson : null;
   searchCityName.value = hit.detail?.split(' · ').pop() || null;
   leadSignPoint.value = null;
-  mapExpanded.value = true;
+  openMap();
 };
 
 // ── Ask AI — deterministic candidate-set zone resolver ─────────────────────────
 // Resolves against the same geometry the map draws, so the AI never contradicts
 // what the user is looking at (sign-first logic is independent of this).
 const { verdict: aiVerdict } = useZoneResolver(
-  coords,
+  zoneCoords,
   displayZones,
   signReports
 );
@@ -1842,23 +2020,88 @@ const smsLink = (zone: any) => smsHref(zone.sms_shortcode, defaultPlate.value);
 // meant "Serbia only" — and left Belgrade, which has zones and prices but no
 // shortcode, with a screen that identified the zone and then offered nothing.
 // ── Daily ticket ──────────────────────────────────────────────────────────────
-// The zone defines the product (Blue: 95 RSD → 8215); the geometry says which
-// lots actually sell it — nine of Novi Sad's 262 segments. Both have to hold, so
-// the offer never appears on a stretch of the same zone that does not sell it.
+// The zone defines the product (Blue and White: 95 RSD → 8215); the geometry says
+// which lots our map lists as selling it — nine of Novi Sad's 262 segments.
 //
-// The editor has captured this flag all along and nothing ever read it, so a
-// driver parking for three hours on one of those nine lots paid 150 RSD for
-// something that costs 95.
-const dailyHere = computed(() => {
+// Wherever the zone has the product it is offered as an equal second way to pay,
+// not a footnote: a driver staying three hours on a daily lot was paying 150 RSD
+// for something that costs 95. On a listed lot it is offered plainly. Elsewhere
+// in the zone the extra sign is the only authority on whether it is valid, so the
+// option says that before the slide — the same deferral as everywhere else.
+const zoneDaily = computed(() => {
   const z: any = selectedZone.value;
-  return !!(
-    nearest.value?.daily &&
-    parkingState.value === "on" &&
-    !atBoundary.value &&
-    z?.daily_amount &&
-    z?.daily_target &&
-    z.name === nearest.value.zoneName
-  );
+  return z?.daily_amount && z?.daily_target
+    ? {
+        amount: Number(z.daily_amount),
+        target: String(z.daily_target),
+        currency: z.price_currency || "RSD",
+      }
+    : null;
+});
+// Edge counts as on the lot: within five metres of its line is still that lot.
+const dailyListed = computed(
+  () =>
+    !!(
+      zoneDaily.value &&
+      nearest.value?.daily &&
+      (parkingState.value === "on" || parkingState.value === "edge") &&
+      selectedZone.value?.name === nearest.value.zoneName
+    ),
+);
+// Not at a boundary: those candidates carry their own slides, and a daily choice
+// inside a refusal to pick the zone would be a pick by another name.
+const dailyOffer = computed(() =>
+  zoneDaily.value && !atBoundary.value && payAction.value?.kind === "sms"
+    ? { ...zoneDaily.value, listed: dailyListed.value }
+    : null,
+);
+const payProduct = ref<"hourly" | "daily">("hourly");
+// Outside charging hours only the hourly carries over to the next window — what a
+// daily bought tonight covers is not something we know — so the daily is shown,
+// with when it can be bought, but not offered.
+const payingDaily = computed(
+  () => payProduct.value === "daily" && !!dailyOffer.value && !nightPrepay.value,
+);
+// A different zone is a different product line; start again from the hourly.
+watch(
+  () => selectedZone.value?.name,
+  () => {
+    payProduct.value = "hourly";
+  },
+);
+const dailyLabel = computed(() => {
+  const d = dailyOffer.value;
+  return d
+    ? t("dailySend", { amount: `${d.amount} ${d.currency}`, code: d.target })
+    : "";
+});
+const payOptions = computed(() => {
+  const z: any = selectedZone.value;
+  const d = dailyOffer.value;
+  if (!z || !d) return [];
+  const later = nightPrepay.value && nextWindow.value;
+  return [
+    {
+      id: "hourly" as const,
+      name: t("payHourly"),
+      price: z.price,
+      note: t("coveredUntil", { time: coveredUntil.value }),
+      disabled: false,
+    },
+    {
+      id: "daily" as const,
+      name: t("payDailyOpt"),
+      price: `${d.amount} ${d.currency}`,
+      note: later
+        ? t("dailyFrom", {
+            when: `${dayWord(nextWindow.value!.dayLabel)} ${nextWindow.value!.start}`,
+          })
+        : dailyFromHours.value
+          ? t("dailyFromShort", { hours: dailyFromHours.value })
+          : t("dailyOnePay"),
+      disabled: !!later,
+    },
+  ];
 });
 
 // From which hour the daily is the cheaper answer. Rounded up, because the hour
@@ -2199,7 +2442,7 @@ onMounted(() => {
   // Offline needs the shell cached, which needs the worker registered for
   // everyone — not only for people who turned notifications on.
   ensureServiceWorker();
-  detectCity();
+  decideLocation();
 
   // Reveal only what is still below the fold. Content used to be hidden until an
   // observer fired, so link previews, crawlers and any screenshot that did not
@@ -2402,6 +2645,13 @@ h1 {
 }
 .search-btn:active {
   transform: scale(0.97);
+}
+.search-outer--quiet .search-btn {
+  color: var(--text);
+  background: var(--bg3);
+}
+.search-outer--quiet .search-btn:hover {
+  background: var(--bg4);
 }
 .search-dropdown {
   position: absolute;
@@ -2669,6 +2919,44 @@ h2 {
   overflow: hidden;
   margin-bottom: 0;
 }
+
+/* Desktop split. The panel keeps the phone-width column it was designed in, on
+   the left where reading starts; the map takes the rest and stays put while the
+   panel scrolls. 57px is the fixed nav; 1300px matches its .container-wide, so
+   the panel lines up under the logo. */
+@media (min-width: 1024px) {
+  .hero-gps .container.gps-split {
+    max-width: 1300px;
+    display: grid;
+    grid-template-columns: minmax(380px, 440px) minmax(0, 1fr);
+    column-gap: 28px;
+    align-items: start;
+  }
+  .gps-split .gps-panel {
+    grid-column: 1;
+    grid-row: 1;
+    min-width: 0;
+  }
+  .gps-split .gps-map-wrap {
+    grid-column: 2;
+    grid-row: 1;
+    position: sticky;
+    top: calc(57px + 16px);
+    height: calc(100vh - 57px - 32px);
+    height: calc(100dvh - 57px - 32px);
+    min-height: 480px;
+    border: 1px solid var(--border);
+  }
+  .gps-split .gps-map-wrap .sk-map {
+    height: 100%;
+    border-radius: 0;
+  }
+  /* The map is already big and interactive here; these only opened a copy of it. */
+  .gps-split .map-expand-btn,
+  .gps-split .np-btn-map {
+    display: none;
+  }
+}
 .map-expand-btn {
   position: absolute;
   bottom: 12px;
@@ -2839,7 +3127,6 @@ h2 {
 .gps-detected-guide:hover {
   color: var(--blue-hover);
 }
-
 /* ── Below-the-fold sections — sign tools + city info, one scroll past pay ── */
 .below-section {
   margin-top: 30px;
@@ -2918,15 +3205,21 @@ h2 {
   margin: 0 auto;
 }
 .free-prepay-btn {
+  /* An option, not the answer: the answer on this screen is "no need to pay",
+     so nothing here gets the brand's loudest fill. */
   padding: 13px;
   font-family: inherit;
   font-size: 14px;
   font-weight: 700;
-  color: var(--on-accent);
-  background: var(--accent);
-  border: none;
+  color: var(--text);
+  background: var(--bg2);
+  border: 1.5px solid var(--text2);
   border-radius: var(--r-md);
   cursor: pointer;
+  transition: border-color 150ms;
+}
+.free-prepay-btn:hover {
+  border-color: var(--text);
 }
 .free-browse-btn {
   padding: 12px;
@@ -2949,17 +3242,14 @@ h2 {
   line-height: 1.5;
   text-align: left;
   text-wrap: pretty;
-  background: var(--amber-bg);
-  border: 1px solid var(--amber-border);
-  border-radius: var(--r-md);
 }
 .free-prepay-tip svg {
   flex-shrink: 0;
   margin-top: 2px;
-  color: var(--amber);
+  color: var(--muted);
 }
 .free-prepay-tip strong {
-  color: var(--amber);
+  color: var(--text);
   font-weight: 700;
 }
 .free-prepay-btn:active,
@@ -2973,6 +3263,198 @@ h2 {
 }
 .pay-step {
   margin-bottom: 16px;
+}
+/* Under the slide: only for the visitor the SMS fails for, so it stays quiet —
+   a neutral row, the way out named on the right. */
+.foreign-sim {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: -4px 0 14px;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text2);
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  text-decoration: none;
+  transition: border-color 150ms;
+}
+.foreign-sim:hover {
+  border-color: var(--blue-border);
+}
+.foreign-sim:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+.foreign-sim :deep(svg) {
+  flex-shrink: 0;
+  color: var(--muted);
+}
+.foreign-sim-text {
+  flex: 1;
+  min-width: 0;
+}
+.foreign-sim-go {
+  flex-shrink: 0;
+  font-weight: 700;
+  color: var(--blue);
+}
+
+/* Desktop "where is your car?" — the first question, then a quiet line once answered */
+/* The first question is the loudest thing in the panel, and its search field the
+   heaviest control: everything else on desktop waits until it is answered. */
+.car-ask {
+  margin-top: 8px;
+}
+/* Pinned under the nav for the length of the panel; the page shows through
+   nowhere, so the strip carries the page background. */
+.car-search {
+  position: sticky;
+  top: 57px;
+  z-index: 20;
+  margin: 0 -4px 12px;
+  padding: 8px 4px 6px;
+  background: var(--bg);
+}
+.car-step-title {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  color: var(--text);
+  text-wrap: balance;
+}
+.car-step-sub {
+  margin: 4px 0 14px;
+  font-size: 14px;
+  color: var(--muted);
+}
+.car-step-search :deep(.azs-field) {
+  border: 2px solid var(--text);
+  box-shadow: var(--shadow-sm);
+}
+.car-step-search :deep(.azs-field:focus-within) {
+  border-color: var(--blue);
+}
+.car-step-search :deep(.azs-input) {
+  padding: 14px 0;
+  font-size: 16px;
+}
+.car-step-or {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 18px 0 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.car-step-or::before,
+.car-step-or::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border2);
+}
+/* An instruction, not a control: it points at the map, where the clicking happens. */
+.car-step-map {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  border: 1px dashed var(--border2);
+  border-radius: var(--r-md);
+}
+.car-step-arrow {
+  font-size: 18px;
+  line-height: 1;
+  color: var(--blue);
+}
+
+/* On the map: the same question, where the eye lands. Not clickable itself. */
+.map-ask {
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  z-index: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 15px;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--on-accent);
+  background: var(--accent);
+  border-radius: 999px;
+  box-shadow: var(--shadow-md);
+  pointer-events: none;
+  transform: translateX(-50%);
+  animation: map-ask-in 220ms var(--ease-out) both;
+}
+@keyframes map-ask-in {
+  from { opacity: 0; transform: translate(-50%, -6px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .map-ask { animation: none; }
+}
+.car-step-set {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+}
+.car-step-pin {
+  flex-shrink: 0;
+  display: flex;
+  color: var(--red);
+}
+.car-step-what {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+}
+.car-step-kicker {
+  font-size: 12px;
+  color: var(--muted);
+}
+.car-step-label {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.car-step-change {
+  flex-shrink: 0;
+  padding: 7px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--blue);
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  transition: background 150ms, border-color 150ms;
+}
+.car-step-change:hover {
+  background: var(--blue-bg);
+  border-color: var(--blue-border);
+}
+.car-step-change:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
 }
 
 /* Consequence line + the plate the SMS pays for */
@@ -3741,57 +4223,6 @@ h2 {
   flex-shrink: 0;
 }
 
-/* Nearest confirmed sign — lead-me card */
-.nsign {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  text-align: left;
-  margin-bottom: 12px;
-  padding: 11px 14px;
-  background: var(--bg);
-  border: 1.5px solid var(--border2);
-  border-radius: var(--r-md);
-  cursor: pointer;
-  font-family: inherit;
-  transition: border-color 150ms var(--ease-out),
-    transform 150ms var(--ease-out);
-}
-.nsign:active {
-  transform: scale(0.99);
-}
-.nsign-arrow {
-  flex-shrink: 0;
-  font-size: 20px;
-  line-height: 1;
-  transition: transform 200ms var(--ease-out);
-}
-.nsign-text {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-.nsign-title {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text);
-  letter-spacing: -0.1px;
-}
-.nsign-sub {
-  font-size: 12px;
-  color: var(--muted);
-}
-.nsign-go {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--blue);
-  flex-shrink: 0;
-  white-space: nowrap;
-}
-
 /* Armed (scheduled pre-pay) card */
 .armed-card {
   display: flex;
@@ -3966,18 +4397,101 @@ h2 {
 }
 /* The daily ticket — an alternative, not an upgrade. Kept visually quieter than
    the hourly slide above it, because under two hours it is the worse buy. */
-.daily {
-  margin-top: 14px;
-  padding: 12px;
+/* Hourly or daily: two equal options above one slide. The chosen one takes the
+   zone's colour, and its radio fills, so the state is never colour alone. */
+.pay-choice {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.pay-opt {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 10px 12px;
+  text-align: left;
   background: var(--bg2);
-  border: 1px dashed var(--border2);
+  border: 1.5px solid var(--border);
+  border-radius: var(--r-md);
+  transition: border-color 150ms, background-color 150ms;
+}
+.pay-opt:hover:not(:disabled) {
+  border-color: var(--border2);
+}
+/* Shown so the option is known to exist, with when it opens; not selectable yet. */
+.pay-opt:disabled {
+  cursor: not-allowed;
+  background: var(--bg);
+  border-style: dashed;
+}
+.pay-opt:disabled .pay-opt-name,
+.pay-opt:disabled .pay-opt-price {
+  color: var(--muted);
+}
+.pay-opt.on {
+  border-color: var(--opt-color);
+  background: color-mix(in srgb, var(--opt-color) 9%, var(--bg2));
+}
+.pay-opt:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+.pay-opt-name {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+.pay-opt-radio {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  border: 2px solid var(--border2);
+  border-radius: 50%;
+  transition: border-color 150ms, box-shadow 150ms;
+}
+.pay-opt.on .pay-opt-radio {
+  border-color: var(--text);
+  box-shadow: inset 0 0 0 2.5px var(--bg2), inset 0 0 0 7px var(--text);
+}
+.pay-opt-price {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--text);
+}
+.pay-opt-note {
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--muted);
+}
+.pay-opt-warn {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin: 0 0 10px;
+  padding: 9px 11px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--amber);
+  background: var(--amber-bg);
+  border: 1px solid var(--amber-border);
   border-radius: var(--r-md);
 }
-.daily-title {
-  display: flex; align-items: center; gap: 6px;
-  font-size: 13px; font-weight: 700; color: var(--text);
+.pay-opt-warn :deep(svg) {
+  flex-shrink: 0;
+  margin-top: 2px;
 }
-.daily-note { margin: 3px 0 10px; font-size: 12.5px; color: var(--muted); line-height: 1.45; }
+@media (prefers-reduced-motion: reduce) {
+  .pay-opt,
+  .pay-opt-radio {
+    transition: none;
+  }
+}
 .pay-need-plate {
   margin-top: 8px;
   font-size: 12.5px;
@@ -4061,12 +4575,42 @@ h2 {
   margin-bottom: 20px;
 }
 
+.city-guide-link {
+  display: inline-block;
+  margin-top: 14px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--blue);
+}
+.city-guide-link:hover {
+  color: var(--blue-hover);
+}
+
 /* Fine warning */
 .gps-fine {
-  background: var(--red-bg);
-  border: 1px solid var(--red-border);
+  background: var(--bg2);
+  border: 1px solid var(--border);
   border-radius: var(--r-md);
   padding: 10px 14px;
+}
+details.gps-fine > summary {
+  cursor: pointer;
+  list-style: none;
+}
+details.gps-fine > summary::-webkit-details-marker {
+  display: none;
+}
+details.gps-fine > summary::after {
+  content: "▾";
+  margin-left: 6px;
+  color: var(--muted);
+}
+details.gps-fine[open] > summary::after {
+  content: "▴";
+}
+details.gps-fine > summary:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
 }
 .gps-fine-row {
   display: flex;
@@ -4095,6 +4639,39 @@ h2 {
 }
 
 /* Detecting state */
+/* First-visit location ask: the hero's one action, with its reason under it */
+.find-zone {
+  max-width: 560px;
+  margin-bottom: 20px;
+}
+.find-zone-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 52px;
+  padding: 0 24px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--on-accent);
+  background: var(--accent);
+  border: none;
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-sm);
+  transition: background 150ms;
+}
+.find-zone-btn:hover {
+  background: var(--accent-hover);
+}
+.find-zone-btn:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+.find-zone-why {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
 .gps-detecting {
   display: flex;
   align-items: center;
