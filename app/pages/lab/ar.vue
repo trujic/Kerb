@@ -7,10 +7,48 @@
 
     <!-- The zone, painted on the ground around you. Only the zone you are standing
          in: nothing is drawn where the boundaries run, so the phone's heading is
-         never needed and never trusted. -->
-    <div class="ar-floor" :class="`ar-floor--${state.kind}`" :style="floorStyle" aria-hidden="true">
-      <div class="ar-plane" />
-    </div>
+         never needed and never trusted. Flat SVG, not a 3D transform: Safari drops
+         a 3D plane that reaches behind the camera, and this one would. -->
+    <svg
+      class="ar-floor"
+      :class="`ar-floor--${state.kind}`"
+      viewBox="0 0 100 100"
+      preserveAspectRatio="none"
+      aria-hidden="true"
+    >
+      <defs>
+        <linearGradient id="ar-fade" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#fff" stop-opacity="0" />
+          <stop offset="0.3" stop-color="#fff" stop-opacity="0.85" />
+          <stop offset="1" stop-color="#fff" stop-opacity="1" />
+        </linearGradient>
+        <mask id="ar-mask" maskUnits="userSpaceOnUse" x="-50" y="0" width="200" height="100">
+          <rect x="-50" width="200" height="100" fill="url(#ar-fade)" />
+        </mask>
+        <pattern id="ar-stripes" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(35)">
+          <rect width="5" height="10" :fill="paint.c1" />
+          <rect x="5" width="5" height="10" :fill="paint.c2" />
+        </pattern>
+      </defs>
+      <g v-if="paint.on" mask="url(#ar-mask)">
+        <polygon class="ar-ground" points="28,0 72,0 140,100 -40,100" :fill="paint.fill" />
+        <!-- Bays across the ground, closer together toward the horizon: it reads
+             as the road you stand on, not a coloured box over the picture. -->
+        <g class="ar-bays">
+          <line v-for="y in [6, 14, 25, 40, 61, 90]" :key="y" x1="-50" :y1="y" x2="150" :y2="y" />
+        </g>
+        <g class="ar-rims">
+          <line x1="28" y1="0" x2="-40" y2="100" />
+          <line x1="72" y1="0" x2="140" y2="100" />
+        </g>
+      </g>
+    </svg>
+
+    <p class="ar-tag" :class="`ar-tag--${state.kind}`">
+      <span v-if="paint.on" class="ar-dot" :style="{ background: paint.c1 }" />
+      <span v-if="state.kind === 'boundary'" class="ar-dot" :style="{ background: paint.c2 }" />
+      {{ tagText }}
+    </p>
 
     <header class="ar-top">
       <span class="ar-pill">Lab · AR-lite</span>
@@ -25,21 +63,35 @@
     </header>
 
     <p v-if="camError" class="ar-note">
-      Kamera nije dostupna: {{ camError }}. Na telefonu otvori stranicu preko HTTPS-a.
+      Kamera nije dostupna: {{ camError }}. Dozvoli kameru za ovu stranicu u podešavanjima browsera.
     </p>
 
-    <!-- The four answers, over the picture -->
+    <!-- The four answers, over the picture, short enough to leave the ground visible -->
     <section class="ar-card" aria-live="polite">
-      <template v-if="state.kind === 'loading'">
+      <template v-if="state.kind === 'nogeo'">
+        <p class="ar-title">Lokacija nije dozvoljena</p>
+        <p class="ar-line">Dozvoli lokaciju za ovu stranicu u podešavanjima browsera, ili izaberi simulaciju gore.</p>
+      </template>
+
+      <template v-else-if="state.kind === 'loading'">
         <p class="ar-title">Tražim gde si…</p>
+        <p class="ar-line">Prvi GPS signal ume da potraje i pola minuta; napolju stiže brže.</p>
+      </template>
+
+      <template v-else-if="state.kind === 'away'">
+        <p class="ar-title">Nisi u Novom Sadu</p>
+        <p class="ar-line">
+          AR za sada zna samo zone Novog Sada (najbliža je {{ fmt(state.nearestM) }} odavde). Izaberi
+          simulaciju gore da vidiš kako izgleda u zoni.
+        </p>
       </template>
 
       <template v-else-if="state.kind === 'none'">
         <p class="ar-title">Ovde se ne plaća</p>
         <p class="ar-line">
-          Najbliža naplata je oko {{ fmt(state.nearestM) }} odavde ({{ zoneLabel(state.nearestZone) }}).
+          Nisi u zoni naplate, zato put nije obojen. Najbliža naplata je oko {{ fmt(state.nearestM) }}
+          odavde ({{ zoneLabel(state.nearestZone) }}).
         </p>
-        <p class="ar-check">Tabla pored auta uvek ima poslednju reč.</p>
       </template>
 
       <template v-else-if="state.kind === 'boundary'">
@@ -59,12 +111,12 @@
         <p class="ar-status" :class="{ paid: state.answer.paid }">
           <span class="ar-status-dot" />{{ state.answer.status }}
         </p>
-        <dl class="ar-four">
-          <dt>Koliko</dt><dd>{{ state.answer.price }}</dd>
-          <dt>Koliko dugo</dt><dd>{{ state.answer.limit }}</dd>
-          <dt>Kako</dt><dd>SMS sa tablicom na <b class="mono">{{ state.answer.sms }}</b></dd>
-          <dt>Ako ne platiš</dt><dd>{{ unpaid }}</dd>
-        </dl>
+        <ul class="ar-facts">
+          <li class="ar-price">{{ state.answer.price }}</li>
+          <li>{{ state.answer.limit }}</li>
+          <li>SMS tablica → <b class="mono">{{ state.answer.sms }}</b></li>
+        </ul>
+        <p class="ar-foot">Ako ne platiš: {{ unpaid }}</p>
         <p class="ar-check">
           <span class="ar-dot" :style="{ background: state.answer.color }" />
           Tabla pored auta: <b>{{ zoneLabel(state.answer.name) }}</b>
@@ -81,7 +133,7 @@
 // in; the four answers sit over the picture. Same confidence rules as the
 // dashboard card: a sure zone is painted solid, an edge is painted with a caveat,
 // a boundary is painted in both colours and asks for the sign, and no paid
-// parking paints nothing.
+// parking paints nothing (and says why).
 if (!useRuntimeConfig().public.labPages) throw createError({ statusCode: 404, statusMessage: 'Not found' })
 
 useHead({ title: 'AR-lite · Kerb lab', meta: [{ name: 'robots', content: 'noindex' }] })
@@ -108,7 +160,12 @@ onMounted(async () => {
   try {
     if (!navigator.mediaDevices?.getUserMedia) throw new Error('browser ne daje kameru')
     stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false })
-    if (videoEl.value) videoEl.value.srcObject = stream
+    const v = videoEl.value
+    if (v) {
+      v.srcObject = stream
+      // iOS does not always honour autoplay on a stream set after render.
+      await v.play().catch(() => {})
+    }
   } catch (e: any) {
     camError.value = e?.name === 'NotAllowedError' ? 'dozvola nije data' : e?.message ?? 'nepoznato'
   }
@@ -117,13 +174,19 @@ onUnmounted(() => stream?.getTracks().forEach((tr) => tr.stop()))
 
 // ── position ──
 const real = ref<{ lat: number; lng: number; accuracy: number } | null>(null)
+const geoDenied = ref(false)
 let watchId: number | null = null
 onMounted(() => {
-  if (!navigator.geolocation) return
+  if (!navigator.geolocation) return void (geoDenied.value = true)
   watchId = navigator.geolocation.watchPosition(
-    (p) => (real.value = { lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy }),
-    () => {},
-    { enableHighAccuracy: true, maximumAge: 2000 },
+    (p) => {
+      geoDenied.value = false
+      real.value = { lat: p.coords.latitude, lng: p.coords.longitude, accuracy: p.coords.accuracy }
+    },
+    (e) => {
+      if (e.code === e.PERMISSION_DENIED) geoDenied.value = true
+    },
+    { enableHighAccuracy: true, maximumAge: 2000, timeout: 30000 },
   )
 })
 onUnmounted(() => watchId !== null && navigator.geolocation.clearWatch(watchId))
@@ -169,19 +232,23 @@ const answerFor = (name: string) => {
 
 // Same thresholds as the dashboard (app/pages/index.vue): inside with more than
 // 5 m to the line is sure; a second zone within the GPS error, or level with the
-// first, is a boundary; nothing within 75 m is "not paid here".
+// first, is a boundary; nothing within 75 m is "not paid here". Past 20 km the
+// driver is simply in another city.
 const INSIDE_MARGIN_M = 5
 const BOUNDARY_FLOOR_M = 10
+const AWAY_M = 20_000
 type State =
-  | { kind: 'loading' }
-  | { kind: 'none'; nearestM: number; nearestZone: string }
+  | { kind: 'nogeo' | 'loading' }
+  | { kind: 'away' | 'none'; nearestM: number; nearestZone: string }
   | { kind: 'boundary'; answers: ReturnType<typeof answerFor>[] }
   | { kind: 'sure' | 'edge'; answer: ReturnType<typeof answerFor> }
 const state = computed<State>(() => {
   const c = coords.value
+  if (!c && where.value === 'real' && geoDenied.value) return { kind: 'nogeo' }
   const ds = zoneDistances.value
   if (!c || !geojson.value || !zones.value.length || !ds.length || !nearest.value) return { kind: 'loading' }
   const n = ds[0]!
+  if (n.distanceM > AWAY_M) return { kind: 'away', nearestM: n.distanceM, nearestZone: n.zoneName }
   if (n.distanceM > 75) return { kind: 'none', nearestM: n.distanceM, nearestZone: n.zoneName }
   const margin = Math.max(c.accuracy ?? 0, BOUNDARY_FLOOR_M)
   const tied = ds.filter((d) => d.distanceM <= margin || d.distanceM - n.distanceM <= BOUNDARY_FLOOR_M)
@@ -190,11 +257,28 @@ const state = computed<State>(() => {
   return { kind: sure ? 'sure' : 'edge', answer: answerFor(n.zoneName) }
 })
 
-const floorStyle = computed(() => {
+const paint = computed(() => {
   const s = state.value
-  if (s.kind === 'sure' || s.kind === 'edge') return { '--c1': s.answer.color, '--c2': s.answer.color }
-  if (s.kind === 'boundary') return { '--c1': s.answers[0]!.color, '--c2': s.answers[1]!.color }
-  return {}
+  if (s.kind === 'sure' || s.kind === 'edge')
+    return { on: true, c1: s.answer.color, c2: s.answer.color, fill: s.answer.color }
+  if (s.kind === 'boundary')
+    return { on: true, c1: s.answers[0]!.color, c2: s.answers[1]!.color, fill: 'url(#ar-stripes)' }
+  return { on: false, c1: 'transparent', c2: 'transparent', fill: 'none' }
+})
+
+// The words on the ground itself, so the state reads even when the paint is faint
+// against a busy street.
+const tagText = computed(() => {
+  const s = state.value
+  switch (s.kind) {
+    case 'sure': return `${zoneLabel(s.answer.name)} oko tebe`
+    case 'edge': return `${zoneLabel(s.answer.name)} · na ivici`
+    case 'boundary': return `Granica: ${s.answers.map((a) => zoneLabel(a.name)).join(' / ')}`
+    case 'none': return 'Ovde nema zone naplate'
+    case 'away': return 'Van Novog Sada'
+    case 'nogeo': return 'Nema lokacije'
+    default: return 'Tražim gde si…'
+  }
 })
 </script>
 
@@ -221,48 +305,74 @@ const floorStyle = computed(() => {
   background: linear-gradient(180deg, #2A2F37 0%, #4A505B 55%, #6B7280 100%);
 }
 
-/* The painted ground: a plane tipped back toward the horizon, fading out before
-   it reaches it, so it reads as the road around the driver, not a coloured box. */
+/* The painted ground: from a horizon a little above the middle down to the
+   bottom edge. The card covers the nearest part, so the colour has to be strong
+   enough in the band between the horizon and the card. */
 .ar-floor {
   position: absolute;
   left: 0;
-  right: 0;
-  bottom: 0;
-  height: 62%;
-  perspective: 420px;
-  perspective-origin: 50% 0%;
+  top: 40%;
+  width: 100%;
+  height: 60%;
   pointer-events: none;
-  -webkit-mask-image: linear-gradient(to top, #000 45%, transparent 100%);
-  mask-image: linear-gradient(to top, #000 45%, transparent 100%);
+  overflow: visible;
 }
-.ar-plane {
+.ar-ground {
+  transition: fill-opacity 250ms var(--ease-out);
+}
+.ar-floor--sure .ar-ground,
+.ar-floor--boundary .ar-ground {
+  fill-opacity: 0.68;
+}
+/* At an edge: the zone, but lighter and with dashed rims, present, not certain. */
+.ar-floor--edge .ar-ground {
+  fill-opacity: 0.45;
+}
+.ar-bays line,
+.ar-rims line {
+  stroke: #fff;
+  vector-effect: non-scaling-stroke;
+}
+.ar-bays line {
+  stroke-width: 2;
+  stroke-opacity: 0.35;
+}
+.ar-floor--boundary .ar-bays {
+  display: none;
+}
+.ar-rims line {
+  stroke-width: 4;
+  stroke-opacity: 0.9;
+}
+.ar-floor--edge .ar-rims line {
+  stroke-dasharray: 14 10;
+}
+
+/* The words on the ground */
+.ar-tag {
   position: absolute;
-  left: -40%;
-  right: -40%;
-  top: 0;
-  bottom: -30%;
-  transform: rotateX(58deg);
-  transform-origin: 50% 0%;
-  opacity: 0;
-  transition: opacity 250ms var(--ease-out);
+  top: 46%;
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 32px);
+  padding: 8px 16px;
+  font-size: 17px;
+  font-weight: 700;
+  white-space: nowrap;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.94);
+  border-radius: 999px;
+  box-shadow: var(--shadow-lg);
 }
-.ar-floor--sure .ar-plane {
-  opacity: 0.55;
-  background:
-    repeating-linear-gradient(90deg, transparent 0 46px, rgba(255, 255, 255, 0.28) 46px 50px),
-    var(--c1);
-}
-/* At an edge: the zone, but thinner and dashed — present, not certain. */
-.ar-floor--edge .ar-plane {
-  opacity: 0.4;
-  background:
-    repeating-linear-gradient(0deg, transparent 0 22px, rgba(255, 255, 255, 0.35) 22px 26px),
-    var(--c1);
-}
-/* Two zones meet: both colours, in stripes, so neither reads as the answer. */
-.ar-floor--boundary .ar-plane {
-  opacity: 0.55;
-  background: repeating-linear-gradient(45deg, var(--c1) 0 34px, var(--c2) 34px 68px);
+.ar-tag--none,
+.ar-tag--away,
+.ar-tag--nogeo,
+.ar-tag--loading {
+  font-weight: 600;
+  color: var(--text2);
 }
 
 .ar-top {
@@ -312,27 +422,28 @@ const floorStyle = computed(() => {
   bottom: calc(env(safe-area-inset-bottom, 0px) + 12px);
   max-width: 480px;
   margin: 0 auto;
-  padding: 16px;
-  background: rgba(255, 255, 255, 0.94);
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.95);
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-lg);
   display: grid;
-  gap: 10px;
+  gap: 8px;
 }
 .ar-title {
-  font-size: 20px;
+  font-size: 19px;
   font-weight: 700;
   line-height: 1.25;
 }
 .ar-line {
   font-size: 15px;
+  line-height: 1.4;
   color: var(--text2);
 }
 .ar-status {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 17px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--green);
 }
@@ -345,17 +456,24 @@ const floorStyle = computed(() => {
   border-radius: 50%;
   background: currentColor;
 }
-.ar-four {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 6px 14px;
+.ar-facts {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 14px;
   font-size: 15px;
-}
-.ar-four dt {
-  color: var(--muted);
-}
-.ar-four dd {
   font-weight: 600;
+}
+.ar-price {
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.ar-foot {
+  font-size: 13px;
+  color: var(--text2);
 }
 .ar-check {
   display: flex;
@@ -398,6 +516,6 @@ const floorStyle = computed(() => {
   clip: rect(0 0 0 0);
 }
 @media (prefers-reduced-motion: reduce) {
-  .ar-plane { transition: none; }
+  .ar-ground { transition: none; }
 }
 </style>
