@@ -188,9 +188,9 @@
 </template>
 
 <script setup lang="ts">
-// Dev-only lab page: the prototype for recognising sign kinds on the device.
-// Not part of the published app (see useSignRecognizer for how it works).
-if (!import.meta.dev) throw createError({ statusCode: 404, statusMessage: 'Not found' })
+// Lab page, behind runtimeConfig.public.labPages: the prototype for recognising
+// sign kinds on the device (see useSignRecognizer for how it works).
+if (!useRuntimeConfig().public.labPages) throw createError({ statusCode: 404, statusMessage: 'Not found' })
 
 useHead({ title: 'Prepoznavanje tabli · Kerb lab', meta: [{ name: 'robots', content: 'noindex' }] })
 

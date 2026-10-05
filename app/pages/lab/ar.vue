@@ -76,12 +76,13 @@
 </template>
 
 <script setup lang="ts">
-// Dev-only lab page: AR-lite. The camera shows the street; the ground around the
-// driver is tinted with the zone they are standing in; the four answers sit over
-// the picture. Same confidence rules as the dashboard card: a sure zone is
-// painted solid, an edge is painted with a caveat, a boundary is painted in both
-// colours and asks for the sign, and no paid parking paints nothing.
-if (!import.meta.dev) throw createError({ statusCode: 404, statusMessage: 'Not found' })
+// Lab page, behind runtimeConfig.public.labPages: AR-lite. The camera shows the
+// street; the ground around the driver is tinted with the zone they are standing
+// in; the four answers sit over the picture. Same confidence rules as the
+// dashboard card: a sure zone is painted solid, an edge is painted with a caveat,
+// a boundary is painted in both colours and asks for the sign, and no paid
+// parking paints nothing.
+if (!useRuntimeConfig().public.labPages) throw createError({ statusCode: 404, statusMessage: 'Not found' })
 
 useHead({ title: 'AR-lite · Kerb lab', meta: [{ name: 'robots', content: 'noindex' }] })
 

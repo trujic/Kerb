@@ -25,6 +25,10 @@ export default defineNuxtConfig({
       // Privacy-friendly analytics (Plausible). Empty = no script, no events.
       // NUXT_PUBLIC_PLAUSIBLE_DOMAIN=kerb.rs
       plausibleDomain: '',
+      // The /lab prototypes (sign recognition, AR-lite) on the live site, unlinked
+      // and noindex, so they can be tried on a real phone over HTTPS while there
+      // are no users. Turn off before launch: NUXT_PUBLIC_LAB_PAGES=false.
+      labPages: true,
     },
   },
 
