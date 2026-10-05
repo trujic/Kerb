@@ -112,20 +112,15 @@ const dict = {
     sr: 'Proveri tablu i plati po njoj.',
     en: 'Check the sign and pay accordingly.',
   },
-  // The daily ticket: an equal second way to pay wherever the zone sells it, and
+  // The daily ticket: an equal second way to pay on the lots that sell it, and
   // worth offering loudly, because it is the one place the app saves a driver
-  // money rather than just saving them from a fine. Off the lots our map lists,
-  // the extra sign decides, and the option says so.
+  // money rather than just saving them from a fine.
   payChoiceLabel: { sr: 'Način plaćanja', en: 'How to pay' },
   payHourly: { sr: 'Po satu', en: 'By the hour' },
   payDailyOpt: { sr: 'Dnevna karta', en: 'Daily ticket' },
   dailyFromShort: { sr: 'Isplati se od {hours} h', en: 'Cheaper from {hours} h' },
   dailyOnePay: { sr: 'Jedna uplata', en: 'One payment' },
   dailyFrom: { sr: 'Može od: {when}', en: 'Available from {when}' },
-  dailyOnlyIfSign: {
-    sr: 'Za ovo mesto nemamo podatak da važi dnevna karta. Plati je samo ako na dodatnoj tabli piše da važi.',
-    en: 'We have no record of the daily ticket at this spot. Pay it only if an extra sign says it is valid here.',
-  },
   payDailyBtn: { sr: 'Plati dnevnu kartu', en: 'Pay the daily ticket' },
   dailySend: { sr: 'Prevuci za dnevnu — {amount} → {code}', en: 'Slide for the daily — {amount} → {code}' },
   wrongZone: { sr: 'Pogrešna zona? Pogledaj sve zone', en: 'Wrong zone? See all zones' },

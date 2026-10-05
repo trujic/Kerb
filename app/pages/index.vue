@@ -558,12 +558,6 @@
                   <span class="pay-opt-note">{{ opt.note }}</span>
                 </button>
               </div>
-              <!-- The map lists the lots that sell it; elsewhere in the zone the
-                   extra sign decides, and the driver is told so before paying. -->
-              <p v-if="payingDaily && !dailyOffer!.listed" class="pay-opt-warn">
-                <Icon name="sign" :size="14" />
-                <span>{{ t("dailyOnlyIfSign") }}</span>
-              </p>
               <!-- Night pre-pay: free now, the SMS carries over to the next window -->
               <div v-if="nightPrepay" class="prepay">
                 <SlideToConfirm
@@ -2023,11 +2017,12 @@ const smsLink = (zone: any) => smsHref(zone.sms_shortcode, defaultPlate.value);
 // The zone defines the product (Blue and White: 95 RSD → 8215); the geometry says
 // which lots our map lists as selling it — nine of Novi Sad's 262 segments.
 //
-// Wherever the zone has the product it is offered as an equal second way to pay,
-// not a footnote: a driver staying three hours on a daily lot was paying 150 RSD
-// for something that costs 95. On a listed lot it is offered plainly. Elsewhere
-// in the zone the extra sign is the only authority on whether it is valid, so the
-// option says that before the slide — the same deferral as everywhere else.
+// Offered only on a lot that sells it — the whole White zone, a handful of Blue
+// lots — and there as an equal second way to pay, not a footnote: a driver staying
+// three hours on a daily lot was paying 150 RSD for something that costs 95. The
+// rest of the Blue zone does not sell it, so there is no daily option there at
+// all; offering it "if the extra sign says so" put a choice on screen that, on
+// nearly every Blue street, is not one.
 const zoneDaily = computed(() => {
   const z: any = selectedZone.value;
   return z?.daily_amount && z?.daily_target
@@ -2051,8 +2046,8 @@ const dailyListed = computed(
 // Not at a boundary: those candidates carry their own slides, and a daily choice
 // inside a refusal to pick the zone would be a pick by another name.
 const dailyOffer = computed(() =>
-  zoneDaily.value && !atBoundary.value && payAction.value?.kind === "sms"
-    ? { ...zoneDaily.value, listed: dailyListed.value }
+  zoneDaily.value && dailyListed.value && !atBoundary.value && payAction.value?.kind === "sms"
+    ? zoneDaily.value
     : null,
 );
 const payProduct = ref<"hourly" | "daily">("hourly");
@@ -4468,23 +4463,6 @@ h2 {
   font-size: 12px;
   line-height: 1.35;
   color: var(--muted);
-}
-.pay-opt-warn {
-  display: flex;
-  align-items: flex-start;
-  gap: 7px;
-  margin: 0 0 10px;
-  padding: 9px 11px;
-  font-size: 12.5px;
-  line-height: 1.45;
-  color: var(--amber);
-  background: var(--amber-bg);
-  border: 1px solid var(--amber-border);
-  border-radius: var(--r-md);
-}
-.pay-opt-warn :deep(svg) {
-  flex-shrink: 0;
-  margin-top: 2px;
 }
 @media (prefers-reduced-motion: reduce) {
   .pay-opt,
