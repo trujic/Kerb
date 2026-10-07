@@ -168,8 +168,8 @@ const dict = {
   // Desktop — the laptop is not where the car is, so the panel asks.
   carWhereTitle: { sr: 'Gde su ti kola?', en: 'Where is your car?' },
   carWhereSub: {
-    sr: 'Laptop ne zna gde su ti kola, zato upiši ulicu.',
-    en: 'A laptop cannot tell where your car is, so type the street.',
+    sr: 'Laptop ne zna gde su ti kola, zato upiši ulicu ili izaberi zonu.',
+    en: 'A laptop cannot tell where your car is, so type the street or pick the zone.',
   },
   carWhereMap: { sr: 'Klikni na mapi zonu u kojoj su kola', en: 'Click the zone your car is in on the map' },
   carMapChip: { sr: 'Klikni zonu u kojoj su ti kola', en: 'Click the zone your car is in' },
@@ -181,6 +181,21 @@ const dict = {
   carNoParkingTitle: { sr: 'Tamo nema naplate', en: 'No paid zone there' },
   carNoParkingSub: { sr: 'Parkiranje na tom mestu je verovatno besplatno. Najbliža naplata je', en: 'Parking there is likely free. Nearest paid parking is' },
   carAwayOn: { sr: 'dalje —', en: 'away —' },
+  // A phone whose location failed or was refused asks the same question, and
+  // leads with the zones: a visitor can read the sign, not the street name.
+  carWhereSubFailed: {
+    sr: 'Lokacija nije stigla, zato izaberi zonu sa table ili upiši ulicu.',
+    en: 'Your location did not come through, so pick the zone on the sign or type the street.',
+  },
+  carWhereSubDenied: {
+    sr: 'Lokacija je isključena za ovaj sajt, zato izaberi zonu sa table ili upiši ulicu.',
+    en: 'Location is off for this site, so pick the zone on the sign or type the street.',
+  },
+  zonesOnSign: { sr: 'Koja zona piše na tabli?', en: 'Which zone does the sign say?' },
+  carMapPick: { sr: 'Pokaži kola na mapi', en: 'Show your car on the map' },
+  retryLocation: { sr: 'Probaj ponovo lokaciju', en: 'Try location again' },
+  zonePickedKicker: { sr: 'Zona sa table', en: 'Zone on the sign' },
+  useMyLocation: { sr: 'Moja lokacija', en: 'My location' },
   scanContribute: { sr: 'Vidiš tablu? Skeniraj je', en: 'See a sign? Scan it' },
 
   // Address search — "which zone parks at this address", for a place you are

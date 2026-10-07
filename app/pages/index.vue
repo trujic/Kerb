@@ -21,11 +21,11 @@
               :zones="wideLayout ? (searchZones ?? displayZones) : displayZones"
               :highlight="wideLayout && searchPin ? null : highlightPoint"
               :pin="mapPin"
-              :signs="deskAsking ? [] : signReports"
+              :signs="asking ? [] : signReports"
               :zone-meta="allZones"
               :city-id="detectedCity?.id ?? expectCityId"
               :payable="wideLayout"
-              :pay-label="deskMode ? t('carHereBtn') : undefined"
+              :pay-label="t('carHereBtn')"
               :compass-prompt="compassPrompt"
               labels
               @pay-zone="onPayZone"
@@ -34,7 +34,7 @@
             />
             <!-- The map is the second way to answer the panel's question; say so on
                  the map itself, where the eye already is. -->
-            <p v-if="deskAsking" class="map-ask">
+            <p v-if="asking && wideLayout" class="map-ask">
               <Icon name="pin" :size="14" /> {{ t("carMapChip") }}
             </p>
             <button
@@ -110,6 +110,7 @@
                   :zone-meta="allZones"
                   :city-id="detectedCity?.id ?? expectCityId"
                   payable
+                  :pay-label="t('carHereBtn')"
                   @pay-zone="onPayZone"
                   :compass-prompt="compassPrompt"
                   fill
@@ -200,19 +201,20 @@
 
         <!-- ═══ FULL DASHBOARD — paid now, or browsing while free ═══ -->
         <template v-else>
-          <!-- Desktop: the laptop is not where the car is, so ask. Above every
-               answer, including "no paid parking there", so the place can always
-               be changed. Direct children of the panel, so the search can stay
-               pinned under the nav for the whole length of it. -->
-          <template v-if="deskMode">
-            <!-- Until the car is placed: one question, the two ways to answer it,
-                 and nothing else asking to be read. -->
-            <div v-if="!carPoint" class="car-ask">
+          <!-- Where is the car? Asked when the device cannot say: always on a
+               laptop, and on a phone whose location failed or was refused. Above
+               every answer, including "no paid parking there", so the place can
+               always be changed. -->
+          <template v-if="placeAsked">
+            <!-- Until something is named: one question, the ways to answer it, and
+                 nothing else asking to be read. -->
+            <div v-if="asking" class="car-ask">
               <h2 class="car-step-title">{{ t("carWhereTitle") }}</h2>
-              <p class="car-step-sub">{{ t("carWhereSub") }}</p>
+              <p class="car-step-sub">{{ askSub }}</p>
             </div>
-            <!-- Always on screen: the place can be changed at any point in the flow. -->
-            <div ref="carSearchEl" class="car-search">
+            <!-- Desktop: the street first, pinned under the nav for the whole panel,
+                 since someone at a laptop knows the address. -->
+            <div v-if="deskMode" ref="carSearchEl" class="car-search">
               <AddressZoneSearch
                 class="car-step-search"
                 pick-only
@@ -223,27 +225,86 @@
                 @locate="onCarAddress"
               />
             </div>
-            <div v-if="!carPoint" class="pay-step">
-              <p class="car-step-or"><span>{{ t("or") }}</span></p>
-              <p class="car-step-map">
+            <template v-if="asking">
+              <p v-if="deskMode" class="car-step-or"><span>{{ t("or") }}</span></p>
+              <!-- The zones themselves, as the sign names them. Someone who does
+                   not know the city cannot name the street, but can read the sign
+                   next to the car. Picking one skips the map and the address. -->
+              <div class="pay-step">
+                <p class="car-zones-title">{{ t("zonesOnSign") }}</p>
+                <div class="zone-alt car-zones">
+                  <button
+                    v-for="zone in payableZones"
+                    :key="zone.id"
+                    type="button"
+                    class="zone-alt-row"
+                    @click="selectZone(zone.name)"
+                  >
+                    <span class="zone-alt-stripe" :style="{ background: zone.color }" />
+                    <span class="zone-alt-name">{{ zoneLabel(zone.name) }}</span>
+                    <span
+                      v-if="zoneLimits[zone.name]?.cap"
+                      class="zone-alt-limit"
+                      :style="{ color: zone.color, borderColor: zone.color }"
+                      >{{ zoneLimits[zone.name]!.label }}</span
+                    >
+                    <span class="zone-alt-price" :style="{ color: zone.color }">{{
+                      zone.price
+                    }}</span>
+                  </button>
+                </div>
+              </div>
+              <p v-if="deskMode" class="car-step-map">
                 {{ t("carWhereMap") }}
                 <span class="car-step-arrow" aria-hidden="true">→</span>
               </p>
-            </div>
-            <div v-else class="pay-step car-step-set">
-              <span class="car-step-pin"><Icon name="pin" :size="15" /></span>
-              <span class="car-step-what">
-                <span class="car-step-kicker">{{ t("carIsAt") }}</span>
-                <strong class="car-step-label">{{ carLabel }}</strong>
-              </span>
-              <button type="button" class="car-step-change" @click="focusCarSearch">
-                {{ t("carChange") }}
-              </button>
-            </div>
+              <!-- Phone: the street second (a visitor rarely knows it), then the
+                   map, then one more try at the location if it only timed out. -->
+              <template v-else>
+                <p class="car-step-or"><span>{{ t("or") }}</span></p>
+                <div ref="carSearchEl" class="pay-step">
+                  <AddressZoneSearch
+                    class="car-step-search"
+                    pick-only
+                    :city-id="detectedCity?.id ?? expectCityId"
+                    :lock-city="detectedCity"
+                    :zones="allZones"
+                    :geojson="zoneBoundaries"
+                    @locate="onCarAddress"
+                  />
+                </div>
+                <div class="car-ask-more">
+                  <button type="button" class="np-btn" @click="openMap">
+                    <Icon name="expand" :size="14" /> {{ t("carMapPick") }}
+                  </button>
+                  <button
+                    v-if="fixFailure !== 'denied'"
+                    type="button"
+                    class="np-btn"
+                    :disabled="detecting"
+                    @click="retryLocation"
+                  >
+                    <Icon name="pin" :size="14" />
+                    {{ detecting ? t("detecting") : t("retryLocation") }}
+                  </button>
+                </div>
+              </template>
+            </template>
           </template>
+          <!-- Once named: what the answer below is about, and the way back. -->
+          <div v-if="placeLine" class="pay-step car-step-set">
+            <span class="car-step-pin"><Icon name="pin" :size="15" /></span>
+            <span class="car-step-what">
+              <span class="car-step-kicker">{{ placeLine.kicker }}</span>
+              <strong class="car-step-label">{{ placeLine.label }}</strong>
+            </span>
+            <button type="button" class="car-step-change" @click="changePlace">
+              {{ placeLine.action }}
+            </button>
+          </div>
           <!-- Geometry still loading — hold the verdict inside the frame the real
              zone card + slider will fill; never guess a zone to unsay -->
-          <template v-if="!geoResolved">
+          <template v-if="!geoResolved && !asking">
             <div v-if="!user" class="pay-step" aria-busy="true">
               <div class="sk sk-plate" />
             </div>
@@ -272,12 +333,12 @@
               <div class="np-icon"><Icon name="parking" :size="24" /></div>
               <div class="np-text">
                 <p class="np-title">
-                  {{ deskMode ? t("carNoParkingTitle") : t("noParkingTitle") }}
+                  {{ carPoint ? t("carNoParkingTitle") : t("noParkingTitle") }}
                 </p>
                 <p class="np-sub">
-                  {{ deskMode ? t("carNoParkingSub") : t("noParkingSub") }}
+                  {{ carPoint ? t("carNoParkingSub") : t("noParkingSub") }}
                   <strong>~{{ formatDist(nearest!.distanceM) }}</strong>
-                  {{ deskMode ? t("carAwayOn") : t("awayOn") }}
+                  {{ carPoint ? t("carAwayOn") : t("awayOn") }}
                   <span :style="{ color: zoneColor(nearest!.zoneName) }">{{
                     nearest!.zoneName
                   }}</span>
@@ -298,14 +359,14 @@
           </div>
 
           <!-- ═══ PAY SURFACE — one screen: zone → slide; plate is a chip once known ═══ -->
-          <template v-else>
+          <template v-else-if="!asking">
             <!-- First run only: no plate yet — the one moment it deserves the space -->
             <!-- Guests always type the plate in the open — exactly as on the
                  vehicle, capitals and diacritics included; no chip to unfold -->
-            <div v-if="!user && (!deskMode || carPoint)" class="pay-step">
+            <div v-if="!user" class="pay-step">
               <PlateInput v-model="guestPlate" :camera="!deskMode" />
             </div>
-            <div v-else-if="user && !defaultPlate && (!deskMode || carPoint)" class="pay-step">
+            <div v-else-if="user && !defaultPlate" class="pay-step">
               <NuxtLink to="/profile" class="veh-add"
                 >{{ t("addPlate") }} →</NuxtLink
               >
@@ -724,8 +785,9 @@
           ><!-- /pay surface -->
 
           <!-- ═══ BELOW THE FOLD — the sign tools, one scroll past the pay job ═══ -->
-          <!-- On desktop the same search already sits at the top, as "where is the car". -->
-          <div v-if="!deskMode" class="below-section">
+          <!-- Where the place is asked, the same search already sits at the top,
+               as "where is the car". -->
+          <div v-if="!placeAsked" class="below-section">
             <p class="section-label">{{ t("addressTitle") }}</p>
             <p class="addr-sub">{{ t("addressSub") }}</p>
             <AddressZoneSearch
@@ -740,7 +802,7 @@
           <!-- The first-time explainer and the "nearest confirmed sign" card used
                to sit here. The explainer stays reachable from "Druga zona?" → Pitaj
                AI; the sign card could point a kilometre away, at a different street. -->
-          <div v-if="relayPublic && (!deskMode || carPoint)" class="below-section">
+          <div v-if="relayPublic && !asking" class="below-section">
             <!-- Pay for me — the one case the pay surface above cannot serve:
                  a driver whose phone physically cannot send the message. Last
                  of the tools, because for most people here it is not the job. -->
@@ -756,7 +818,7 @@
           <!-- /sign tools -->
 
           <!-- ═══ CITY INFO — reference & reassurance, never urgent ═══ -->
-          <div v-if="!deskMode || carPoint" class="below-section">
+          <div v-if="!asking" class="below-section">
             <!-- Full weekly charging schedule (reference) -->
             <ParkingHours :city-id="detectedCity!.id" class="gps-hours" />
 
@@ -795,7 +857,7 @@
           v-if="showScan"
           :city-id="detectedCity!.id"
           :zones="allZones"
-          :coords="deskMode ? carPoint : coords"
+          :coords="deskMode ? carPoint : coords ?? carPoint"
           :heading="heading"
           :street="nearest?.streetName ?? null"
           :likely-zone-name="likelyZoneName"
@@ -1198,9 +1260,17 @@ onUnmounted(() => {
 // That place stands in for the GPS fix everywhere a zone is worked out — nearest
 // segment, boundary ties, the edge warning — so an address on a zone line still
 // gets the two-zone answer rather than a confident pick.
+//
+// A phone asks the same question when its location failed or was refused: the
+// dashboard opens on the city anyway, with every zone to pick from. And a spot
+// tapped on the map ("Kola su ovde") outranks the phone's own fix, which is where
+// the driver is standing, not necessarily where the car is.
 const deskMode = computed(() => wideLayout.value && finePointer.value);
+const placeAsked = computed(() => deskMode.value || !coords.value);
 const carPoint = ref<{ lat: number; lng: number; accuracy: number; label: string } | null>(null);
-const zoneCoords = computed(() => (deskMode.value ? carPoint.value : coords.value));
+const zoneCoords = computed(
+  () => carPoint.value ?? (deskMode.value ? null : coords.value),
+);
 // The blue dot is only drawn when it means something. On a laptop it is usually
 // tens of metres out, and it reads as "your car is here".
 const LAPTOP_DOT_MAX_M = 50;
@@ -1217,9 +1287,6 @@ const mapCenter = computed(() => {
   const mid = cityCenter(detectedCity.value?.id) ?? { lat: 45.2551, lng: 19.8452 };
   return { ...mid, accuracy: Infinity };
 });
-// Desktop before the car is placed: one question on screen. Sign pins wait too —
-// at city zoom they are a cluster of icons competing with the zones to be clicked.
-const deskAsking = computed(() => deskMode.value && !carPoint.value);
 // On a wide screen the map is already on screen; opening the fullscreen copy
 // would only cover the panel it is meant to sit beside.
 const openMap = () => {
@@ -1259,12 +1326,20 @@ const decideLocation = async () => {
   startDetect();
 };
 
-// Desktop that could not place itself — timed out, denied, no Wi-Fi positioning.
-// Its position would only have chosen the city, so open the city it last used, or
-// the only one we publish, and let the panel ask for the car's street as it does
-// anyway. A city we do not cover keeps its honest "not covered" answer.
+// A device that could not place itself — timed out, denied, no Wi-Fi positioning.
+// On desktop its position would only have chosen the city anyway. On a phone it
+// would have chosen the zone too, and without it the old answer was an error on
+// the marketing page. Either way: open the city it last used, or the only one we
+// publish, and let the panel ask where the car is, with every zone to pick from.
+// A city we do not cover keeps its honest "not covered" answer, and a phone that
+// has a position but no city (somewhere we cannot name) is not moved to ours.
+const fixFailure = ref<"denied" | "failed" | null>(null);
 const openCityWithoutFix = async (found: unknown) => {
-  if (found || !deskMode.value || unsupportedCity.value) return;
+  if (found || unsupportedCity.value) return;
+  if (!deskMode.value) {
+    if (coords.value) return;
+    fixFailure.value = gpsDenied.value ? "denied" : "failed";
+  }
   let id: string | null = null;
   try {
     id = localStorage.getItem(EXPECT_GPS_KEY);
@@ -1277,6 +1352,12 @@ const openCityWithoutFix = async (found: unknown) => {
     if (live.length === 1) id = live[0]!;
   }
   if (id) await setCityWithoutFix(id);
+};
+// The phone's second chance, from inside the dashboard: a timeout is often just a
+// cold GPS. A refusal is not retried; only the browser's settings can undo it.
+const retryLocation = () => {
+  fixFailure.value = null;
+  startDetect();
 };
 const showScan = ref(false); // scan-the-sign modal
 const showAi = ref(false); // ask-AI resolver panel
@@ -1487,7 +1568,7 @@ const claimLevel = computed(() => zoneClaimNow.value?.you.level ?? "none");
 const claimNeighbourLine = computed(() => {
   const c = zoneClaimNow.value;
   if (!c || c.you.level !== "normal" || !c.you.nearestOther) return null;
-  return claimLines(c, zoneLabel, t, { car: deskMode.value }).you;
+  return claimLines(c, zoneLabel, t, { car: !!carPoint.value }).you;
 });
 // Evidence folded into the provenance line rather than given a row of its own —
 // more sources must not cost more screen.
@@ -1650,7 +1731,7 @@ const showUnsureBox = computed(
 const spotNote = computed(() => {
   const c = zoneClaimNow.value;
   if (!c || !unsure.value || claimLevel.value !== "quiet") return null;
-  return claimLines(c, zoneLabel, t, { car: deskMode.value }).spot ?? null;
+  return claimLines(c, zoneLabel, t, { car: !!carPoint.value }).spot ?? null;
 });
 
 // No paid parking where the user stands (with geometry to back it) — the wizard
@@ -1692,8 +1773,8 @@ const activeSuggestedName = computed<string | null>(() => {
       : null;
   }
   // The street-name match comes from the device's own reverse-geocode, which on a
-  // desktop is the laptop's street, not the car's.
-  return deskMode.value ? null : suggestedZoneName.value;
+  // desktop is the laptop's street, and once a car is placed is not the car's.
+  return deskMode.value || carPoint.value ? null : suggestedZoneName.value;
 });
 
 // GPS gives a best guess — never a verdict. The user taps the zone on the sign.
@@ -1820,12 +1901,11 @@ const selectZone = (name: string) => {
 const pickedZonePin = ref<{ lat: number; lng: number; label?: string } | null>(null);
 
 const onPayZone = async (pick: { zone: string; lat: number; lng: number }) => {
-  if (deskMode.value) {
-    // The tapped spot becomes where the car is. Let the zone watch settle on the
-    // new place first, so the explicit pick below is the last word, not undone.
-    carPoint.value = { lat: pick.lat, lng: pick.lng, accuracy: BOUNDARY_FLOOR_M, label: "" };
-    await nextTick();
-  }
+  // The tapped spot becomes where the car is, on a phone as on a laptop: the
+  // button says "Kola su ovde". Let the zone watch settle on the new place first,
+  // so the explicit pick below is the last word, not undone.
+  carPoint.value = { lat: pick.lat, lng: pick.lng, accuracy: BOUNDARY_FLOOR_M, label: "" };
+  await nextTick();
   selectZone(pick.zone);
   pickedZonePin.value = { lat: pick.lat, lng: pick.lng, label: pick.zone };
   mapExpanded.value = false;
@@ -1846,17 +1926,60 @@ const carLabel = computed(
   () => carPoint.value?.label || nearest.value?.streetName || t("carOnMap"),
 );
 const mapPin = computed(() => {
-  if (!deskMode.value) return searchPin.value ?? pickedZonePin.value;
   const c = carPoint.value;
-  return c ? { lat: c.lat, lng: c.lng, label: carLabel.value } : null;
+  if (c) return { lat: c.lat, lng: c.lng, label: carLabel.value };
+  return deskMode.value ? null : searchPin.value ?? pickedZonePin.value;
 });
+
+// Nothing named yet: the device cannot say where the car is, and the driver has
+// not said either (no street, no spot on the map, no zone off the sign). Until
+// then the panel shows the question and nothing that would put a price on it.
+const asking = computed(
+  () => placeAsked.value && !carPoint.value && !userPickedZone.value,
+);
+// Every zone a payment can be made in: the list a driver standing at the car
+// picks from, by the colour and name on the sign.
+const payableZones = computed(() =>
+  allZones.value.filter((z: any) => payActionFor(z).kind !== "none"),
+);
+const askSub = computed(() => {
+  if (deskMode.value) return t("carWhereSub");
+  return fixFailure.value === "denied" ? t("carWhereSubDenied") : t("carWhereSubFailed");
+});
+// Once named, one quiet line says what the answer below is about, with the way
+// back. A phone that has its own fix goes back to it; otherwise back to asking.
+const placeLine = computed(() => {
+  if (carPoint.value)
+    return {
+      kicker: t("carIsAt"),
+      label: carLabel.value,
+      action: placeAsked.value ? t("carChange") : t("useMyLocation"),
+    };
+  if (placeAsked.value && userPickedZone.value && selectedZone.value)
+    return {
+      kicker: t("zonePickedKicker"),
+      label: zoneLabel(selectedZone.value.name),
+      action: t("carChange"),
+    };
+  return null;
+});
+const changePlace = async () => {
+  carPoint.value = null;
+  userPickedZone.value = false;
+  pickedZonePin.value = null;
+  if (placeAsked.value) selectedZoneName.value = null;
+  if (deskMode.value) {
+    await nextTick();
+    focusCarSearch();
+  }
+};
 
 // Follow the likely zone until the user picks; afterwards only repair invalid picks.
 // The zones[0] fallback is only honest AFTER geometry has settled — before that it
 // painted a confident wrong hero that the real verdict then swapped out from under
 // the user. While unresolved, null keeps the wizard on its "checking" line instead.
 watch(
-  [likelyZoneName, allZones, geoResolved, deskMode, carPoint],
+  [likelyZoneName, allZones, geoResolved, placeAsked, carPoint],
   (cur, prev) => {
     // Driving into a different zone — or out of one — is new information, and it
     // retires whatever the user picked earlier. Without this, one tap on the map
@@ -1872,11 +1995,12 @@ watch(
       (z: any) => z.name === selectedZoneName.value
     );
     if (!userPickedZone.value || !valid) {
-      // On desktop with no car placed yet there is no zone to show at all; the
-      // first-zone fallback would put a price on a place nobody has named.
+      // With no place named yet (a laptop, or a phone without a fix) there is no
+      // zone to show at all; the first-zone fallback would put a price on a place
+      // nobody has named.
       selectedZoneName.value =
         likelyZoneName.value ??
-        (geoResolved.value && !deskMode.value ? allZones.value[0]?.name ?? null : null);
+        (geoResolved.value && !placeAsked.value ? allZones.value[0]?.name ?? null : null);
     }
   },
   { immediate: true }
@@ -1885,8 +2009,9 @@ watch(
 // A tapped lead-to-sign point, else the nearest paid segment.
 const leadSignPoint = ref<{ lat: number; lng: number } | null>(null);
 const highlightPoint = computed(() => {
-  // The pointer is a line from the blue dot. On desktop the dot is the laptop.
-  if (deskMode.value) return null;
+  // The pointer is a line from the blue dot. On desktop the dot is the laptop, and
+  // once the car is placed the dot is not the car.
+  if (deskMode.value || carPoint.value) return null;
   if (leadSignPoint.value) return leadSignPoint.value;
   return parkingState.value !== "on"
     ? nearest.value?.point ?? null
@@ -2033,14 +2158,25 @@ const zoneDaily = computed(() => {
       }
     : null;
 });
+// A zone whose every lot sells it (White, in Novi Sad) offers it wherever the car
+// is, including when the zone was picked off the sign with no position at all.
+// Blue sells it only on marked lots, so there it still takes the lot.
+const dailyEverywhere = computed(() => {
+  const name = selectedZone.value?.name;
+  const lots = (zoneBoundaries.value?.features ?? []).filter(
+    (f: any) => f.properties?.zone === name,
+  );
+  return lots.length > 0 && lots.every((f: any) => f.properties?.daily === true);
+});
 // Edge counts as on the lot: within five metres of its line is still that lot.
 const dailyListed = computed(
   () =>
     !!(
       zoneDaily.value &&
-      nearest.value?.daily &&
-      (parkingState.value === "on" || parkingState.value === "edge") &&
-      selectedZone.value?.name === nearest.value.zoneName
+      (dailyEverywhere.value ||
+        (nearest.value?.daily &&
+          (parkingState.value === "on" || parkingState.value === "edge") &&
+          selectedZone.value?.name === nearest.value.zoneName))
     ),
 );
 // Not at a boundary: those candidates carry their own slides, and a daily choice
@@ -3369,6 +3505,33 @@ h2 {
   font-size: 18px;
   line-height: 1;
   color: var(--blue);
+}
+/* The zones as the sign names them: the first answer on a phone without a fix. */
+.car-zones-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+.car-zones {
+  margin-top: 10px;
+}
+/* The map and the location retry: secondary to the list and the street, side by
+   side, in the panel's neutral border rather than the free card's green. */
+.car-ask-more {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+.car-ask-more .np-btn {
+  border-color: var(--border);
+}
+.car-ask-more .np-btn:hover {
+  border-color: var(--border2);
+}
+.car-ask-more .np-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
 /* On the map: the same question, where the eye lands. Not clickable itself. */

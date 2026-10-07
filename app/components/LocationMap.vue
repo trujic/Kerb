@@ -266,7 +266,7 @@ watchEffect((onCleanup) => {
     // silently unclickable.
     if (props.interactive && zoneName)
       layer.bindPopup(
-        zonePopup(zoneName, name, color, residents, () => layer.getPopup()?.getLatLng() ?? null),
+        zonePopup(zoneName, name, color, residents, daily, () => layer.getPopup()?.getLatLng() ?? null),
         { className: 'lm-pop-wrap', closeButton: true },
       )
     layers.push(layer)
@@ -343,7 +343,7 @@ const { lang, t, zoneLabel } = useLang()
  * whenever the layer happened to be built.
  */
 const zonePopup = (
-  zoneName: string, street: string, color: string, residents: boolean,
+  zoneName: string, street: string, color: string, residents: boolean, daily: boolean,
   at: () => { lat: number; lng: number } | null,
 ) => () => {
   const z = props.zoneMeta?.find((m: any) => m?.name === zoneName)
@@ -358,7 +358,11 @@ const zonePopup = (
     `<div class="lm-pop-row"><span class="lm-pop-dot" style="background:${st!.paid ? '#EF4444' : '#16A34A'}"></span>` +
     `<span><strong>${esc(desc.label)}</strong> · ${esc(desc.detail)}</span></div>`)
   if (max) rows.push(`<div class="lm-pop-row">${esc(t('zoneMaxStay', { n: max }))}</div>`)
-  if (z?.daily_amount) rows.push(`<div class="lm-pop-row">${esc(t('zoneDaily', {
+  // Only on the lots that sell it. The zone's record carries the daily price for
+  // all of Blue, but in Novi Sad the ticket is valid in White and on a handful of
+  // marked Blue lots; offering it on any other Blue street sells a ticket that
+  // does not cover the car.
+  if (daily && z?.daily_amount) rows.push(`<div class="lm-pop-row">${esc(t('zoneDaily', {
     amount: formatMoney(Number(z.daily_amount), z.price_currency ?? null),
   }))}</div>`)
   // The checked, bilingual note for this city wins over the registry's prose,
