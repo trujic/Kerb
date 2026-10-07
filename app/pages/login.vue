@@ -2,25 +2,22 @@
   <div class="auth-page">
     <div class="auth-card">
       <NuxtLink to="/" class="auth-logo">Kerb</NuxtLink>
-      <p class="auth-sub">{{ isRegister ? 'Create your account' : 'Sign in to your account' }}</p>
-      <p class="auth-value">
-        Save your plate, keep your session history, and get a heads-up before parking
-        runs out — across every device. Free, no card.
-      </p>
+      <p class="auth-sub">{{ isRegister ? t('loginCreateSub') : t('loginSignInSub') }}</p>
+      <p class="auth-value">{{ t('loginValue') }}</p>
 
       <form class="auth-form" @submit.prevent="handleSubmit">
         <div v-if="isRegister" class="form-group">
-          <label class="form-label">Display name</label>
-          <input v-model="form.displayName" class="form-input" type="text" placeholder="Your name" autocomplete="name" />
+          <label class="form-label">{{ t('loginName') }}</label>
+          <input v-model="form.displayName" class="form-input" type="text" :placeholder="t('loginNamePh')" autocomplete="name" />
         </div>
 
         <div class="form-group">
-          <label class="form-label">Email *</label>
+          <label class="form-label">{{ t('loginEmail') }}</label>
           <input v-model="form.email" class="form-input" type="email" placeholder="you@example.com" required autocomplete="email" />
         </div>
 
         <div class="form-group">
-          <label class="form-label">Password *</label>
+          <label class="form-label">{{ t('loginPassword') }}</label>
           <div class="pw-wrap">
             <input
               v-model="form.password"
@@ -34,9 +31,9 @@
             <button
               type="button"
               class="pw-toggle"
-              :aria-label="showPw ? 'Hide password' : 'Show password'"
+              :aria-label="showPw ? t('loginHideAria') : t('loginShowAria')"
               @click="showPw = !showPw"
-            >{{ showPw ? 'Hide' : 'Show' }}</button>
+            >{{ showPw ? t('loginHide') : t('loginShow') }}</button>
           </div>
         </div>
 
@@ -44,14 +41,14 @@
         <div v-if="successMsg" class="success-banner">{{ successMsg }}</div>
 
         <button type="submit" class="btn-primary submit-btn" :disabled="loading">
-          {{ loading ? 'Please wait...' : isRegister ? 'Create account' : 'Sign in' }}
+          {{ loading ? t('loginWait') : isRegister ? t('loginCreateBtn') : t('loginSignInBtn') }}
         </button>
       </form>
 
       <div class="auth-toggle">
-        {{ isRegister ? 'Already have an account?' : "Don't have an account?" }}
+        {{ isRegister ? t('loginHaveAccount') : t('loginNoAccount') }}
         <button class="toggle-btn" @click="toggleMode">
-          {{ isRegister ? 'Sign in' : 'Create one' }}
+          {{ isRegister ? t('loginSignInBtn') : t('loginCreateOne') }}
         </button>
       </div>
     </div>
@@ -60,6 +57,7 @@
 
 <script setup lang="ts">
 const { signIn, signUp, user } = useAuth()
+const { t } = useLang()
 
 // Redirect if already logged in
 if (user.value) await navigateTo('/')
@@ -85,20 +83,20 @@ const handleSubmit = async () => {
   try {
     if (isRegister.value) {
       await signUp(form.email, form.password, form.displayName)
-      successMsg.value = 'Account created! Check your email to confirm, then sign in.'
+      successMsg.value = t('loginCreated')
       isRegister.value = false
     } else {
       await signIn(form.email, form.password)
       await navigateTo('/')
     }
   } catch (e: any) {
-    authError.value = e?.message ?? 'Something went wrong.'
+    authError.value = e?.message ?? t('loginFailed')
   } finally {
     loading.value = false
   }
 }
 
-useSeoMeta({ title: 'Sign in — Kerb' })
+useSeoMeta({ title: () => `${t('loginTitle')} · Kerb` })
 </script>
 
 <style scoped>

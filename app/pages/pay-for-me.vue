@@ -160,6 +160,11 @@
 </template>
 
 <script setup lang="ts">
+// Paying for someone else is the question put to the parking operator, and the
+// page stays closed until it is answered: reachable by link would mean doing it
+// before asking. Opens with the rest of the relay (runtimeConfig.public.relayPublic).
+if (!useRuntimeConfig().public.relayPublic) throw createError({ statusCode: 404, statusMessage: 'Not found' })
+
 const CITY = 'novi-sad'
 const STORE_KEY = 'kerb_relay_token'
 const WALLET_KEY = 'kerb_wallet_token'

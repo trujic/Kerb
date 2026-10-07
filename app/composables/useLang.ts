@@ -183,6 +183,34 @@ const dict = {
   carAwayOn: { sr: 'dalje —', en: 'away —' },
   // A phone whose location failed or was refused asks the same question, and
   // leads with the zones: a visitor can read the sign, not the street name.
+  // Sign-in page. An account keeps saved plates across devices, and that is all
+  // it promises: session history and expiry reminders were cut from the MVP.
+  loginTitle: { sr: 'Prijava', en: 'Sign in' },
+  loginSignInSub: { sr: 'Prijavi se na svoj nalog', en: 'Sign in to your account' },
+  loginCreateSub: { sr: 'Napravi nalog', en: 'Create your account' },
+  loginValue: {
+    sr: 'Sačuvaj tablice i koristi ih na svakom uređaju. Besplatno, bez kartice.',
+    en: 'Save your plates and use them on every device. Free, no card.',
+  },
+  loginName: { sr: 'Ime', en: 'Display name' },
+  loginNamePh: { sr: 'Tvoje ime', en: 'Your name' },
+  loginEmail: { sr: 'E-adresa *', en: 'Email *' },
+  loginPassword: { sr: 'Lozinka *', en: 'Password *' },
+  loginShow: { sr: 'Prikaži', en: 'Show' },
+  loginHide: { sr: 'Sakrij', en: 'Hide' },
+  loginShowAria: { sr: 'Prikaži lozinku', en: 'Show password' },
+  loginHideAria: { sr: 'Sakrij lozinku', en: 'Hide password' },
+  loginWait: { sr: 'Sačekaj…', en: 'Please wait…' },
+  loginSignInBtn: { sr: 'Prijavi se', en: 'Sign in' },
+  loginCreateBtn: { sr: 'Napravi nalog', en: 'Create account' },
+  loginHaveAccount: { sr: 'Već imaš nalog?', en: 'Already have an account?' },
+  loginNoAccount: { sr: 'Nemaš nalog?', en: "Don't have an account?" },
+  loginCreateOne: { sr: 'Napravi ga', en: 'Create one' },
+  loginCreated: {
+    sr: 'Nalog je napravljen. Potvrdi e-adresu preko poruke koju smo poslali, pa se prijavi.',
+    en: 'Account created. Confirm your email from the message we sent, then sign in.',
+  },
+  loginFailed: { sr: 'Nešto nije u redu. Pokušaj ponovo.', en: 'Something went wrong. Try again.' },
   carWhereSubFailed: {
     sr: 'Lokacija nije stigla, zato izaberi zonu sa table ili upiši ulicu.',
     en: 'Your location did not come through, so pick the zone on the sign or type the street.',
