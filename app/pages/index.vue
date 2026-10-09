@@ -238,7 +238,7 @@
                     :key="zone.id"
                     type="button"
                     class="zone-alt-row"
-                    @click="selectZone(zone.name)"
+                    @click="pickFromSign(zone.name)"
                   >
                     <span class="zone-alt-stripe" :style="{ background: zone.color }" />
                     <span class="zone-alt-name">{{ zoneLabel(zone.name) }}</span>
@@ -1352,6 +1352,9 @@ const openCityWithoutFix = async (found: unknown) => {
     if (live.length === 1) id = live[0]!;
   }
   if (id) await setCityWithoutFix(id);
+  // How often a phone ends up here, and why: the case this whole flow is for.
+  if (!deskMode.value && fixFailure.value)
+    track("Location failed", { city: id ?? "unknown", kind: fixFailure.value });
 };
 // The phone's second chance, from inside the dashboard: a timeout is often just a
 // cold GPS. A refusal is not retried; only the browser's settings can undo it.
@@ -1905,6 +1908,7 @@ const onPayZone = async (pick: { zone: string; lat: number; lng: number }) => {
   // button says "Kola su ovde". Let the zone watch settle on the new place first,
   // so the explicit pick below is the last word, not undone.
   carPoint.value = { lat: pick.lat, lng: pick.lng, accuracy: BOUNDARY_FLOOR_M, label: "" };
+  track("Car placed", { city: detectedCity.value?.id ?? "unknown", kind: "map" });
   await nextTick();
   selectZone(pick.zone);
   pickedZonePin.value = { lat: pick.lat, lng: pick.lng, label: pick.zone };
@@ -1915,6 +1919,12 @@ const onPayZone = async (pick: { zone: string; lat: number; lng: number }) => {
 // geocoder's — a house number lands on the building, not the kerb in front of it.
 const onCarAddress = (hit: any) => {
   carPoint.value = { lat: hit.lat, lng: hit.lng, accuracy: 15, label: hit.label };
+  track("Car placed", { city: detectedCity.value?.id ?? "unknown", kind: "street" });
+};
+// A zone read off the sign, from the list shown when the place is asked.
+const pickFromSign = (name: string) => {
+  track("Zone picked", { city: detectedCity.value?.id ?? "unknown", kind: "list" });
+  selectZone(name);
 };
 // The search is already on screen; "change" just puts the cursor in it.
 const carSearchEl = ref<HTMLElement | null>(null);
@@ -2054,10 +2064,13 @@ const pay = (zone: any) => {
 
   const a = payActionFor(zone, { plate: defaultPlate.value });
   if (a.actionable) {
+    // The daily ticket reaches here as the zone with its daily number swapped in.
+    const daily = !!zone?.daily_target && zone?.sms_shortcode === zone?.daily_target;
     track("SMS opened", {
       city: detectedCity.value?.id ?? "unknown",
       zone: zone?.name ?? "unknown",
       boundary: atBoundary.value,
+      kind: `${zone?.name ?? "unknown"}${daily ? " daily" : ""}`,
     });
     openPayAction(a);
   }

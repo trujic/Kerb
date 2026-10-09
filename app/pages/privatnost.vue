@@ -65,7 +65,7 @@ const sr: Legal = {
     {
       h: 'Merenje posete',
       p: [
-        'Ako je uključeno, koristimo Plausible, alat za merenje posete bez kolačića i bez praćenja pojedinaca. Beležimo samo zbirne brojke, na primer koliko puta je otvoren SMS ili skenirana tabla, bez tvoje lokacije i tablice.',
+        'Brojimo samo zbirne dnevne brojke, na primer koliko puta je prikazana zona, otvoren SMS ili skenirana tabla, po gradu. Ti brojevi se čuvaju kod nas (Supabase) i u njima nema tvoje tablice, lokacije, ulice ni IP adrese; IP adresa se koristi samo trenutno, da bi se sprečilo zloupotrebljavanje brojača, i ne čuva se. Ako je uključeno, iste zbirne brojke šaljemo i alatu Plausible, koji ne koristi kolačiće i ne prati pojedince.',
       ],
     },
     {
@@ -120,7 +120,7 @@ const en: Legal = {
     },
     {
       h: 'Measuring visits',
-      p: ['When enabled, we use Plausible, a cookie-free analytics tool that does not track individuals. We record only totals, such as how often an SMS was opened or a sign scanned, never your location or plate.'],
+      p: ['We count only daily totals, such as how often a zone was shown, an SMS opened or a sign scanned, per city. Those totals are kept by us (Supabase) and hold no plate, location, street or IP address; the IP address is used only in the moment, to stop the counter being abused, and is not stored. When enabled, the same totals also go to Plausible, which uses no cookies and does not track individuals.'],
     },
     {
       h: 'Who receives data',

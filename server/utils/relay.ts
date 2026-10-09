@@ -68,6 +68,16 @@ export const adminUserIds = (): string[] =>
   (process.env.ADMIN_USER_IDS || process.env.RELAY_USER_IDS || '')
     .split(',').map((s) => s.trim()).filter(Boolean)
 
+/** The same check as requireRelay, against the admin list. */
+export const requireAdmin = async (event: H3Event) => {
+  const user = await serverSupabaseUser(event)
+  const id = userIdOf(user)
+  if (!id || !adminUserIds().includes(id)) {
+    throw createError({ statusCode: 403, statusMessage: 'Not an admin' })
+  }
+  return { id }
+}
+
 /** Push to every device of the given accounts. Throws only on misconfiguration
  *  of the push library itself; a dead subscription is pruned, not fatal. */
 export const pushToUsers = async (ids: string[], payload: Record<string, unknown>) => {
