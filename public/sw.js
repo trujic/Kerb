@@ -10,7 +10,9 @@
 // copy — but only when the network genuinely fails, and every offline answer is
 // dated in the UI. Nothing here is served stale while the network works.
 
-const SHELL = 'kerb-shell-v1'
+// v2: pages are kept under their own path. v1 stored every page it saw as '/',
+// so a visit to the privacy page made it the offline home screen.
+const SHELL = 'kerb-shell-v2'
 const DATA = 'kerb-data-v1'
 
 // ── LOCAL ALARMS ──────────────────────────────────────────────────────────────
@@ -98,7 +100,8 @@ self.addEventListener('install', (e) => {
   e.waitUntil((async () => {
     try {
       const cache = await caches.open(SHELL)
-      await cache.add(new Request('/', { cache: 'reload' }))
+      const res = await fetch(new Request('/', { cache: 'reload' }))
+      if (res.ok) await cache.put(pageKey(new URL('/', self.location.href)), res)
     } catch { /* offline at install time; the next online visit will fill it */ }
     await self.skipWaiting()
   })())
@@ -135,9 +138,28 @@ self.addEventListener('message', (e) => {
 })
 
 const isZoneData = (url) => url.pathname.startsWith('/zones/')
+// The one file under /_nuxt/ that is not content-hashed: the app reads it to
+// learn that a newer build exists. Kept from the cache, or it would say "no
+// news" forever.
+const isBuildPointer = (url) => url.pathname === '/_nuxt/builds/latest.json'
+// A prerendered page's data. Its query is the build id, so like a hashed asset a
+// hit is the same bytes for as long as that build's page is cached, and the app
+// does not start without it.
+const isPayload = (url) => url.pathname.endsWith('/_payload.json')
 const isAsset = (url) =>
-  url.pathname.startsWith('/_nuxt/') ||
-  /\.(css|js|woff2?|png|svg|ico|webp|jpg|jpeg)$/.test(url.pathname)
+  !isBuildPointer(url) &&
+  (url.pathname.startsWith('/_nuxt/') ||
+    isPayload(url) ||
+    /\.(css|js|woff2?|png|svg|ico|webp|jpg|jpeg)$/.test(url.pathname))
+
+// How long opening the app waits for the network before it starts from the last
+// good copy. On a connection that is up but delivering nothing, a weak cell or a
+// handover between towers, a fetch neither answers nor fails, and network-first
+// with no limit was a white screen for as long as the browser cared to wait.
+// The copy is only the frame: the page fetches its own data on boot and dates
+// anything it has to show from a stored copy.
+const NAV_TIMEOUT_MS = 3000
+const pageKey = (url) => new Request(url.origin + url.pathname)
 
 // The asset cache below is cache-first, which is only safe because production
 // builds are content-hashed. The dev server breaks both halves of that: its
@@ -159,17 +181,33 @@ self.addEventListener('fetch', (event) => {
   // honestly rather than resolve from a cache the app cannot date.
   if (url.origin !== self.location.origin) return
 
-  // Navigations: network first, falling back to the last good page so the app
-  // opens at all. A cached page still re-fetches its own data on boot.
+  // Navigations: network first, but not forever. With a stored copy of this page
+  // the network gets NAV_TIMEOUT_MS; after that the copy answers, and the fresh
+  // page still lands in the cache for next time. With no copy there is nothing
+  // better than waiting. A failed network falls back to the copy, then to the
+  // home page, so the app opens at all.
   if (req.mode === 'navigate') {
     event.respondWith((async () => {
+      const cache = await caches.open(SHELL)
+      const key = pageKey(url)
+      const network = fetch(req).then(async (res) => {
+        if (res.ok) await cache.put(key, res.clone())
+        return res
+      })
+      event.waitUntil(network.catch(() => {}))
+      const copy = await cache.match(key)
+      if (!copy) {
+        try {
+          return await network
+        } catch {
+          return (await cache.match(pageKey(new URL('/', url)))) || Response.error()
+        }
+      }
+      const late = new Promise((resolve) => setTimeout(() => resolve(null), NAV_TIMEOUT_MS))
       try {
-        const fresh = await fetch(req)
-        ;(await caches.open(SHELL)).put('/', fresh.clone())
-        return fresh
+        return (await Promise.race([network, late])) ?? copy
       } catch {
-        const cache = await caches.open(SHELL)
-        return (await cache.match(req)) || (await cache.match('/')) || Response.error()
+        return copy
       }
     })())
     return

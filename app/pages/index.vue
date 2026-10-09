@@ -2274,31 +2274,99 @@ watch(detectedCity, async (city) => {
   if (!city) return;
   geoResolved.value = false;
   loadingCityDetail.value = true;
-  try {
-    cityDetail.value = await getCity(city.id);
-  } catch {
-    // Offline this throws after Supabase exhausts its retries. Without a catch the
-    // whole handler aborted here and the geometry below never loaded — so the app
-    // knew the city from cache and still showed its marketing page. The cached
-    // zones are picked up by loadZoneGeometry instead.
-    cityDetail.value = null;
-  } finally {
-    loadingCityDetail.value = false;
-  }
 
-  // Load signs + geometry together so the pins and the streets land in the same
-  // paint rather than one after the other.
-  try {
-    const [geo, reports] = await Promise.all([
-      loadZoneGeometry(city.id),
-      loadSignReports(city.id),
-    ]);
-    signReports.value = reports;
-    if (geo) zoneBoundaries.value = geo;
-  } finally {
-    geoResolved.value = true; // a failed fetch must still release the verdict UI
+  // What this phone kept for the city is local and instant. It answers at once
+  // when there is clearly no network, and after KEPT_AFTER_MS when the network is
+  // there but slow, so a weak signal shows a dated answer instead of a skeleton.
+  // The network keeps going either way, and its answer replaces the copy.
+  const kept = await loadCity(city.id);
+  let fresh = false;
+  const showKept = () => {
+    if (fresh || !kept?.geojson?.features?.length) return;
+    // Prices, rules and shortcodes live in Supabase, so they are cached beside the
+    // geometry: a zone name with no price is a worse answer than a dated one.
+    if (!cityDetail.value?.zones?.length && kept.zones?.length)
+      cityDetail.value = { ...(kept.city ?? {}), zones: kept.zones } as any;
+    zoneBoundaries.value = kept.geojson;
+    zonesFromCache.value = true;
+    zonesAsOf.value = kept.fetchedAt;
+    loadingCityDetail.value = false;
+    geoResolved.value = true;
+  };
+  if (surelyOffline()) showKept();
+  const keptTimer = setTimeout(showKept, KEPT_AFTER_MS);
+
+  fresh = await loadFresh(city.id, kept);
+  clearTimeout(keptTimer);
+  if (!fresh) {
+    if (kept?.geojson?.features?.length) showKept();
+    else if (lastGeo) {
+      zoneBoundaries.value = lastGeo;
+      zonesFromCache.value = true;
+      zonesAsOf.value = null; // the service worker's copy, which we never dated
+    }
+    scheduleRefresh(city.id, kept);
   }
+  if (!cityDetail.value?.zones?.length && kept?.zones?.length)
+    cityDetail.value = { ...(kept.city ?? {}), zones: kept.zones } as any;
+  loadingCityDetail.value = false;
+  geoResolved.value = true; // a failed fetch must still release the verdict UI
+
+  // Sign pins are a layer on the map, not part of the answer: they come when they
+  // come, and never hold the zone card back.
+  loadSignReports(city.id)
+    .then((reports) => (signReports.value = reports))
+    .catch(() => {});
   watchLiveZones(city.id);
+});
+
+// The network's answer for a city: the record with its zones, and the geometry.
+// True when fresh geometry landed. A geometry that came back while the phone says
+// it is offline was the service worker's copy, so it is kept aside, not trusted.
+let lastGeo: any = null;
+const loadFresh = async (cityId: string, kept: any): Promise<boolean> => {
+  const [detail, geo] = await Promise.all([
+    surelyOffline() ? null : getCity(cityId, { fast: true }).catch(() => null),
+    fetchZoneGeometry(cityId),
+  ]);
+  if (detectedCity.value?.id !== cityId) return false; // the driver moved on
+  if (detail) cityDetail.value = detail;
+  if (!geo) return false;
+  if (surelyOffline()) {
+    lastGeo = geo.geojson;
+    return false;
+  }
+  zoneBoundaries.value = geo.geojson;
+  zonesFromCache.value = false;
+  zonesAsOf.value = Date.now();
+  saveCity({
+    cityId, geojson: geo.geojson,
+    zones: cityDetail.value?.zones ?? kept?.zones ?? [],
+    city: detectedCity.value, fetchedAt: Date.now(), updatedAt: geo.updatedAt,
+  });
+  return true;
+};
+
+// A copy on screen is a promise to replace it. The network is asked again on a
+// widening interval, and at once when the phone says it is back online.
+const REFRESH_DELAYS_MS = [15_000, 30_000, 60_000, 120_000];
+let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+const scheduleRefresh = (cityId: string, kept: any, attempt = 0) => {
+  if (refreshTimer) clearTimeout(refreshTimer);
+  if (attempt >= REFRESH_DELAYS_MS.length) return;
+  refreshTimer = setTimeout(async () => {
+    if (detectedCity.value?.id !== cityId || !zonesFromCache.value) return;
+    if (!(await loadFresh(cityId, kept))) scheduleRefresh(cityId, kept, attempt + 1);
+  }, REFRESH_DELAYS_MS[attempt]);
+};
+const refreshOnReconnect = () => {
+  const id = detectedCity.value?.id;
+  if (id && zonesFromCache.value) loadFresh(id, null);
+};
+onMounted(() => window.addEventListener("online", refreshOnReconnect));
+onUnmounted(() => {
+  window.removeEventListener("online", refreshOnReconnect);
+  if (refreshTimer) clearTimeout(refreshTimer);
 });
 
 // ── zone geometry: live row first, committed file second ──────────────────────
@@ -2310,63 +2378,38 @@ const db = useSupabaseClient<any>();
 const { online } = useOnlineState();
 const zonesFromCache = ref(false);
 const zonesAsOf = ref<number | null>(null);
+// How long a slow network gets before the kept copy is shown in its place.
+const KEPT_AFTER_MS = 2500;
 
-const loadZoneGeometry = async (cityId: string) => {
+// Fresh geometry: the live row, else the committed file. Null when neither came.
+// Both are bounded (see bootRead): behind them is a copy that is ready now.
+const fetchZoneGeometry = async (
+  cityId: string,
+): Promise<{ geojson: any; updatedAt: string | null } | null> => {
+  if (surelyOffline()) return null;
   let geojson: any = null;
   let updatedAt: string | null = null;
   try {
-    const { data } = await db
+    let query = db
       .from("city_zones")
       .select("geojson, updated_at")
-      .eq("city_id", cityId)
-      .maybeSingle();
+      .eq("city_id", cityId);
+    const signal = bootSignal();
+    if (signal) query = query.abortSignal(signal);
+    const { data } = await query.maybeSingle().retry(false);
     if (data?.geojson?.features?.length) {
       geojson = data.geojson;
       updatedAt = data.updated_at ?? null;
     }
   } catch {
-    // not migrated yet, or offline — fall through
+    // not migrated yet, or no network: fall through to the file
   }
   if (!geojson) {
-    // The service worker answers this from its own copy when the network is
-    // down, so a successful fetch is NOT proof of being online.
-    geojson = await fetch(`/zones/${cityId}.json`)
+    geojson = await fetch(`/zones/${cityId}.json`, { signal: bootSignal() })
       .then((r) => (r.ok ? r.json() : null))
       .catch(() => null);
   }
-
-  const reallyOnline = !import.meta.client || navigator.onLine;
-  if (geojson?.features?.length && reallyOnline) {
-    zonesFromCache.value = false;
-    zonesAsOf.value = Date.now();
-    saveCity({
-      cityId, geojson, zones: cityDetail.value?.zones ?? [],
-      city: detectedCity.value, fetchedAt: Date.now(), updatedAt,
-    });
-    return geojson;
-  }
-
-  // Offline: use what we kept, and remember when we took it.
-  const cached = await loadCity(cityId);
-  if (cached?.geojson?.features?.length) {
-    zonesFromCache.value = true;
-    zonesAsOf.value = cached.fetchedAt;
-    // Prices and shortcodes come from Supabase too, so they are cached with it —
-    // a zone name with no price is a worse answer than a dated one.
-    if (!cityDetail.value?.zones?.length && cached.zones?.length) {
-      // Prices, rules and shortcodes live in Supabase, so they are cached beside
-      // the geometry — a zone name with no price is a worse answer than a dated one.
-      cityDetail.value = {
-        ...(cached.city ?? {}), ...(cityDetail.value ?? {}), zones: cached.zones,
-      } as any;
-    }
-    return cached.geojson;
-  }
-  if (geojson?.features?.length) {
-    zonesFromCache.value = true;
-    zonesAsOf.value = null; // came from the SW copy, which we never dated
-  }
-  return geojson;
+  return geojson?.features?.length ? { geojson, updatedAt } : null;
 };
 
 // An open tab swaps geometry the moment the row changes, so a fix lands on the

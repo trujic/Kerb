@@ -105,7 +105,34 @@ export const useGPS = () => {
     }
   }
 
+  // The street is a label on the first line, nothing more: it follows the answer
+  // when the network allows and is simply absent when it does not.
+  const labelStreet = (latitude: number, longitude: number) => {
+    fetchWithTimeout(
+      `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json&accept-language=en`,
+      { headers: { 'User-Agent': 'Kerb/1.0 (parking guide app)' } },
+      DETECT_TIMEOUT_MS,
+    )
+      .then((r) => r.json())
+      .then((geo) => {
+        const a = geo?.address ?? {}
+        const raw = a.road || a.pedestrian || a.footway || null
+        if (raw) detectedStreet.value = transliterate(raw)
+      })
+      .catch(() => {})
+  }
+
   const detectCityAt = async (latitude: number, longitude: number) => {
+    // A covered city this phone has kept is known from the coordinate alone, and
+    // its stored map is enough to name the zone. Asking a geocoder first made a
+    // returning driver on a weak signal wait up to 12 s on a street name, and
+    // then sent them to an error over it.
+    const known = await cityFromCache(latitude, longitude)
+    if (known) {
+      detectedCity.value = known
+      labelStreet(latitude, longitude)
+      return known
+    }
     try {
       // Reverse geocode with Nominatim (free, no API key)
       const res = await fetchWithTimeout(

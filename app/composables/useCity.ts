@@ -40,11 +40,13 @@ export const useCity = () => {
     return list.filter((c: any) => isLive(c.id))
   }
 
-  // Fetch one city with all related data for the detail page
-  const getCity = async (id: string) => {
+  // Fetch one city with all related data for the detail page. `fast` is for the
+  // first screen: one try, bounded (see bootRead), because a cached copy is
+  // waiting behind it.
+  const getCity = async (id: string, opts: { fast?: boolean } = {}) => {
     const draft = await draftCity(id)
     if (draft) return { ...draft, live: isLive(id) }
-    const { data, error } = await supabase
+    let query = supabase
       .from('cities')
       .select(`
         *,
@@ -56,7 +58,9 @@ export const useCity = () => {
         tags         ( id, label )
       `)
       .eq('id', id)
-      .single()
+    const signal = opts.fast ? bootSignal() : undefined
+    if (signal) query = query.abortSignal(signal)
+    const { data, error } = opts.fast ? await query.single().retry(false) : await query.single()
 
     if (error) throw error
 
